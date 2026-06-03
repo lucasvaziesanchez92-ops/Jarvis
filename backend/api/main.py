@@ -57,16 +57,20 @@ async def lifespan(app: FastAPI):
     # This prevents crashes when LLM provider is unavailable
     logger.info("Graph and TTS will initialize on first request (lazy mode)")
 
-    # Pre-download TTS model in background to avoid Railway 502 timeout
-    import threading
+    # Pre-download TTS model in background — skips if low memory (< 400MB free)
+    import threading, psutil
     def _warm_tts():
         try:
+            mem = psutil.virtual_memory()
+            if mem.available < 400 * 1024 * 1024:
+                logger.info(f"TTS pre-warm skipped: only {mem.available // 1024 // 1024}MB available")
+                return
             from backend.services.tts_service import TextToSpeechService
             svc = TextToSpeechService()
             svc._init_voice()
             logger.info("TTS model pre-warmed successfully")
         except Exception as e:
-            logger.warning(f"TTS pre-warm skipped: {e}")
+            logger.warning(f"TTS pre-warm failed (ok, loads on first request): {e}")
     threading.Thread(target=_warm_tts, daemon=True).start()
 
     yield
