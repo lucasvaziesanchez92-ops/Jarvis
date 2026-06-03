@@ -1,0 +1,7 @@
+[build]
+dockerfilePath = "Dockerfile.backend"
+
+[deploy]
+restartPolicyType = "ALWAYS"
+restartPolicyMaxRetries = 5
+numReplicas = 1
