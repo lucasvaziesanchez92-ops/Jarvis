@@ -10,17 +10,8 @@ from backend.agent.nodes import call_model_with_tools
 from backend.agent.rag_node import retrieval_node
 from backend.tools.semantic_router import ToolRouter
 
-import os
-os.makedirs("data", exist_ok=True)
-try:
-    import sqlite3
-    from langgraph.checkpoint.sqlite import SqliteSaver
-    _conn = sqlite3.connect("data/checkpoints.db", check_same_thread=False)
-    checkpointer = SqliteSaver(_conn)
-except Exception as e:
-    logger.warning(f"No se pudo inicializar SqliteSaver ({e}). Usando InMemorySaver.")
-    from langgraph.checkpoint.memory import InMemorySaver
-    checkpointer = InMemorySaver()
+from langgraph.checkpoint.memory import InMemorySaver
+checkpointer = InMemorySaver()
 
 MAX_TOOL_ITERATIONS = 5
 _router = None
