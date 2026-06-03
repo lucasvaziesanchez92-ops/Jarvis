@@ -84,6 +84,7 @@ pypdf>=5.0.0
 python-docx>=1.1.0
 openpyxl>=3.1.0
 python-magic>=0.4.27
+python-frontmatter>=1.0.0
 
 # Utils
 psutil>=5.9.0
