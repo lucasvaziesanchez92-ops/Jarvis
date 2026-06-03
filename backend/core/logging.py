@@ -8,7 +8,10 @@ from backend.config import settings
 
 # Ensure log directory exists
 LOG_DIR = Path(settings.data_dir) / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except PermissionError:
+    pass  # Railway runtime filesystem, loguru writes to stderr anyway
 
 
 def _fmt_console(record: dict) -> str:
