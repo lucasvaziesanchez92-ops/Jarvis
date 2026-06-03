@@ -49,3 +49,4 @@ python-magic>=0.4.27
 
 python-dotenv>=1.0.0
 huggingface_hub>=0.20.0
+slowapi>=0.1.0
