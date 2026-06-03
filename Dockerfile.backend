@@ -23,10 +23,8 @@ COPY backend/ ./backend/
 COPY main.py knowledge_engine.py librarian.py sync_service.py alembic.ini ./
 COPY web-next/public/models/brain.stl ./data/
 
-RUN mkdir -p /app/data && chown -R 1000:1000 /app/data
-
 RUN addgroup --system app && adduser --system --group app
-RUN mkdir -p /app/data /app/data/logs && chown -R app:app /app/data
+RUN mkdir -p /app/data/logs /app/data/voices /app/data/chroma_wiki /app/data/chroma_db /app/data/sources /app/data/checkpoints && chown -R app:app /app/data
 USER app
 
 EXPOSE 8000
