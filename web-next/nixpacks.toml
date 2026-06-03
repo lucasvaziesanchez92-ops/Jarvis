@@ -1,0 +1,5 @@
+[start]
+cmd = "npx next start --port 8080"
+
+[phases.build]
+copy = ["public/"]

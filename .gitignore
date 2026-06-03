@@ -1,0 +1,134 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.ruff_cache/
+.mypy_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# .env.example stays tracked; .env.production does NOT
+.env.production
+
+# Agent skills registry (generated)
+.atl/
+
+# Data / secrets
+data/
+credentials.json
+token.json
+gcal_token.json
+.secrets.baseline
+client_secret.json
+*.secret.json
+
+# Node
+node_modules/
+web-next/node_modules/
+mobile/node_modules/
+
+# Next.js
+.next/
+web-next/.next/
+web-next/out/
+web-next/tsconfig.tsbuildinfo
+
+# Build artifacts
+*.tsbuildinfo
+
+# Blender / 3D source files
+blender_brain/
+*.stl
+*.obj
+*.blend
+*.fbx
+*.3ds
+*.dae
+*.ply
+
+# Logs
+*.log
+backend_log.txt
+
+# Scripts batch — only keep deploy.sh for Railway
+*.bat
+*.ps1
+!deploy.bat
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Docker
+docker-compose.override.yml
+
+# Alembic __pycache__ only (alembic.ini + migrations are tracked)
+alembic/__pycache__/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temp / junk
+New folder (2)/
+ver_cerebro.py
+temp_*.py
+
+# TypeScript generated
+web-next/next-env.d.ts
+
+# Brain preview HTML (keep GLB, not HTML)
+web-next/public/brain_*.html
+brain_preview.html
+
+# Dev docs (not production code)
+PROJECT_STATUS.md
+web-next/DESIGN_PROMPT.md
+web-next/DESIGN_SPEC.md
+web-next/JARVIS_TODO.md
+web-next/components.json
+web-next/backup/
+
+# Shadcn UI components — generated, track only what you use
+# web-next/src/components/ui/ — already committed, review individually
+
+# Mobile
+mobile/node_modules/
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+
+# Tests — keep test files, ignore cache
+test_agent_actions.py
+test_agent_wiki.py
+test_agent.py
+test_brain_cycle.py
+test_db.py
+test_ollama_direct.py
+test_playwright.py
+test_tools.py
+TEST_CEREBRO.bat
+test_jarvis.bat
+
+# Dev scripts
+check_system.py
+preprocess_stl.py
+_temp_*/

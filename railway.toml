@@ -1,0 +1,35 @@
+[build]
+# Use Nixpacks for auto-detection or Dockerfiles
+builder = "docker"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+numReplicas = 1
+
+# ── Services ──────────────────────────────────────────
+# Backend:  Dockerfile.backend  → Port 8000 → /api/v1/*
+# Frontend: Dockerfile.frontend → Port 3000 → web-next/*
+#
+# Configurar en Railway Dashboard → Service Settings:
+#   Backend:
+#     Root Directory = /
+#     Dockerfile     = Dockerfile.backend
+#     Port           = 8000 (Railway usa PORT env var)
+#     Health Check   = GET /health
+#
+#   Frontend:
+#     Root Directory = /web-next
+#     Dockerfile     = Dockerfile.frontend
+#     Port           = 3000
+#
+# Environment Variables (Railway Dashboard → Variables):
+#   OLLAMA_API_KEY=tu-api-key
+#   OLLAMA_MODEL_ID=minimax-m2.7:cloud
+#   OLLAMA_BASE_URL=https://ollama.cloud/api/chat
+#   GROQ_API_KEY=tu-key
+#   GOOGLE_CLIENT_ID=tu-id
+#   GOOGLE_CLIENT_SECRET=tu-secret
+#   PIPER_MODEL_PATH=data/voices/es_ES-sharvard-medium/es_ES-sharvard-medium.onnx
+#   DATA_DIR=data
+#   NODE_ENV=production

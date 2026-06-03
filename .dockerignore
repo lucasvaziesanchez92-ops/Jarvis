@@ -1,0 +1,77 @@
+# Ignorar secretos y archivos de desarrollo
+.env
+.env.*
+client_secret.json
+*.secret.json
+credentials.json
+token.json
+gcal_token.json
+
+# Git
+.git
+.gitattributes
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.npm/
+.next/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data
+data/
+*.stl
+!web-next/public/models/brain.stl
+
+# Logs
+*.log
+
+# Tests
+test_*.py
+TEST_*.bat
+
+# Temp
+*.tmp
+*.temp
+temp_*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+Dockerfile*
+docker-compose*.yml
+!Dockerfile.backend
+!Dockerfile.frontend
+!docker-compose.yml
+
+# Batch scripts (Windows)
+*.bat
+*.ps1
+!deploy.bat
+
+# Docs (no necesarios en imagen)
+docs/
+PROJECT_*.md
+PRD*.md
+web-next/DESIGN_*.md

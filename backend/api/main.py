@@ -1,0 +1,283 @@
+"""FastAPI application -- Jarvis backend (v2 with production improvements)."""
+import os
+import warnings
+from pathlib import Path
+from contextlib import asynccontextmanager
+
+# Suppress Pydantic V1 compatibility warnings (Python 3.14 + langchain v1)
+warnings.filterwarnings("ignore", message="Core Pydantic V1 functionality", category=UserWarning)
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
+from loguru import logger
+
+from backend.config import settings
+from backend.core.logging import setup_logging
+from backend.core.middleware import RequestIDMiddleware, RequestResponseLoggingMiddleware
+from backend.core.exceptions import (
+    validation_exception_handler,
+    pydantic_validation_exception_handler,
+    generic_exception_handler,
+    http_exception_handler,
+    AppError,
+    app_error_handler,
+)
+from backend.core.rate_limiter import limiter
+from backend.api.routers import chat, notes, todos, calendar, email, threads, messages, agent, diagnostics, search, tts, personas, backup, stt, auth, llm, voice, files, auth_google, gmail, drive, wiki
+
+
+# -- Initialize Structured Logging -------------------------------
+setup_logging()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events."""
+    # Startup
+    logger.info("=" * 60)
+    logger.info("Jarvis API starting up")
+    logger.info(f"LLM Provider: {settings.llm_provider}")
+    logger.info(f"Data Directory: {settings.data_dir}")
+    logger.info(f"LangSmith: {'enabled' if settings.enable_langsmith else 'disabled'}")
+    logger.info("=" * 60)
+
+    # Enable LangSmith observability if configured
+    if settings.enable_langsmith and settings.langsmith_api_key:
+        os.environ["LANGSMITH_TRACING"] = "true"
+        os.environ["LANGSMITH_API_KEY"] = settings.langsmith_api_key
+        os.environ["LANGSMITH_PROJECT"] = "jarvis"
+        logger.info("LangSmith observability enabled")
+
+    # LAZY LOAD: No pre-warm graph at startup anymore
+    # Graph will initialize on first request, not blocking server start
+    # This prevents crashes when LLM provider is unavailable
+    logger.info("Graph and TTS will initialize on first request (lazy mode)")
+
+    # Pre-download TTS model in background to avoid Railway 502 timeout
+    import threading
+    def _warm_tts():
+        try:
+            from backend.services.tts_service import TextToSpeechService
+            svc = TextToSpeechService()
+            svc._init_voice()
+            logger.info("TTS model pre-warmed successfully")
+        except Exception as e:
+            logger.warning(f"TTS pre-warm skipped: {e}")
+    threading.Thread(target=_warm_tts, daemon=True).start()
+
+    yield
+
+    # Shutdown
+    logger.info("Jarvis API shutting down")
+
+
+# -- Application Factory --------------------------------------
+
+app = FastAPI(
+    title="Jarvis API",
+    version="2.0.0",
+    description="Personal AI assistant powered by LangGraph + Local LLM",
+    lifespan=lifespan,
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
+)
+
+# -- Middleware Stack (order matters: last added = first executed) ---
+
+# 1. Response compression (GZip for responses > 1KB)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# 2. CORS — localhost solo en desarrollo, Railway en producción
+import os
+_CORS_ORIGINS = [
+    "https://front-end-production.up.railway.app",
+]
+if os.getenv("NODE_ENV") != "production":
+    _CORS_ORIGINS.insert(0, "http://localhost:3001")
+    _CORS_ORIGINS.insert(0, "http://localhost:3010")
+_CORS_ORIGINS.append("http://localhost:8001")  # OAuth callback local
+if settings.cors_origins and settings.cors_origins != ["*"]:
+    for o in settings.cors_origins:
+        if o not in _CORS_ORIGINS:
+            _CORS_ORIGINS.append(o)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 3. Request ID tracing
+app.add_middleware(RequestIDMiddleware)
+
+# 4. Request/Response logging
+app.add_middleware(RequestResponseLoggingMiddleware)
+
+# -- Exception Handlers ---------------------------------------
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
+
+# Monkey-patch for HTTPException (FastAPI internal)
+from fastapi import HTTPException
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(AppError, app_error_handler)
+
+# -- Rate Limiter State ----------------------------------------
+app.state.limiter = limiter
+
+# Rate limit exceeded handler
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def rate_limit_exceeded_handler(request: Request, exc: Exception):
+    from slowapi.errors import RateLimitExceeded
+    if isinstance(exc, RateLimitExceeded):
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": {
+                    "type": "rate_limit_exceeded",
+                    "message": "Too many requests. Please try again later.",
+                    "retry_after": int(exc.detail.retry_after) if hasattr(exc.detail, 'retry_after') else 60,
+                }
+            },
+        )
+    raise exc
+
+
+# -- Health Checks ---------------------------------------------
+
+@app.get("/api/v1/health")
+async def health():
+    """Basic health check."""
+    return {"status": "ok", "service": "jarvis", "version": "2.0.0"}
+
+
+@app.get("/api/v1/health/ready")
+async def readiness_check():
+    """Readiness check -- is the app ready to serve requests?"""
+    checks = {}
+
+    # Check database
+    try:
+        from backend.storage.sqlite_store import get_store
+        store = get_store()
+        session = store.get_session()
+        session.execute("SELECT 1")
+        session.close()
+        checks["database"] = "healthy"
+    except Exception as e:
+        checks["database"] = f"unhealthy: {str(e)}"
+
+    # Check LLM provider
+    try:
+        from backend.llm import get_llm
+        llm = get_llm()
+        checks["llm_provider"] = f"{settings.llm_provider} (loaded)"
+    except Exception as e:
+        checks["llm_provider"] = f"unhealthy: {str(e)}"
+
+    # Check circuit breakers
+    from backend.core.resilience import get_circuit_breaker_states
+    checks["circuit_breakers"] = get_circuit_breaker_states()
+
+    all_healthy = all(v == "healthy" or "loaded" in str(v) for v in checks.values())
+
+    return {
+        "status": "ready" if all_healthy else "degraded",
+        "checks": checks,
+    }
+
+
+@app.get("/api/v1/health/live")
+async def liveness_check():
+    """Liveness check -- is the process alive?"""
+    return {"status": "alive"}
+
+
+# -- API v1 Routes -------------------------------------------
+
+app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
+app.include_router(agent.router, prefix="/api/v1", tags=["agent"])
+app.include_router(diagnostics.router, prefix="/api/v1", tags=["diagnostics"])
+app.include_router(tts.router, prefix="/api/v1", tags=["tts"])
+app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
+app.include_router(notes.router, prefix="/api/v1/notes", tags=["notes"])
+app.include_router(todos.router, prefix="/api/v1/todos", tags=["todos"])
+app.include_router(calendar.router, prefix="/api/v1/calendar", tags=["calendar"])
+app.include_router(email.router, prefix="/api/v1/emails", tags=["email"])
+app.include_router(threads.router, prefix="/api/v1/threads", tags=["threads"])
+app.include_router(messages.router, prefix="/api/v1/messages", tags=["messages"])
+app.include_router(search.router, prefix="/api/v1", tags=["search"])
+app.include_router(personas.router, prefix="/api/v1", tags=["personas"])
+app.include_router(backup.router, prefix="/api/v1", tags=["backup"])
+app.include_router(stt.router, prefix="/api/v1", tags=["stt"])
+app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
+app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
+
+# File storage (Railway Object Storage bucket)
+app.include_router(files.router, prefix="/api/v1", tags=["files"])
+
+# Google OAuth + Services (Gmail, Drive, Calendar)
+app.include_router(auth_google.router, prefix="/auth", tags=["google-auth"])
+app.include_router(gmail.router, prefix="/api/v1", tags=["gmail"])
+app.include_router(drive.router, prefix="/api/v1", tags=["drive"])
+# Calendar ya existe como router separado
+
+# Wiki / Obsidian Second Brain
+app.include_router(wiki.router, prefix="/api/v1", tags=["wiki"])
+
+
+# -- Legacy Routes (backward compatibility) --------------------
+
+app.include_router(chat.router, tags=["chat (legacy)"])
+app.include_router(agent.router, tags=["agent (legacy)"])
+app.include_router(diagnostics.router, tags=["diagnostics (legacy)"])
+app.include_router(notes.router, prefix="/notes", tags=["notes (legacy)"])
+app.include_router(todos.router, prefix="/todos", tags=["todos (legacy)"])
+app.include_router(calendar.router, prefix="/calendar", tags=["calendar (legacy)"])
+app.include_router(email.router, prefix="/emails", tags=["email (legacy)"])
+app.include_router(threads.router, prefix="/threads", tags=["threads (legacy)"])
+app.include_router(messages.router, prefix="/messages", tags=["messages (legacy)"])
+
+# Legacy health endpoint
+@app.get("/health")
+async def health_legacy():
+    return {"status": "ok", "service": "jarvis"}
+
+
+@app.get("/api/v1/health")
+async def health_v1():
+    return {"status": "ok", "service": "jarvis"}
+
+
+from fastapi.responses import RedirectResponse, FileResponse
+from backend.api.dependencies import get_jarvis_graph
+
+# -- Brain STL served from backend (Nixpacks no copia public/) --
+_brain_stl = Path(__file__).parent.parent.parent / "data" / "brain.stl"
+_brain_html = Path(__file__).parent.parent.parent / "web-next" / "public" / "brain.html"
+
+@app.get("/brain.stl")
+async def brain_stl():
+    if _brain_stl.exists():
+        return FileResponse(str(_brain_stl), media_type="application/octet-stream")
+    return {"status": "error", "detail": "brain.stl not found"}
+
+@app.get("/brain")
+async def brain_page():
+    """Serve the neural brain standalone page if available."""
+    if _brain_html.exists():
+        return FileResponse(str(_brain_html))
+    return {"status": "ok", "service": "jarvis", "note": "Brain page not built"}
+
+@app.get("/")
+async def root_page():
+    """API root -- frontend runs on port 3010."""
+    return {"status": "ok", "service": "jarvis", "note": "Next.js frontend runs on port 3010"}

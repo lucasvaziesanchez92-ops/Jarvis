@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jarvis Debug Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .neon-text { text-shadow: 0 0 10px rgba(0, 245, 255, 0.5); }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 font-sans h-screen flex flex-col">
+
+    <!-- Header / Status -->
+    <header class="p-4 glass flex justify-between items-center shrink-0">
+        <div>
+            <h1 class="text-cyan-400 font-bold tracking-widest neon-text">JARVIS CORE</h1>
+            <p id="status" class="text-[10px] text-slate-500 uppercase tracking-tighter">System Ready</p>
+        </div>
+        <div class="flex gap-2">
+            <div id="brain-indicator" class="w-2 h-2 rounded-full bg-slate-700"></div>
+        </div>
+    </header>
+
+    <!-- Brain Activity Monitor -->
+    <div id="activity-log" class="bg-slate-900/50 p-2 text-[10px] font-mono text-cyan-500/70 border-b border-white/5 h-12 overflow-hidden shrink-0">
+        > Awaiting uplink...
+    </div>
+
+    <!-- Chat Area -->
+    <main id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="bg-slate-900/50 rounded-lg p-3 border border-white/5 max-w-[80%]">
+            <p class="text-sm">Hola. El cerebro de Jarvis está en línea. ¿Qué quieres investigar hoy?</p>
+        </div>
+    </main>
+
+    <!-- Input Area -->
+    <footer class="p-4 glass shrink-0">
+        <div class="flex gap-2">
+            <input type="text" id="user-input" placeholder="Comando de voz o texto..." 
+                class="flex-1 bg-slate-900 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-cyan-500 transition-all">
+            <button id="send-btn" class="bg-cyan-600 hover:bg-cyan-500 w-10 h-10 rounded-full flex items-center justify-center transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                </svg>
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const log = document.getElementById('activity-log');
+
+        function appendMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = role === 'user' ? 'ml-auto bg-cyan-900/30 rounded-lg p-3 border border-cyan-500/20 max-w-[80%]' : 'bg-slate-900/50 rounded-lg p-3 border border-white/5 max-w-[80%]';
+            div.innerHTML = `<p class="text-sm">${text}</p>`;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return div;
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            appendMessage('user', text);
+            userInput.value = '';
+            log.innerText = "> Thinking...";
+
+            // TODO: Integrar con endpoint de streaming real
+            setTimeout(() => {
+                appendMessage('jarvis', "He recibido tu comando. Iniciando investigación en la web y base de conocimiento local...");
+                log.innerText = "> [WIKI] Querying local index...";
+            }, 500);
+        }
+
+        sendBtn.onclick = sendMessage;
+        userInput.onkeypress = (e) => e.key === 'Enter' && sendMessage();
+    </script>
+</body>
+</html>

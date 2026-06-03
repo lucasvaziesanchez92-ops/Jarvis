@@ -1,0 +1,5 @@
+# Binary files - NO CRLF conversion
+*.stl binary
+*.glb binary
+*.obj binary
+*.onnx binary

@@ -1,0 +1,97 @@
+# Core LangGraph + LangChain (pin to existing venv versions)
+langgraph==1.1.2
+langgraph-checkpoint-sqlite>=1.0.0
+langchain-core==1.2.20
+langchain-aws>=1.4.0
+langchain-ollama>=0.2.2
+langchain-openai>=0.2.0
+
+# Web Search (Tavily — optional, falls back to DuckDuckGo)
+langchain-tavily>=0.1.0
+langchain-community>=0.2.0
+
+# AWS SDK (Bedrock)
+boto3>=1.42.0
+botocore>=1.42.0
+
+# Pydantic + settings
+pydantic>=2.10.6
+pydantic-settings>=2.5.0
+
+# FastAPI + server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+websockets>=13.0
+python-multipart>=0.0.12
+httpx>=0.27.0
+
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+
+# Security & Auth
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+slowapi>=0.1.9
+
+# Logging
+loguru>=0.7.2
+structlog>=24.1.0
+
+# Compression & Caching
+brotli>=1.1.0
+fastapi-cache2>=0.2.1
+
+# Retry & Circuit Breaker
+tenacity>=8.2.3
+pybreaker>=1.0.2
+
+# Vector Search (Memory)
+chromadb>=0.4.22
+tiktoken>=0.6.0
+sentence-transformers>=3.0.0
+langchain-huggingface>=0.1.0
+
+# Google APIs (Gmail — Phase 2)
+google-auth>=2.35.0
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.149.0
+
+# MCP (Model Context Protocol — Claude Desktop integration)
+mcp[cli]>=1.0.0
+
+# Observability (LangSmith — optional)
+langsmith>=0.1.0
+
+# Speech (Whisper STT — optional)
+openai-whisper>=20231117
+
+# Scraping (Web Agent)
+playwright>=1.40.0
+beautifulsoup4>=4.12.0
+
+# Speech (TTS)
+piper-tts>=1.0.0
+numpy>=1.26.0
+pydub>=0.25.0
+onnxruntime>=1.20.0
+
+# Speech (STT) — Groq cloud API
+groq>=1.0.0
+
+# File text extraction
+pypdf>=5.0.0
+python-docx>=1.1.0
+openpyxl>=3.1.0
+python-magic>=0.4.27
+
+# Utils
+psutil>=5.9.0
+python-dotenv>=1.0.0
+huggingface_hub>=0.20.0
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+pytest-cov>=4.1.0
+anyio>=4.6.0
+responses>=0.25.0
+locust>=2.20.0

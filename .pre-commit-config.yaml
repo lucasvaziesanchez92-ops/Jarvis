@@ -1,0 +1,48 @@
+repos:
+  # ── Code Formatting ────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.5
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # ── Type Checking ─────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: true
+        args: [--ignore-missing-imports]
+
+  # ── Testing ───────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [tests/phase2/, tests/phase3/, -v, --tb=short]
+
+  # ── Secret Scanning ───────────────────────────────────────
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: "test_.*\\.py"
+
+  # ── Git Hooks ─────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: no-commits-to-main
+        name: No direct commits to main
+        entry: bash -c 'echo "Direct commits to main are not allowed"'
+        language: system
+        fail_fast: true
+        always_run: true

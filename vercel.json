@@ -1,0 +1,18 @@
+# JARVIS Frontend — Vercel Deployment
+{
+  "builds": [
+    {
+      "src": "web-next/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "web-next/$1"
+    }
+  ],
+  "env": {
+    "API_URL": "https://jarvis-ai-production.up.railway.app"
+  }
+}
