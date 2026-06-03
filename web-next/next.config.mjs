@@ -4,9 +4,12 @@
  * En Railway → proxy a backend-production
  */
 const API_BASE =
-  process.env.NODE_ENV === 'production'
+  process.env.API_URL ||
+  process.env.BACKEND_URL ||
+  (process.env.NODE_ENV === 'production'
     ? 'https://backend-production-2522d.up.railway.app'
-    : 'http://localhost:8001'
+    : 'http://localhost:8001')
+
 
 const nextConfig = {
   async rewrites() {

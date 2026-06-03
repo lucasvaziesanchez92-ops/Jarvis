@@ -38,18 +38,21 @@ def _get_client() -> chromadb.PersistentClient:
 def _get_collection() -> chromadb.Collection:
     global _collection
     if _collection is None:
-        from langchain_huggingface import HuggingFaceEmbeddings
-        ef = HuggingFaceEmbeddings(
-            model_name=EMBEDDING_MODEL,
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True},
-        )
+        try:
+            from langchain_huggingface import HuggingFaceEmbeddings
+            ef = HuggingFaceEmbeddings(
+                model_name=EMBEDDING_MODEL,
+                model_kwargs={"device": "cpu"},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+        except Exception as e:
+            logger.warning(f"HuggingFace embeddings failed ({e}), using ChromaDB default")
+            ef = None
         client = _get_client()
-        _collection = client.get_or_create_collection(
-            name="obsidian_notes",
-            embedding_function=ef,
-            metadata={"hnsw:space": "cosine"},
-        )
+        kwargs = {"name": "obsidian_notes", "metadata": {"hnsw:space": "cosine"}}
+        if ef is not None:
+            kwargs["embedding_function"] = ef
+        _collection = client.get_or_create_collection(**kwargs)
     return _collection
 
 

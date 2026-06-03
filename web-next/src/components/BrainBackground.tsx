@@ -84,16 +84,13 @@ function IceBrain() {
   // Remove unused refs
 
   const { activityState, persona } = useJarvisStore()
-  const BACKEND_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8001'
-    : 'https://backend-production-2522d.up.railway.app'
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null)
 
-  /* Load STL — backend or public fallback */
+  /* Load STL — relative proxy path or public fallback */
   useEffect(() => {
     const loader = new STLLoader()
     const urls = [
-      `${BACKEND_BASE}/brain.stl`,
+      '/brain.stl',
       '/models/brain.stl',
     ]
     let idx = 0

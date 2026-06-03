@@ -1,6 +1,9 @@
+[build]
+dockerfilePath = "Dockerfile.backend"
+
 [deploy]
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
+restartPolicyType = "ALWAYS"
+restartPolicyMaxRetries = 5
 numReplicas = 1
 
 # ── Services ──────────────────────────────────────────
