@@ -26,6 +26,7 @@ COPY web-next/public/models/brain.stl ./data/
 RUN mkdir -p /app/data && chown -R 1000:1000 /app/data
 
 RUN addgroup --system app && adduser --system --group app
+RUN mkdir -p /app/data /app/data/logs && chown -R app:app /app/data
 USER app
 
 EXPOSE 8000
