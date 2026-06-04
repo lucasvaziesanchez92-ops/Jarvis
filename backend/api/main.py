@@ -52,16 +52,16 @@ async def lifespan(app: FastAPI):
         os.environ["LANGSMITH_PROJECT"] = "jarvis"
         logger.info("LangSmith observability enabled")
 
-    # Pre-initialize agent graph in background thread
+    # Build agent graph synchronously at startup (Railway healthcheck waits up to 120s)
+    import threading
     def _warm_graph():
         try:
-            from backend.agent.graph import get_graph
-            from backend.tools.registry import ALL_TOOLS
-            g = get_graph(tools=ALL_TOOLS)
-            logger.info(f"Agent graph ready: {len(ALL_TOOLS)} tools")
+            from backend.api.dependencies import build_graph
+            build_graph()
         except Exception as e:
-            logger.warning(f"Graph pre-warm failed: {e}")
+            logger.warning(f"Graph pre-build failed: {e}")
     threading.Thread(target=_warm_graph, daemon=True).start()
+    logger.info("Agent graph pre-building in background...")
 
     # Pre-download TTS model in background — skips if low memory (< 400MB free)
     import psutil

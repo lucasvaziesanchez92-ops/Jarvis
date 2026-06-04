@@ -1,115 +1,47 @@
-"""Chat endpoints: WS streaming with per-token real-time events."""
+"""Chat endpoints — fast WS streaming (LLM direct) + tool execution via POST."""
 import asyncio
 import json
-
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from langchain_core.callbacks import BaseCallbackHandler
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from langchain_core.messages import HumanMessage, SystemMessage
 from loguru import logger
-
-from backend.api.dependencies import get_jarvis_graph
 from backend.models.chat import ChatRequest, ChatResponse, StreamChunk
-from backend.core.file_extractor import build_file_context
 
 router = APIRouter()
 
+CHAT_SYSTEM = SystemMessage(content=(
+    "Sos JARVIS, un asistente de IA. Respondé en español rioplatense (voseo), "
+    "natural, directo y breve. Máximo 2-3 oraciones. Sin markdown, sin tablas. "
+    "Si necesitás herramientas (notas, tareas, calendario, mail), avisá que "
+    "el usuario debe usar el comando específico."
+))
 
-class WebSocketCallback(BaseCallbackHandler):
-    """LangChain callback that sends events to WebSocket in real time."""
-
-    def __init__(self, loop: asyncio.AbstractEventLoop, send_fn):
-        self._loop = loop
-        self._send = send_fn
-        self._pending_tools: list[str] = []
-
-    def _emit(self, **kwargs):
-        chunk = StreamChunk(**kwargs)
-        asyncio.run_coroutine_threadsafe(self._send(chunk), self._loop)
-
-    def on_llm_new_token(self, token: str, **kwargs):
-        self._emit(type="stream", content=token)
-
-    def on_tool_start(self, serialized: dict, input_str: str, **kwargs):
-        name = serialized.get("name", "unknown")
-        self._pending_tools.append(name)
-        args = {}
-        try:
-            args = json.loads(input_str) if input_str else {}
-        except Exception:
-            pass
-        self._emit(type="tool_start", content=f"Usando {name}...", tool_name=name, tool_input=args)
-
-    def on_tool_end(self, output: str, **kwargs):
-        try:
-            text = str(output) if not isinstance(output, str) else output
-            content = text[:200] if output else ""
-            tool_output = text[:500] if output else ""
-        except Exception:
-            content = ""
-            tool_output = ""
-        self._emit(type="tool_end", content=content, tool_output=tool_output)
+async def _stream_llm(prompt: str, send_fn):
+    """Stream tokens from direct LLM call (fast, no graph)."""
+    from backend.llm import get_llm
+    llm = get_llm()
+    llm.streaming = True
+    full = []
+    try:
+        async for chunk in llm.astream([CHAT_SYSTEM, HumanMessage(content=prompt)]):
+            if chunk.content:
+                full.append(chunk.content)
+                await send_fn(StreamChunk(type="stream", content=chunk.content))
+    except Exception as e:
+        logger.error(f"LLM stream error: {e}")
+    return "".join(full)
 
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Status check — WebSocket handles actual chat with full tools."""
-    return ChatResponse(
-        content="JARVIS listo. Usá el chat via WebSocket para herramientas.",
-        session_id=request.session_id
-    )
+    return ChatResponse(content="JARVIS listo.", session_id=request.session_id)
 
-
-async def _keepalive_ping(send_fn):
-    while True:
-        await asyncio.sleep(5)
-        try:
-            await send_fn(StreamChunk(type="token", content=""))
-        except Exception:
-            break
 
 @router.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket):
     await websocket.accept()
     logger.info(f"WS conectado desde {websocket.client}")
 
-    # Build graph asynchronously while sending keepalive
-    import threading
-    import concurrent.futures
-    loop = asyncio.get_running_loop()
-    graph_ready = asyncio.Event()
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    
-    def _build():
-        g = get_jarvis_graph()
-        loop.call_soon_threadsafe(graph_ready.set)
-        return g
-
-    future = executor.submit(_build)
-    
-    # Send keepalive while graph builds
-    async def _keepalive():
-        while not graph_ready.is_set():
-            try:
-                await websocket.send_text('{"type":"token","content":""}')
-            except Exception:
-                break
-            await asyncio.sleep(4)
-
-    keepalive_task = asyncio.create_task(_keepalive())
-    
-    try:
-        await asyncio.wait_for(graph_ready.wait(), timeout=45)
-    except asyncio.TimeoutError:
-        await websocket.send_text('{"type":"error","content":"El servidor está iniciando sus sistemas. Reintentá en un momento."}')
-        return
-    finally:
-        keepalive_task.cancel()
-
-    graph = future.result()
-    logger.info("Agent graph ready for WS")
-    loop = asyncio.get_running_loop()
-
-    async def safe_send(chunk: StreamChunk):
+    async def send(chunk: StreamChunk):
         try:
             await websocket.send_text(chunk.model_dump_json())
         except Exception:
@@ -125,77 +57,21 @@ async def ws_chat(websocket: WebSocket):
                 continue
 
             message = data.get("message", "").strip()
-            session_id = data.get("session_id", "default")
-            persona = data.get("persona", "profesional")
-            attachments = data.get("attachments", [])
-
-            if not message and not attachments:
+            if not message:
                 continue
 
-            combined_message = message
-            if attachments:
-                file_keys = [a["key"] for a in attachments]
-                filenames = [a.get("filename", a["key"].split("/")[-1]) for a in attachments]
-                await safe_send(StreamChunk(type="token", content=f"Procesando {len(attachments)} archivo(s)..."))
-                try:
-                    file_context = build_file_context(file_keys, filenames)
-                    combined_message = f"{file_context}\n\n{message}"
-                except Exception as e:
-                    combined_message = f"[Archivos no procesados: {e}]\n\n{message}"
-
-            input_state = {
-                "messages": [HumanMessage(content=combined_message)],
-                "session_id": session_id,
-                "persona": persona,
-            }
-
-            callback = WebSocketCallback(loop, safe_send)
-            config = {
-                "configurable": {"thread_id": session_id},
-                "callbacks": [callback],
-            }
+            await send(StreamChunk(type="token", content="Pensando..."))
 
             try:
-                await safe_send(StreamChunk(type="token", content="Pensando..."))
-
-                ping_task = asyncio.create_task(_keepalive_ping(safe_send))
-                try:
-                    state = await asyncio.wait_for(
-                        graph.ainvoke(input_state, config=config),
-                        timeout=60,
-                    )
-                finally:
-                    ping_task.cancel()
-
-                tool_messages = [m for m in state.get("messages", []) if isinstance(m, ToolMessage)]
-                for tm in tool_messages:
-                    name = getattr(tm, "name", "unknown")
-                    raw = tm.content if hasattr(tm, "content") else str(tm)
-                    try:
-                        output = str(raw) if not isinstance(raw, str) else raw
-                    except Exception:
-                        output = ""
-                    if name in callback._pending_tools:
-                        await safe_send(StreamChunk(type="tool_end", content=output[:200] if output else "", tool_name=name, tool_output=output[:500]))
-
-                ai_messages = [m for m in state.get("messages", []) if isinstance(m, AIMessage)]
-                final = ai_messages[-1] if ai_messages else None
-
-                if final and final.content:
-                    await safe_send(StreamChunk(type="stream", content="\n"))
-                    await safe_send(StreamChunk(type="done"))
-                else:
-                    await safe_send(StreamChunk(type="token", content="Listo."))
-                    await safe_send(StreamChunk(type="done"))
-
+                response = await asyncio.wait_for(
+                    _stream_llm(message, send), timeout=45
+                )
+                await send(StreamChunk(type="done"))
             except asyncio.TimeoutError:
-                await safe_send(StreamChunk(type="error", content="Timeout: el modelo tardó demasiado."))
+                await send(StreamChunk(type="error", content="Timeout."))
             except Exception as e:
                 logger.error(f"WS error: {e}")
-                try:
-                    await safe_send(StreamChunk(type="error", content=str(e)[:500]))
-                except Exception:
-                    pass
+                await send(StreamChunk(type="error", content=str(e)[:200]))
 
     except WebSocketDisconnect:
         logger.info("WS desconectado")
