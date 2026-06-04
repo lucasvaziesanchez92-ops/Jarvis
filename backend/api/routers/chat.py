@@ -52,23 +52,11 @@ class WebSocketCallback(BaseCallbackHandler):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Fast sync chat — max 512 tokens, 20s timeout (Railway 30s limit)."""
-    import asyncio
-    try:
-        from backend.llm import get_llm
-        from langchain_core.messages import HumanMessage, SystemMessage
-        llm = get_llm()
-        llm.max_tokens = 512
-        messages = [
-            SystemMessage(content="Respondé en español natural, breve (1-2 oraciones). Sin markdown."),
-            HumanMessage(content=request.message),
-        ]
-        response = await asyncio.wait_for(llm.ainvoke(messages), timeout=20)
-        return ChatResponse(content=response.content, session_id=request.session_id)
-    except asyncio.TimeoutError:
-        return ChatResponse(content="Estoy procesando. Reintentá.", session_id=request.session_id)
-    except Exception:
-        return ChatResponse(content="Error temporal. Reintentá.", session_id=request.session_id)
+    """Status check — WebSocket handles actual chat with full tools."""
+    return ChatResponse(
+        content="JARVIS listo. Usá el chat via WebSocket para herramientas.",
+        session_id=request.session_id
+    )
 
 
 async def _keepalive_ping(send_fn):
