@@ -52,13 +52,20 @@ async def lifespan(app: FastAPI):
         os.environ["LANGSMITH_PROJECT"] = "jarvis"
         logger.info("LangSmith observability enabled")
 
-    # LAZY LOAD: No pre-warm graph at startup anymore
-    # Graph will initialize on first request, not blocking server start
-    # This prevents crashes when LLM provider is unavailable
-    logger.info("Graph and TTS will initialize on first request (lazy mode)")
+    # Pre-initialize agent graph to avoid 502 on first chat request
+    import threading
+    def _warm_graph():
+        try:
+            from backend.tools.registry import ALL_TOOLS
+            from backend.agent.graph import get_graph
+            get_graph(tools=ALL_TOOLS)
+            logger.info("Agent graph pre-initialized")
+        except Exception as e:
+            logger.warning(f"Graph pre-init skipped (will init on first request): {e}")
+    threading.Thread(target=_warm_graph, daemon=True).start()
 
     # Pre-download TTS model in background — skips if low memory (< 400MB free)
-    import threading, psutil
+    import psutil
     def _warm_tts():
         try:
             mem = psutil.virtual_memory()

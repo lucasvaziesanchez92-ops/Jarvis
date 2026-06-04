@@ -53,17 +53,23 @@ class WebSocketCallback(BaseCallbackHandler):
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, graph=Depends(get_jarvis_graph)):
     config = {"configurable": {"thread_id": request.session_id or "default"}}
-    state = await graph.ainvoke(
-        {
-            "messages": [HumanMessage(content=request.message)],
-            "user_id": request.user_id,
-            "session_id": request.session_id,
-            "persona": request.persona,
-        },
-        config=config,
-    )
-    ai_message = state["messages"][-1]
-    return ChatResponse(content=ai_message.content, session_id=request.session_id)
+    try:
+        state = await asyncio.wait_for(
+            graph.ainvoke(
+                {
+                    "messages": [HumanMessage(content=request.message)],
+                    "user_id": request.user_id,
+                    "session_id": request.session_id,
+                    "persona": request.persona,
+                },
+                config=config,
+            ),
+            timeout=25,  # Railway free tier 30s proxy timeout
+        )
+        ai_message = state["messages"][-1]
+        return ChatResponse(content=ai_message.content, session_id=request.session_id)
+    except asyncio.TimeoutError:
+        return ChatResponse(content="Procesando tu solicitud. Esperá unos segundos y preguntá de nuevo.", session_id=request.session_id)
 
 
 @router.websocket("/ws/chat")
