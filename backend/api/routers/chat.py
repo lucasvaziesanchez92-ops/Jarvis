@@ -16,11 +16,23 @@ CHAT_SYSTEM = SystemMessage(content=(
 ))
 
 async def _stream_llm(prompt: str, send_fn):
-    """Stream tokens from direct LLM call (fast, no graph)."""
+    """Stream tokens from direct LLM with keepalive pings."""
     from backend.llm import get_llm
     llm = get_llm()
     llm.streaming = True
     full = []
+    running = True
+    
+    async def _ping():
+        while running:
+            await asyncio.sleep(3)
+            if running:
+                try:
+                    await send_fn(StreamChunk(type="token"))
+                except Exception:
+                    break
+    
+    ping_task = asyncio.create_task(_ping())
     try:
         async for chunk in llm.astream([CHAT_SYSTEM, HumanMessage(content=prompt)]):
             if chunk.content:
@@ -28,6 +40,9 @@ async def _stream_llm(prompt: str, send_fn):
                 await send_fn(StreamChunk(type="stream", content=chunk.content))
     except Exception as e:
         logger.error(f"LLM stream error: {e}")
+    finally:
+        running = False
+        ping_task.cancel()
     return "".join(full)
 
 
