@@ -1,25 +1,35 @@
-"""FastAPI dependency — pre-compiled graph at import time to avoid 502 on first request."""
+"""FastAPI dependency — graph pre-built in background, served when ready."""
+import threading
+import time
 from loguru import logger
 
 _jarvis_graph = None
-_ready = False
+_build_started = False
+_build_lock = threading.Lock()
 
-try:
+def _build():
+    global _jarvis_graph
     from backend.agent.graph import get_graph
     from backend.tools.registry import ALL_TOOLS
-    logger.info("Building agent graph at startup...")
     _jarvis_graph = get_graph(tools=ALL_TOOLS)
-    _ready = True
-    logger.info(f"Agent graph ready: {len(ALL_TOOLS)} tools loaded")
-except Exception as e:
-    logger.warning(f"Graph pre-build failed, will retry on first request: {e}")
+    logger.info(f"Agent graph ready: {len(ALL_TOOLS)} tools")
+
+def _start_build():
+    global _build_started
+    with _build_lock:
+        if not _build_started:
+            _build_started = True
+            threading.Thread(target=_build, daemon=True).start()
+            logger.info("Agent graph build started in background")
+
+_start_build()
 
 def get_jarvis_graph():
-    global _jarvis_graph, _ready
-    if _ready and _jarvis_graph is not None:
+    global _jarvis_graph
+    if _jarvis_graph is not None:
         return _jarvis_graph
+    # Build synchronously as fallback (should already be built from background thread)
     from backend.agent.graph import get_graph
     from backend.tools.registry import ALL_TOOLS
     _jarvis_graph = get_graph(tools=ALL_TOOLS)
-    _ready = True
     return _jarvis_graph
