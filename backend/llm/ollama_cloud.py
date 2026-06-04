@@ -15,6 +15,6 @@ def get_llm() -> BaseChatModel:
         base_url=f"{settings.ollama_base_url.rstrip('/')}/v1",
         temperature=0.5,
         streaming=True,
-        max_tokens=4096,
-        timeout=httpx.Timeout(connect=10.0, read=45.0, write=10.0, pool=5.0),
+        max_tokens=512,
+        timeout=httpx.Timeout(connect=8.0, read=25.0, write=8.0, pool=5.0),
     )
