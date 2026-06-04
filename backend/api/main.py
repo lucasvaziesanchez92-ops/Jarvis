@@ -102,12 +102,13 @@ app = FastAPI(
 # 1. Response compression (GZip for responses > 1KB)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# 2. CORS — permissive in production (Railway uses unique domains)
-_CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else []
+# 2. CORS — allow both Railway frontend domains + local dev
+_CORS_ORIGINS = [
+    "https://frontend-production-6465.up.railway.app",
+    "https://front-end-production.up.railway.app",
+]
 if os.getenv("NODE_ENV") != "production":
-    _CORS_ORIGINS += ["http://localhost:3010", "http://localhost:3001"]
-if not _CORS_ORIGINS:
-    _CORS_ORIGINS = ["*"]
+    _CORS_ORIGINS += ["http://localhost:3010", "http://localhost:3001", "http://localhost:8001"]
 
 app.add_middleware(
     CORSMiddleware,
