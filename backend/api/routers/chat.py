@@ -70,8 +70,43 @@ async def _keepalive_ping(send_fn):
 @router.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket):
     await websocket.accept()
-    graph = get_jarvis_graph()  # Get graph AFTER accept to avoid handshake timeout
     logger.info(f"WS conectado desde {websocket.client}")
+
+    # Build graph asynchronously while sending keepalive
+    import threading
+    import concurrent.futures
+    loop = asyncio.get_running_loop()
+    graph_ready = asyncio.Event()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    
+    def _build():
+        g = get_jarvis_graph()
+        loop.call_soon_threadsafe(graph_ready.set)
+        return g
+
+    future = executor.submit(_build)
+    
+    # Send keepalive while graph builds
+    async def _keepalive():
+        while not graph_ready.is_set():
+            try:
+                await websocket.send_text('{"type":"token","content":""}')
+            except Exception:
+                break
+            await asyncio.sleep(4)
+
+    keepalive_task = asyncio.create_task(_keepalive())
+    
+    try:
+        await asyncio.wait_for(graph_ready.wait(), timeout=45)
+    except asyncio.TimeoutError:
+        await websocket.send_text('{"type":"error","content":"El servidor está iniciando sus sistemas. Reintentá en un momento."}')
+        return
+    finally:
+        keepalive_task.cancel()
+
+    graph = future.result()
+    logger.info("Agent graph ready for WS")
     loop = asyncio.get_running_loop()
 
     async def safe_send(chunk: StreamChunk):
