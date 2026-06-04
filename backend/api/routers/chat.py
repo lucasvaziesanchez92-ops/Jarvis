@@ -71,6 +71,14 @@ async def chat(request: ChatRequest):
         return ChatResponse(content="Error temporal. Reintentá.", session_id=request.session_id)
 
 
+async def _keepalive_ping(send_fn):
+    while True:
+        await asyncio.sleep(5)
+        try:
+            await send_fn(StreamChunk(type="token", content=""))
+        except Exception:
+            break
+
 @router.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket, graph=Depends(get_jarvis_graph)):
     await websocket.accept()
@@ -126,25 +134,52 @@ async def ws_chat(websocket: WebSocket, graph=Depends(get_jarvis_graph)):
             try:
                 await safe_send(StreamChunk(type="token", content="Pensando..."))
 
-                async for event in graph.astream_events(input_state, config=config, version="v2"):
-                    kind = event.get("event")
-                    if kind == "on_chat_model_stream":
-                        chunk = event.get("data", {}).get("chunk")
-                        if chunk and hasattr(chunk, "content") and chunk.content:
-                            await safe_send(StreamChunk(type="stream", content=chunk.content))
-                    elif kind == "on_tool_start":
-                        name = event.get("name", "unknown")
-                        await safe_send(StreamChunk(type="tool_start", content=f"Usando {name}...", tool_name=name))
-                    elif kind == "on_tool_end":
-                        output = event.get("data", {}).get("output", "")
-                        try:
-                            text = str(output) if not isinstance(output, str) else output
-                        except Exception:
-                            text = ""
-                        await safe_send(StreamChunk(type="tool_end", content=text[:200], tool_output=text[:500]))
+                # Keepalive ping every 5s to prevent Railway 30s timeout
+                ping_task = asyncio.create_task(_keepalive_ping(safe_send))
 
-                await safe_send(StreamChunk(type="stream", content="\n"))
-                await safe_send(StreamChunk(type="done"))
+                try:
+                    state = await asyncio.wait_for(
+                        graph.ainvoke(input_state, config=config),
+                        timeout=60,
+                    )
+                finally:
+                    ping_task.cancel()
+
+                # Emit tool_end for any tools that didn't fire on_tool_end
+                tool_messages = [m for m in state.get("messages", []) if isinstance(m, ToolMessage)]
+                for tm in tool_messages:
+                    name = getattr(tm, "name", "unknown")
+                    raw = tm.content if hasattr(tm, "content") else str(tm)
+                    try:
+                        output = str(raw) if not isinstance(raw, str) else raw
+                    except Exception:
+                        output = ""
+                    if name in callback._pending_tools:
+                        await safe_send(StreamChunk(
+                            type="tool_end",
+                            content=output[:200] if output else "",
+                            tool_name=name,
+                            tool_output=output[:500],
+                        ))
+
+                ai_messages = [m for m in state.get("messages", []) if isinstance(m, AIMessage)]
+                final = ai_messages[-1] if ai_messages else None
+
+                if final and final.content:
+                    await safe_send(StreamChunk(type="stream", content="\n"))
+                    await safe_send(StreamChunk(type="done"))
+                else:
+                    await safe_send(StreamChunk(type="token", content="Listo."))
+                    await safe_send(StreamChunk(type="done"))
+
+            except asyncio.TimeoutError:
+                await safe_send(StreamChunk(type="error", content="Timeout: el modelo tardó demasiado."))
+            except Exception as e:
+                logger.error(f"WS error: {e}")
+                try:
+                    await safe_send(StreamChunk(type="error", content=str(e)[:500]))
+                except Exception:
+                    pass
 
     except WebSocketDisconnect:
         logger.info("WS desconectado")
