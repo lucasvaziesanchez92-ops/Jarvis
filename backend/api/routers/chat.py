@@ -51,37 +51,23 @@ class WebSocketCallback(BaseCallbackHandler):
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, graph=Depends(get_jarvis_graph)):
-    """Fast sync chat — uses graph only if already ready, else quick LLM fallback."""
+async def chat(request: ChatRequest):
+    """Fast sync chat — uses direct LLM without tools (WebSocket handles full agent)."""
     import asyncio
-    from backend.api.dependencies import wait_graph_ready
-    
-    if not wait_graph_ready(timeout=2):
-        # Graph not ready yet — use fast lightweight response
-        try:
-            from backend.llm import get_llm
-            from langchain_core.messages import HumanMessage
-            llm = get_llm()
-            response = await asyncio.wait_for(
-                llm.ainvoke([HumanMessage(content=request.message)]), timeout=15
-            )
-            return ChatResponse(content=response.content, session_id=request.session_id)
-        except (asyncio.TimeoutError, Exception):
-            return ChatResponse(content="Estoy iniciando mis sistemas. Probá de nuevo en 20 segundos.", session_id=request.session_id)
-    
-    config = {"configurable": {"thread_id": request.session_id or "default"}}
     try:
-        state = await asyncio.wait_for(
-            graph.ainvoke(
-                {"messages": [HumanMessage(content=request.message)], "session_id": request.session_id, "persona": request.persona},
-                config=config,
-            ),
-            timeout=20,
-        )
-        ai_message = state["messages"][-1]
-        return ChatResponse(content=ai_message.content, session_id=request.session_id)
+        from backend.llm import get_llm
+        from langchain_core.messages import HumanMessage, SystemMessage
+        llm = get_llm()
+        messages = [
+            SystemMessage(content="Respondé en español natural, breve, una sola oración. No uses markdown."),
+            HumanMessage(content=request.message),
+        ]
+        response = await asyncio.wait_for(llm.ainvoke(messages), timeout=18)
+        return ChatResponse(content=response.content, session_id=request.session_id)
     except asyncio.TimeoutError:
-        return ChatResponse(content="Procesando tu solicitud. Probá de nuevo en un momento.", session_id=request.session_id)
+        return ChatResponse(content="El modelo está procesando. Probá de nuevo en unos segundos.", session_id=request.session_id)
+    except Exception as e:
+        return ChatResponse(content=f"Lo siento, tuve un problema. ¿Podés intentar de nuevo?", session_id=request.session_id)
 
 
 @router.websocket("/ws/chat")
