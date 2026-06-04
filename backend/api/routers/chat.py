@@ -68,8 +68,9 @@ async def _keepalive_ping(send_fn):
             break
 
 @router.websocket("/ws/chat")
-async def ws_chat(websocket: WebSocket, graph=Depends(get_jarvis_graph)):
+async def ws_chat(websocket: WebSocket):
     await websocket.accept()
+    graph = get_jarvis_graph()  # Get graph AFTER accept to avoid handshake timeout
     logger.info(f"WS conectado desde {websocket.client}")
     loop = asyncio.get_running_loop()
 
@@ -122,9 +123,7 @@ async def ws_chat(websocket: WebSocket, graph=Depends(get_jarvis_graph)):
             try:
                 await safe_send(StreamChunk(type="token", content="Pensando..."))
 
-                # Keepalive ping every 5s to prevent Railway 30s timeout
                 ping_task = asyncio.create_task(_keepalive_ping(safe_send))
-
                 try:
                     state = await asyncio.wait_for(
                         graph.ainvoke(input_state, config=config),
@@ -133,7 +132,6 @@ async def ws_chat(websocket: WebSocket, graph=Depends(get_jarvis_graph)):
                 finally:
                     ping_task.cancel()
 
-                # Emit tool_end for any tools that didn't fire on_tool_end
                 tool_messages = [m for m in state.get("messages", []) if isinstance(m, ToolMessage)]
                 for tm in tool_messages:
                     name = getattr(tm, "name", "unknown")
@@ -143,12 +141,7 @@ async def ws_chat(websocket: WebSocket, graph=Depends(get_jarvis_graph)):
                     except Exception:
                         output = ""
                     if name in callback._pending_tools:
-                        await safe_send(StreamChunk(
-                            type="tool_end",
-                            content=output[:200] if output else "",
-                            tool_name=name,
-                            tool_output=output[:500],
-                        ))
+                        await safe_send(StreamChunk(type="tool_end", content=output[:200] if output else "", tool_name=name, tool_output=output[:500]))
 
                 ai_messages = [m for m in state.get("messages", []) if isinstance(m, AIMessage)]
                 final = ai_messages[-1] if ai_messages else None
