@@ -15,9 +15,9 @@ RUN pip install --no-cache-dir \
     langchain-core==1.3.2 \
     langchain-ollama==1.0.1 \
     langchain-openai==1.1.11 \
-    langchain-chroma==0.2.0 \
-    langchain-text-splitters==0.3.0 \
-    langchain-huggingface==0.2.0 \
+    langchain-chroma==1.1.0 \
+    langchain-text-splitters==1.1.1 \
+    langchain-huggingface==1.2.1 \
     groq==1.0.0
 
 COPY requirements.railway.txt requirements.txt
@@ -26,6 +26,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY main.py knowledge_engine.py librarian.py sync_service.py alembic.ini ./
 COPY web-next/public/models/brain.stl ./data/
+
+# client_secret.json is gitignored and not in the repo.
+# Railway deploys use GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars as fallback.
+# Ensure the data dir exists for the app
+RUN mkdir -p /app/data && chown -R app:app /app/data
 
 RUN addgroup --system app && adduser --system --group app
 RUN mkdir -p /app/data/logs /app/data/voices /app/data/chroma_wiki /app/data/chroma_db /app/data/sources /app/data/checkpoints && chown -R app:app /app/data
