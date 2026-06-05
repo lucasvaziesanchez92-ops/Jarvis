@@ -1,22 +1,25 @@
-"""Google Calendar service — list, create, update, delete events."""
+"""Google Calendar service — list, create, update, delete events with auto-refresh."""
 from datetime import datetime, timezone
 from typing import Optional
 
-from backend.services.google_auth import GoogleAuthService, get_refresh_token
+from backend.services.google_auth import (
+    GoogleAuthService, GoogleNotConfiguredError,
+    get_token_pair, save_tokens, get_refresh_token, _ensure_config,
+)
 
 DEFAULT_USER = "default_user"
 
 
 def _get_calendar_service(user_id: str = DEFAULT_USER):
-    token = get_refresh_token(user_id)
-    if not token:
+    _ensure_config()
+    refresh_token, access_token, expires_at = get_token_pair(user_id)
+    if not refresh_token:
         raise RuntimeError("Google no está conectado. Hacé login en Google primero.")
-    creds = GoogleAuthService.get_credentials(token)
+    creds = GoogleAuthService.get_credentials(refresh_token, access_token, expires_at)
     return GoogleAuthService.build_calendar(creds)
 
 
 def list_events(max_results: int = 20, time_min: Optional[str] = None, time_max: Optional[str] = None, query: str = "", user_id: str = DEFAULT_USER) -> list[dict]:
-    """List upcoming calendar events."""
     service = _get_calendar_service(user_id)
     now = datetime.now(timezone.utc).isoformat()
     params = {
@@ -48,7 +51,6 @@ def list_events(max_results: int = 20, time_min: Optional[str] = None, time_max:
 
 
 def create_event(summary: str, start_time: str, end_time: str, description: str = "", location: str = "", attendees: list[str] | None = None, user_id: str = DEFAULT_USER) -> dict:
-    """Create a calendar event."""
     service = _get_calendar_service(user_id)
     event_body = {
         "summary": summary,
@@ -65,7 +67,6 @@ def create_event(summary: str, start_time: str, end_time: str, description: str 
 
 
 def update_event(event_id: str, summary: str | None = None, start_time: str | None = None, end_time: str | None = None, description: str | None = None, user_id: str = DEFAULT_USER) -> dict:
-    """Update an existing calendar event."""
     service = _get_calendar_service(user_id)
     event = service.events().get(calendarId="primary", eventId=event_id).execute()
     if summary:
@@ -81,7 +82,6 @@ def update_event(event_id: str, summary: str | None = None, start_time: str | No
 
 
 def delete_event(event_id: str, user_id: str = DEFAULT_USER) -> dict:
-    """Delete a calendar event."""
     service = _get_calendar_service(user_id)
     service.events().delete(calendarId="primary", eventId=event_id, sendUpdates="all").execute()
     return {"id": event_id, "status": "deleted"}

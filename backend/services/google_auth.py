@@ -1,4 +1,4 @@
-"""Google OAuth 2.0 service — con PKCE (code verifier/challenge)."""
+"""Google OAuth 2.0 service — con PKCE + auto-refresh de tokens."""
 import base64
 import hashlib
 import json
@@ -6,6 +6,7 @@ import os
 import secrets
 import sqlite3
 import urllib.parse
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -30,10 +31,33 @@ SCOPES = [
 def _get_client_config() -> dict:
     global _client_config_cache
     if _client_config_cache is None:
-        if not CLIENT_SECRET_FILE.exists():
-            raise FileNotFoundError(f"client_secret.json not found at {CLIENT_SECRET_FILE}")
-        _client_config_cache = json.loads(CLIENT_SECRET_FILE.read_text())["web"]
+        if CLIENT_SECRET_FILE.exists():
+            _client_config_cache = json.loads(CLIENT_SECRET_FILE.read_text())["web"]
+        else:
+            client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+            client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
+            if client_id and client_secret:
+                _client_config_cache = {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "auth_uri": os.getenv("GOOGLE_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+                    "token_uri": os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+                }
+            else:
+                _client_config_cache = {}
     return _client_config_cache
+
+
+class GoogleNotConfiguredError(RuntimeError):
+    """Raised when Google APIs are not configured — callers should return 503."""
+    pass
+
+
+def _ensure_config():
+    if not _get_client_config():
+        raise GoogleNotConfiguredError(
+            "Google APIs no están configuradas. Falta client_secret.json o las variables GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET."
+        )
 
 
 def _generate_pkce() -> tuple[str, str]:
@@ -99,28 +123,33 @@ class GoogleAuthService:
             raise ValueError(body.get("error_description", body["error"]))
 
         return {
-            "token": body["access_token"],
+            "access_token": body["access_token"],
             "refresh_token": body.get("refresh_token", ""),
+            "expires_at": (
+                datetime.now(timezone.utc).timestamp() + body.get("expires_in", 3600)
+                if "expires_in" in body else None
+            ),
             "token_uri": self.token_uri,
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
             "scopes": body.get("scope", "").split(),
-            "expiry": None,
         }
 
     @staticmethod
-    def get_credentials(refresh_token: str) -> Credentials:
+    def get_credentials(refresh_token: str, access_token: str | None = None, expires_at: float | None = None) -> Credentials:
         config = _get_client_config()
         creds = Credentials(
-            token=None,
+            token=access_token,
             refresh_token=refresh_token,
             token_uri="https://oauth2.googleapis.com/token",
             client_id=config["client_id"],
             client_secret=config["client_secret"],
             scopes=SCOPES,
         )
-        if creds.expired and creds.refresh_token:
+        if expires_at:
+            creds.expiry = datetime.fromtimestamp(expires_at, tz=timezone.utc)
+        if not creds.valid and creds.refresh_token:
+            logger.info("Refrescando access token...")
             creds.refresh(google.auth.transport.requests.Request())
+            _update_access_token_in_db(refresh_token, creds.token, creds.expiry.timestamp())
         return creds
 
     @staticmethod
@@ -145,27 +174,53 @@ def _get_auth_conn():
     db_path = _get_auth_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS tokens (
             user_id TEXT PRIMARY KEY,
             refresh_token TEXT NOT NULL,
+            access_token TEXT,
             email TEXT,
+            expires_at REAL,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         )
     """)
+    try:
+        conn.execute("ALTER TABLE tokens ADD COLUMN access_token TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE tokens ADD COLUMN expires_at REAL")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     return conn
 
 
-def save_tokens(user_id: str, refresh_token: str, email: str = ""):
+def save_tokens(user_id: str, refresh_token: str, email: str = "", access_token: str = "", expires_at: float = 0):
     conn = _get_auth_conn()
     conn.execute(
-        "INSERT OR REPLACE INTO tokens (user_id, refresh_token, email, updated_at) VALUES (?, ?, ?, datetime('now'))",
-        (user_id, refresh_token, email),
+        """INSERT OR REPLACE INTO tokens
+           (user_id, refresh_token, access_token, email, expires_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, datetime('now'))""",
+        (user_id, refresh_token, access_token, email, expires_at),
     )
     conn.commit()
     conn.close()
+
+
+def _update_access_token_in_db(refresh_token: str, new_access_token: str, new_expires_at: float):
+    conn = _get_auth_conn()
+    conn.execute(
+        "UPDATE tokens SET access_token = ?, expires_at = ?, updated_at = datetime('now') WHERE refresh_token = ?",
+        (new_access_token, new_expires_at, refresh_token),
+    )
+    conn.commit()
+    conn.close()
+    logger.info("Access token actualizado en DB")
 
 
 def get_refresh_token(user_id: str) -> Optional[str]:
@@ -173,6 +228,17 @@ def get_refresh_token(user_id: str) -> Optional[str]:
     row = conn.execute("SELECT refresh_token FROM tokens WHERE user_id = ?", (user_id,)).fetchone()
     conn.close()
     return row[0] if row else None
+
+
+def get_token_pair(user_id: str) -> tuple[str | None, str | None, float | None]:
+    conn = _get_auth_conn()
+    row = conn.execute(
+        "SELECT refresh_token, access_token, expires_at FROM tokens WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    conn.close()
+    if row:
+        return row[0], row[1], row[2]
+    return None, None, None
 
 
 def get_user_info(user_id: str) -> Optional[dict]:

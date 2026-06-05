@@ -23,7 +23,7 @@ async def google_login(request: Request):
 
 @router.get("/callback")
 async def google_callback(code: str = Query(...), state: str = Query(None), request: Request = None):
-    svc = GoogleAuthService(redirect_uri=_get_redirect_uri(request) if request else "https://backend-production-2522d.up.railway.app/auth/google/callback")
+    svc = GoogleAuthService(redirect_uri=_get_redirect_uri(request) if request else "https://backend-production-cabf.up.railway.app/auth/google/callback")
     try:
         tokens = svc.exchange_code(code, state=state)
     except Exception as e:
@@ -35,7 +35,7 @@ async def google_callback(code: str = Query(...), state: str = Query(None), requ
     save_tokens(user_id, tokens["refresh_token"], email)
     logger.info(f"Google OAuth connected for {email}")
 
-    frontend_url = "https://front-end-production.up.railway.app"
+    frontend_url = "https://frontend-production-6465.up.railway.app"
     if request and "localhost" in str(request.url):
         frontend_url = "http://localhost:3010"
     return RedirectResponse(url=f"{frontend_url}/settings?google=connected")

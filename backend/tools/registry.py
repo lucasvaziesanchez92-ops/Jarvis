@@ -6,9 +6,6 @@ from backend.tools.notes import create_note, list_notes, get_note, update_note, 
 # Todos CRUD (FULL)
 from backend.tools.todos import create_todo, list_todos, complete_todo, update_todo, delete_todo
 
-# Calendar
-from backend.tools.calendar import list_calendar_events, create_calendar_event, update_calendar_event, delete_calendar_event
-
 # Email
 from backend.tools.email import search_emails, send_email, list_emails
 
@@ -25,7 +22,10 @@ from backend.tools.memory import search_memory, save_memory, list_memories, dele
 try:
     from backend.tools.google_suite import (
         search_gmail, send_gmail, list_gmail,
-        search_drive, list_drive_files,
+        search_drive, list_drive_files, list_drive_folder,
+        read_drive_file, get_drive_file_info,
+        upload_drive_file, delete_drive_file,
+        analyze_drive_image,
         list_calendar_google, create_calendar_event_google,
     )
     _GOOGLE_SUITE_AVAILABLE = True
@@ -36,6 +36,12 @@ except Exception:
     list_gmail = None          # type: ignore
     search_drive = None        # type: ignore
     list_drive_files = None    # type: ignore
+    list_drive_folder = None   # type: ignore
+    read_drive_file = None     # type: ignore
+    get_drive_file_info = None # type: ignore
+    upload_drive_file = None   # type: ignore
+    delete_drive_file = None   # type: ignore
+    analyze_drive_image = None # type: ignore
     list_calendar_google = None              # type: ignore
     create_calendar_event_google = None      # type: ignore
 
@@ -92,13 +98,15 @@ if _SEMANTIC_AVAILABLE:
 if _GOOGLE_SUITE_AVAILABLE:
     CORE_TOOLS += [
         list_gmail, search_gmail, send_gmail,
-        search_drive, list_drive_files,
+        search_drive, list_drive_files, list_drive_folder,
+        read_drive_file, get_drive_file_info,
+        upload_drive_file, delete_drive_file,
+        analyze_drive_image,
         list_calendar_google, create_calendar_event_google,
     ]
 
-# ── Extended tools — calendar + email (legacy, kept for compatibility) ──
+# ── Extended tools — email (legacy, kept for compatibility) + memory ──
 EXTENDED_TOOLS = [
-    list_calendar_events, create_calendar_event, update_calendar_event, delete_calendar_event,
     search_emails, send_email, list_emails,
     search_memory, save_memory, list_memories, delete_memory,
 ]

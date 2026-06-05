@@ -17,6 +17,16 @@ def extract_text_from_file(object_key: str, filename_hint: Optional[str] = None)
     """Descarga un archivo del bucket/local y extrae su texto plano."""
     data = download_bytes(object_key)
     filename = filename_hint or object_key.split("/")[-1]
+    return _dispatch_extract(data, filename)
+
+
+def extract_text_from_bytes(data: bytes, filename: str) -> str:
+    """Extrae texto plano directamente de bytes (sin depender de object storage)."""
+    return _dispatch_extract(data, filename)
+
+
+def _dispatch_extract(data: bytes, filename: str) -> str:
+    """Route extraction based on file extension."""
     ext = filename.split(".")[-1].lower() if "." in filename else ""
 
     if len(data) > MAX_FILE_BYTES:

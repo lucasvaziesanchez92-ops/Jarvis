@@ -42,6 +42,36 @@ ALLOWED_EXTENSIONS = {
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
+_MAGIC_SIGNATURES = {
+    # Extension -> [(offset, bytes_hex), ...]
+    ".pdf":  [(0, "25504446")],
+    ".png":  [(0, "89504e47")],
+    ".jpg":  [(0, "ffd8")],
+    ".jpeg": [(0, "ffd8")],
+    ".gif":  [(0, "47494638")],
+    ".webp": [(0, "52494646")],  # RIFF container, weak check
+    ".mp3":  [(0, "fffb"), (0, "fff3"), (0, "fffa"), (0, "494433")],  # MP3 or ID3
+    ".wav":  [(0, "52494646")],
+    ".mp4":  [(4, "66747970")],
+    ".mov":  [(4, "66747970")],
+    ".webm": [(0, "1a45dfa3")],
+    ".docx": [(0, "504b0304")],
+    ".xlsx": [(0, "504b0304")],
+    ".ods":  [(0, "504b0304")],
+}
+
+
+def _validate_magic_bytes(data: bytes, ext: str) -> bool:
+    """Check file magic bytes match expected extension. Returns True if valid or unknown ext."""
+    signatures = _MAGIC_SIGNATURES.get(ext)
+    if not signatures:
+        return True
+    for offset, expected_hex in signatures:
+        end = offset + len(expected_hex) // 2
+        if len(data) >= end and data[offset:end].hex() == expected_hex:
+            return True
+    return False
+
 
 def _generate_key(filename: str, folder: Optional[str] = None) -> str:
     """Generate a unique S3 object key."""
@@ -59,8 +89,9 @@ async def upload_file(
     generate_url: bool = Form(True),
 ):
     """Upload a file to Railway Object Storage bucket."""
-    # Validate extension
-    ext = ("." + file.filename.split(".")[-1]).lower() if file.filename and "." in file.filename else ""
+    # Validate extension + check magic bytes
+    filename = file.filename or "unnamed"
+    ext = ("." + filename.split(".")[-1]).lower() if "." in filename else ""
     if ext and ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"Tipo de archivo no permitido: {ext}. Tipos permitidos: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
 
@@ -68,8 +99,10 @@ async def upload_file(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(400, f"File too large. Max: {MAX_FILE_SIZE / 1024 / 1024}MB")
 
-    # Generate key
-    key = _generate_key(file.filename or "unnamed", folder)
+    if not _validate_magic_bytes(content, ext):
+        raise HTTPException(400, f"El contenido del archivo no coincide con la extensión {ext}. Rechazado por seguridad.")
+
+    key = _generate_key(filename, folder)
 
     # Upload
     try:
@@ -92,11 +125,17 @@ async def upload_file(
     return response
 
 
+def _sanitize_key(key: str) -> str:
+    sanitized = key.replace("\\", "/")
+    parts = [p for p in sanitized.split("/") if p and p not in (".", "..")]
+    return "/".join(parts)
+
+
 @router.get("/download/{key:path}")
 async def download_file_endpoint(key: str):
     """Download a file from the bucket by key."""
     try:
-        data = download_bytes(key)
+        data = download_bytes(_sanitize_key(key))
     except Exception:
         raise HTTPException(404, "File not found")
 
@@ -129,7 +168,7 @@ async def list_bucket_files(
 async def delete_file_endpoint(key: str):
     """Delete a file from the bucket."""
     try:
-        delete_file(key)
+        delete_file(_sanitize_key(key))
     except Exception:
         raise HTTPException(404, "File not found or could not delete")
 

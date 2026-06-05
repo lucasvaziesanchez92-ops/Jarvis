@@ -76,6 +76,7 @@ export interface JarvisStore {
   previousScreen: AppScreen | null
   panelMode: PanelMode
   panelExpanded: boolean         // Panel completo vs minimizado
+  brainMode: string
 
   /* ── Audio / Voice ── */
   micActive: boolean             // Micrófono grabando
@@ -105,8 +106,13 @@ export interface JarvisStore {
   /* ── Backend Health ── */
   backendStatus: 'disconnected' | 'connecting' | 'connected' | 'error'
 
+  /* ── Google Auth ── */
+  googleConnected: boolean | null
+  googleEmail: string | null
+
   /* ── Actions ── */
   setActivityState: (s: ActivityState) => void
+  setBrainMode: (mode: string) => void
   setPanelMode: (m: PanelMode) => void
   setScreen: (s: AppScreen) => void
   goBack: () => void
@@ -143,6 +149,9 @@ export interface JarvisStore {
 
   setBackendStatus: (s: 'disconnected' | 'connecting' | 'connected' | 'error') => void
 
+  setGoogleConnected: (connected: boolean, email?: string) => void
+  checkGoogleAuth: (apiBase: string) => Promise<void>
+
   reset: () => void
 }
 
@@ -164,6 +173,7 @@ export const useJarvisStore = create<JarvisStore>()(
   previousScreen: null,
   panelMode: 'chat',
   panelExpanded: true,
+  brainMode: 'hologram',
 
   micActive: false,
   voiceEnabled: false,
@@ -184,6 +194,9 @@ export const useJarvisStore = create<JarvisStore>()(
   lastUserText: '',
 
   backendStatus: 'disconnected',
+
+  googleConnected: null,
+  googleEmail: null,
 
   /* actions */
   setActivityState: (activityState) => {
@@ -212,6 +225,7 @@ export const useJarvisStore = create<JarvisStore>()(
 
   togglePanelExpanded: () => set((s) => ({ panelExpanded: !s.panelExpanded })),
   setPanelExpanded: (panelExpanded) => set({ panelExpanded }),
+  setBrainMode: (brainMode) => set({ brainMode }),
 
   setMicActive: (micActive) => set({ micActive }),
   setVoiceEnabled: (voiceEnabled) => set({ voiceEnabled }),
@@ -310,6 +324,17 @@ export const useJarvisStore = create<JarvisStore>()(
 
   setBackendStatus: (backendStatus) => set({ backendStatus }),
 
+  setGoogleConnected: (googleConnected, googleEmail = null) => set({ googleConnected, googleEmail }),
+  checkGoogleAuth: async (apiBase: string) => {
+    try {
+      const res = await fetch(`${apiBase}/auth/google/status`)
+      const data = await res.json()
+      set({ googleConnected: data.connected ?? false, googleEmail: data.email || null })
+    } catch {
+      set({ googleConnected: false, googleEmail: null })
+    }
+  },
+
   reset: () => set({
     activityState: 'idle',
     panelMode: 'chat',
@@ -323,6 +348,7 @@ export const useJarvisStore = create<JarvisStore>()(
     chatMessages: [],
     chatInput: '',
     chatSessionId: makeId(),
+    brainMode: 'hologram',
   }),
 }),
 {
@@ -334,6 +360,7 @@ export const useJarvisStore = create<JarvisStore>()(
     persona: state.persona,
     chatSessionId: state.chatSessionId,
     voiceEnabled: state.voiceEnabled,
+    brainMode: state.brainMode,
     // chatMessages se persiste solo en chatHistory (no en cada token de streaming)
   }),
 }

@@ -15,7 +15,8 @@ except PermissionError:
 
 
 def _fmt_console(record: dict) -> str:
-    """Custom formatter that safely handles missing request_id."""
+    """Custom formatter that safely handles missing request_id, JSON in messages, and angle brackets in function names."""
+    import re
     extra = record.get("extra", {})
     if hasattr(extra, "get"):
         rid = extra.get("request_id", "N/A")
@@ -23,13 +24,20 @@ def _fmt_console(record: dict) -> str:
         rid = "N/A"
     time_str = record["time"].strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
     level_name = record["level"].name if hasattr(record["level"], "name") else str(record["level"])
-    return (
-        f"<green>{time_str}</green> | "
-        f"<level>{level_name: <8}</level> | "
-        f"<cyan>{rid: <36}</cyan> | "
-        f"<bold>{record['name']}:{record['function']}:{record['line']}</bold> - "
-        f"<level>{record['message']}</level>\n"
-    )
+    raw_msg = str(record["message"])
+    safe_msg = raw_msg.replace("{", "{{").replace("}", "}}")
+    func_name = str(record.get("function", "?")).replace("<", r"\<").replace(">", r"\>")
+    mod_name = str(record.get("name", "N/A"))
+    try:
+        return (
+            f"<green>{time_str}</green> | "
+            f"<level>{level_name: <8}</level> | "
+            f"<cyan>{rid: <36}</cyan> | "
+            f"<bold>{mod_name}:{func_name}:{record['line']}</bold> - "
+            f"<level>{safe_msg}</level>\n"
+        )
+    except Exception:
+        return f"<green>{time_str}</green> | <level>{level_name: <8}</level> | {raw_msg[:500]}\n"
 
 
 def setup_logging() -> None:

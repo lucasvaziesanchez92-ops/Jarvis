@@ -47,7 +47,14 @@ MEMORY_TOOLS = ["search_memory", "save_memory", "list_memories", "delete_memory"
 SEARCH_TOOLS = ["web_search", "search_notes_semantic", "search_wiki_semantic", "search_all_knowledge"]
 CALENDAR_TOOLS = ["list_calendar_events", "create_calendar_event", "update_calendar_event", "delete_calendar_event"]
 EMAIL_TOOLS = ["search_emails", "send_email", "list_emails"]
-GOOGLE_TOOLS = ["list_gmail", "search_gmail", "send_gmail", "search_drive", "list_drive_files", "list_calendar_google", "create_calendar_event_google"]
+GOOGLE_TOOLS = [
+    "list_gmail", "search_gmail", "send_gmail",
+    "search_drive", "list_drive_files", "list_drive_folder",
+    "read_drive_file", "get_drive_file_info",
+    "upload_drive_file", "delete_drive_file",
+    "analyze_drive_image",
+    "list_calendar_google", "create_calendar_event_google",
+]
 
 ALL_ALLOWED = NOTES_TOOLS + TODOS_TOOLS + WIKI_TOOLS + TIME_TOOLS + MEMORY_TOOLS + SEARCH_TOOLS + CALENDAR_TOOLS + EMAIL_TOOLS + GOOGLE_TOOLS
 

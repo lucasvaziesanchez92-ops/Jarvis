@@ -12,6 +12,39 @@ from backend.config import settings
 from backend.storage.models import Base, NoteModel, TodoModel, ThreadModel, MessageModel
 
 
+# -- SQLAlchemy engine with WAL mode --------------------------------
+from sqlalchemy import event
+
+_engine: "sqlalchemy.engine.Engine | None" = None
+
+def _enable_wal(dbapi_connection, connection_record):
+    """Enable WAL mode on every new SQLite connection to allow concurrent reads+write."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA synchronous=NORMAL;")
+    cursor.execute("PRAGMA busy_timeout=5000;")
+    cursor.close()
+
+import sqlalchemy
+
+def get_engine(db_path: str) -> sqlalchemy.engine.Engine:
+    """Create or reuse a WAL-enabled SQLAlchemy engine."""
+    global _engine
+    if _engine is None:
+        _engine = create_engine(
+            f"sqlite:///{db_path}",
+            echo=False,
+            poolclass=QueuePool,
+            pool_size=10,
+            max_overflow=20,
+            pool_timeout=30,
+            pool_recycle=3600,
+            connect_args={"check_same_thread": False},
+        )
+        event.listen(_engine, "connect", _enable_wal)
+    return _engine
+
+
 class SqliteStore:
     """SQLite-based storage using SQLAlchemy with connection pooling."""
 
@@ -21,17 +54,7 @@ class SqliteStore:
             data_dir.mkdir(parents=True, exist_ok=True)
             db_path = str(data_dir / "jarvis.db")
 
-        # Connection pool configuration
-        self.engine = create_engine(
-            f"sqlite:///{db_path}",
-            echo=False,
-            poolclass=QueuePool,
-            pool_size=10,  # Max persistent connections
-            max_overflow=20,  # Extra connections under load
-            pool_timeout=30,  # Seconds to wait for connection
-            pool_recycle=3600,  # Recycle connections after 1 hour
-            connect_args={"check_same_thread": False},  # Required for SQLite
-        )
+        self.engine = get_engine(db_path)
 
         # Create tables if they don't exist
         Base.metadata.create_all(self.engine)

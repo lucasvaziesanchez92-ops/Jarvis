@@ -70,7 +70,8 @@ async def _chat_with_agent(transcript: str, session_id: str = "") -> tuple[str, 
     except asyncio.TimeoutError:
         return "Me tardé demasiado procesando eso. ¿Podés repetirlo más breve?", False
     except Exception as e:
-        logger.warning(f"Agent falló, usando fallback directo: {e}")
+        error_msg = str(e)[:200]
+        logger.warning("Agent graph falló en voice, usando fallback directo: {}", error_msg)
         return await _chat_direct_fallback(transcript), False
 
     ai_msgs = [m for m in state.get("messages", []) if hasattr(m, "type") and m.type == "ai"]

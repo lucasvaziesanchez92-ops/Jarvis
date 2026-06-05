@@ -5,9 +5,10 @@ import dynamic from 'next/dynamic'
 import { useJarvisStore } from '@/store/jarvisStore'
 import { 
   Mic, Zap, MessageCircle, BrainCircuit, Moon, AlertTriangle, 
-  FolderOpen, StickyNote, CheckSquare, Settings, Sparkles, Mail, Calendar, BookOpen
+  FolderOpen, StickyNote, CheckSquare, Settings, Sparkles, Mail, Calendar, BookOpen, LogIn, Loader2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { API_BASE } from '@/lib/api'
 
 /* ── Lazy-load panels + brain + bubble + voice ───────────────── */
 const BrainBackground = dynamic(() => import('@/components/BrainBackground'), { ssr: false })
@@ -180,16 +181,70 @@ function UnifiedBottomNavbar() {
   )
 }
 
+/* ── Welcome / Google Auth Screen ──────────────────────────── */
+function WelcomeScreen() {
+  const { googleConnected, checkGoogleAuth } = useJarvisStore()
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    checkGoogleAuth(API_BASE).finally(() => setChecking(false))
+  }, [])
+
+  if (checking) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[#040408]">
+        <Loader2 className="h-10 w-10 animate-spin text-cyan-400/60" />
+        <p className="text-xs text-white/20 tracking-widest">INITIALIZING NEURAL CORE</p>
+      </div>
+    )
+  }
+
+  if (googleConnected) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 p-8 bg-[#040408]">
+      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 flex items-center justify-center shadow-[0_0_60px_rgba(68,204,221,0.15)]">
+        <BrainCircuit className="h-10 w-10 text-cyan-400" />
+      </div>
+      <div className="text-center space-y-3 max-w-sm">
+        <h1 className="text-2xl font-black tracking-[0.25em] text-white/90" style={{ textShadow: '0 0 35px rgba(68,204,221,0.25)' }}>JARVIS</h1>
+        <p className="text-sm text-white/50 leading-relaxed">
+          Tu asistente personal con Gmail, Drive, Calendar, notas, tareas y búsqueda semántica.
+        </p>
+        <p className="text-xs text-white/25">Conectá tu cuenta de Google para empezar.</p>
+      </div>
+      <a
+        href={`${API_BASE}/auth/google/login`}
+        className="inline-flex items-center gap-3 px-8 py-3 bg-white text-black font-bold rounded-2xl text-sm hover:bg-white/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_30px_rgba(255,255,255,0.1)]"
+      >
+        <LogIn className="h-4 w-4" /> Conectar con Google
+      </a>
+      <p className="text-[10px] text-white/15 mt-2">
+        Gmail · Drive · Calendar · Todo en uno
+      </p>
+    </div>
+  )
+}
+
 /* ══════════════════════════════════════════════════════════════
    ROOT PAGE — CINEMATIC JARVIS (ADAPTIVE VIEWPORT)
    A fully unified iOS/macOS responsive application.
-══════════════════════════════════════════════════════════════ */
+╚══════════════════════════════════════════════════════════════ */
 export default function RootPage() {
-  const { currentScreen } = useJarvisStore()
+  const { currentScreen, googleConnected, checkGoogleAuth } = useJarvisStore()
   const activeScreen = currentScreen === 'home' ? 'home' : currentScreen
+
+  useEffect(() => {
+    checkGoogleAuth(API_BASE)
+  }, [])
+
+  const showApp = googleConnected === true
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#040408] text-white">
+      {/* Google Auth Gate — blocks everything until connected */}
+      {googleConnected !== true && <WelcomeScreen />}
+
       {/* 1. 3D Brain full screen background (Always active in z-0) */}
       <BrainBackground />
       
@@ -199,7 +254,7 @@ export default function RootPage() {
       )}
 
       {/* 3. Floating Status Badge */}
-      <StatusIndicator />
+      {showApp && <StatusIndicator />}
 
       {/* 4. Thinking Bubble status block */}
       <ThinkingBubble />
@@ -223,7 +278,7 @@ export default function RootPage() {
       )}
 
       {/* 6. Single Unified Floating Bottom Navbar */}
-      <UnifiedBottomNavbar />
+      {showApp && <UnifiedBottomNavbar />}
     </div>
   )
 }

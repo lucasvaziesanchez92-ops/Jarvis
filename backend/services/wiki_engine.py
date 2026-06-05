@@ -118,13 +118,13 @@ def index_vault(vault_path: str = VAULT_PATH) -> dict:
             documents.append(chunk)
             metadatas.append({
                 "filepath": str(fpath),
-                "filename": fpath.name,
-                "title": title,
-                "tags": ", ".join(tags),
-                "links": ", ".join(links),
-                "created": created,
-                "chunk_index": i,
-                "chunk_total": len(chunks),
+                "filename": str(fpath.name),
+                "title": str(title),
+                "tags": ", ".join(str(t) for t in tags),
+                "links": ", ".join(str(l) for l in links),
+                "created": str(created),
+                "chunk_index": str(i),
+                "chunk_total": str(len(chunks)),
             })
             indexed_chunks += 1
 

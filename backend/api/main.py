@@ -137,22 +137,29 @@ app.state.limiter = limiter
 
 # Rate limit exceeded handler
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
-@app.exception_handler(Exception)
-async def rate_limit_exceeded_handler(request: Request, exc: Exception):
-    from slowapi.errors import RateLimitExceeded
-    if isinstance(exc, RateLimitExceeded):
-        return JSONResponse(
-            status_code=429,
-            content={
-                "error": {
-                    "type": "rate_limit_exceeded",
-                    "message": "Too many requests. Please try again later.",
-                    "retry_after": int(exc.detail.retry_after) if hasattr(exc.detail, 'retry_after') else 60,
-                }
-            },
-        )
-    raise exc
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": {
+                "type": "rate_limit_exceeded",
+                "message": "Too many requests. Please try again later.",
+                "retry_after": int(exc.detail.retry_after) if hasattr(exc.detail, 'retry_after') else 60,
+            }
+        },
+    )
+
+from backend.services.google_auth import GoogleNotConfiguredError
+
+@app.exception_handler(GoogleNotConfiguredError)
+async def google_not_configured_handler(request: Request, exc: GoogleNotConfiguredError):
+    return JSONResponse(
+        status_code=503,
+        content={"error": {"type": "google_not_configured", "message": str(exc)}},
+    )
 
 
 # -- Health Checks ---------------------------------------------

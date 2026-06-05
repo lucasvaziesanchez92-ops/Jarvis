@@ -1,26 +1,27 @@
-"""Gmail API service — send, search, list emails."""
+"""Gmail API service — send, search, list emails with auto-refresh."""
 import base64
 from email.mime.text import MIMEText
-from typing import Optional
 
-from google.oauth2.credentials import Credentials
 from loguru import logger
 
-from backend.services.google_auth import GoogleAuthService, get_refresh_token
+from backend.services.google_auth import (
+    GoogleAuthService, GoogleNotConfiguredError,
+    get_token_pair, save_tokens, get_refresh_token, _ensure_config,
+)
 
 DEFAULT_USER = "default_user"
 
 
 def _get_gmail_service(user_id: str = DEFAULT_USER):
-    token = get_refresh_token(user_id)
-    if not token:
+    _ensure_config()
+    refresh_token, access_token, expires_at = get_token_pair(user_id)
+    if not refresh_token:
         raise RuntimeError("Google no está conectado. Hacé login en Google primero.")
-    creds = GoogleAuthService.get_credentials(token)
+    creds = GoogleAuthService.get_credentials(refresh_token, access_token, expires_at)
     return GoogleAuthService.build_gmail(creds)
 
 
 def list_emails(max_results: int = 10, query: str = "", user_id: str = DEFAULT_USER) -> list[dict]:
-    """List recent emails from inbox."""
     service = _get_gmail_service(user_id)
     results = service.users().messages().list(userId="me", maxResults=max_results, q=query).execute()
     messages = results.get("messages", [])
@@ -40,12 +41,10 @@ def list_emails(max_results: int = 10, query: str = "", user_id: str = DEFAULT_U
 
 
 def search_emails(query: str, max_results: int = 20, user_id: str = DEFAULT_USER) -> list[dict]:
-    """Search emails by query using Gmail's search syntax."""
     return list_emails(max_results=max_results, query=query, user_id=user_id)
 
 
 def get_email(email_id: str, user_id: str = DEFAULT_USER) -> dict:
-    """Get full email content by ID."""
     service = _get_gmail_service(user_id)
     detail = service.users().messages().get(userId="me", id=email_id, format="full").execute()
     headers = {h["name"]: h["value"] for h in detail["payload"]["headers"]}
@@ -68,7 +67,6 @@ def get_email(email_id: str, user_id: str = DEFAULT_USER) -> dict:
 
 
 def send_email(to: str, subject: str, body: str, user_id: str = DEFAULT_USER) -> dict:
-    """Send an email via Gmail API."""
     service = _get_gmail_service(user_id)
     message = MIMEText(body)
     message["to"] = to

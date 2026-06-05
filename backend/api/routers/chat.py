@@ -40,9 +40,11 @@ class WebSocketCallback(BaseCallbackHandler):
         self._emit(type="tool_end", content=text[:200], tool_output=text[:500])
 
 
-async def _keepalive(send_fn):
-    while True:
+async def _keepalive(send_fn, connected_ref):
+    while connected_ref[0]:
         await asyncio.sleep(3)
+        if not connected_ref[0]:
+            break
         try:
             await send_fn(StreamChunk(type="token"))
         except Exception:
@@ -58,13 +60,16 @@ async def chat(request: ChatRequest):
 async def ws_chat(websocket: WebSocket):
     await websocket.accept()
     logger.info(f"WS conectado desde {websocket.client}")
+    connected = [True]
     loop = asyncio.get_running_loop()
 
     async def send(chunk: StreamChunk):
+        if not connected[0]:
+            return
         try:
             await websocket.send_text(chunk.model_dump_json())
         except Exception:
-            pass
+            connected[0] = False
 
     try:
         while True:
@@ -79,11 +84,24 @@ async def ws_chat(websocket: WebSocket):
             session_id = data.get("session_id", "default")
             persona = data.get("persona", "profesional")
 
-            if not message:
+            # Accept both 'attachments' (object array from frontend) and 'file_keys' (raw)
+            attachments = data.get("attachments") or []
+            file_keys = data.get("file_keys") or [a.get("key") or a.get("url", "") for a in attachments if isinstance(a, dict)]
+            filenames = data.get("filenames") or [a.get("name", "") for a in attachments if isinstance(a, dict)]
+
+            if not message and not file_keys:
                 continue
 
+            full_message = message
+            if file_keys:
+                try:
+                    ctx = build_file_context(file_keys, filenames)
+                    full_message = f"{ctx}\n\n{message}" if message else ctx
+                except Exception as e:
+                    logger.warning(f"build_file_context failed: {e}")
+
             input_state = {
-                "messages": [HumanMessage(content=message)],
+                "messages": [HumanMessage(content=full_message)],
                 "session_id": session_id,
                 "persona": persona,
             }
@@ -98,7 +116,7 @@ async def ws_chat(websocket: WebSocket):
                 await send(StreamChunk(type="token", content="Pensando..."))
 
                 graph = get_jarvis_graph()
-                ping = asyncio.create_task(_keepalive(send))
+                ping = asyncio.create_task(_keepalive(send, connected))
 
                 try:
                     state = await asyncio.wait_for(
@@ -129,3 +147,5 @@ async def ws_chat(websocket: WebSocket):
         logger.info("WS desconectado")
     except Exception as e:
         logger.error(f"WS fatal: {e}")
+    finally:
+        connected[0] = False
