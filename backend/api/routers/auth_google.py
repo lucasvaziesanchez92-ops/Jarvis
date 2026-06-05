@@ -38,7 +38,7 @@ async def google_callback(code: str = Query(...), state: str = Query(None), requ
     frontend_url = "https://frontend-production-6465.up.railway.app"
     if request and "localhost" in str(request.url):
         frontend_url = "http://localhost:3010"
-    return RedirectResponse(url=f"{frontend_url}/settings?google=connected")
+    return RedirectResponse(url=frontend_url)
 
 
 @router.get("/status")
