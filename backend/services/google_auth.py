@@ -70,7 +70,41 @@ def _generate_pkce() -> tuple[str, str]:
     return code_verifier, code_challenge
 
 
-_pkce_store: dict[str, str] = {}
+def _get_pkce_conn():
+    db_path = _get_auth_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pkce_store (
+            state TEXT PRIMARY KEY,
+            code_verifier TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.commit()
+    return conn
+
+
+def _save_pkce(state: str, code_verifier: str):
+    conn = _get_pkce_conn()
+    conn.execute("INSERT OR REPLACE INTO pkce_store (state, code_verifier, created_at) VALUES (?, ?, datetime('now'))", (state, code_verifier))
+    conn.commit()
+    conn.close()
+
+
+def _pop_pkce(state: str) -> str | None:
+    conn = _get_pkce_conn()
+    row = conn.execute("SELECT code_verifier FROM pkce_store WHERE state = ?", (state,)).fetchone()
+    if row:
+        conn.execute("DELETE FROM pkce_store WHERE state = ?", (state,))
+        conn.commit()
+        conn.close()
+        return row[0]
+    conn.close()
+    return None
 
 
 class GoogleAuthService:
@@ -85,7 +119,7 @@ class GoogleAuthService:
     def get_auth_url(self) -> tuple[str, str]:
         code_verifier, code_challenge = _generate_pkce()
         state = secrets.token_urlsafe(16)
-        _pkce_store[state] = code_verifier
+        _save_pkce(state, code_verifier)
 
         params = {
             "client_id": self.client_id,
@@ -105,7 +139,7 @@ class GoogleAuthService:
     def exchange_code(self, code: str, state: str | None = None) -> dict:
         code_verifier = None
         if state:
-            code_verifier = _pkce_store.pop(state, None)
+            code_verifier = _pop_pkce(state)
 
         data: dict = {
             "client_id": self.client_id,
