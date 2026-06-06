@@ -27,7 +27,7 @@ from backend.core.exceptions import (
     app_error_handler,
 )
 from backend.core.rate_limiter import limiter
-from backend.api.routers import chat, notes, todos, calendar, email, threads, messages, agent, diagnostics, search, tts, personas, backup, stt, auth, llm, voice, files, auth_google, gmail, drive, wiki
+from backend.api.routers import chat, notes, todos, calendar, email, threads, messages, agent, diagnostics, search, tts, personas, backup, stt, auth, llm, voice, files, auth_google, gmail, drive, wiki, chat_smoke
 
 
 # -- Initialize Structured Logging -------------------------------
@@ -209,6 +209,7 @@ async def liveness_check():
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(agent.router, prefix="/api/v1", tags=["agent"])
 app.include_router(diagnostics.router, prefix="/api/v1", tags=["diagnostics"])
+app.include_router(chat_smoke.router, prefix="/api/v1", tags=["diagnostics"])
 app.include_router(tts.router, prefix="/api/v1", tags=["tts"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(notes.router, prefix="/api/v1/notes", tags=["notes"])
