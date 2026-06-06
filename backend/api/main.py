@@ -94,6 +94,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
+    redirect_slashes=False,
 )
 
 # -- Middleware Stack (order matters: last added = first executed) ---

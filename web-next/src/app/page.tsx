@@ -215,6 +215,7 @@ function WelcomeScreen() {
       </div>
       <a
         href={`${API_BASE}/auth/google/login`}
+        target="_self"
         className="inline-flex items-center gap-3 px-8 py-3 bg-white text-black font-bold rounded-2xl text-sm hover:bg-white/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_30px_rgba(255,255,255,0.1)]"
       >
         <LogIn className="h-4 w-4" /> Conectar con Google
@@ -242,43 +243,48 @@ export default function RootPage() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#040408] text-white">
-      {/* Google Auth Gate — blocks everything until connected */}
+      {/* Google Auth Gate — blocks EVERYTHING below until connected */}
       {googleConnected !== true && <WelcomeScreen />}
 
-      {/* 1. 3D Brain full screen background (Always active in z-0) */}
-      <BrainBackground />
-      
-      {/* 2. Ambient backdrop overlay to adjust contrast when panels are loaded */}
-      {activeScreen !== 'home' && (
-        <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-sm transition-all duration-500" />
-      )}
-
-      {/* 3. Floating Status Badge */}
-      {showApp && <StatusIndicator />}
-
-      {/* 4. Thinking Bubble status block */}
-      <ThinkingBubble />
-
-      {/* 5. Main Screen Render Logic */}
-      {activeScreen === 'home' ? (
+      {/* All app UI only renders when Google is connected */}
+      {showApp && (
         <>
-          {/* Centered Large Microphone and Waves */}
-          <VoiceControls />
+          {/* 1. 3D Brain full screen background (Always active in z-0) */}
+          <BrainBackground />
+          
+          {/* 2. Ambient backdrop overlay to adjust contrast when panels are loaded */}
+          {activeScreen !== 'home' && (
+            <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-sm transition-all duration-500" />
+          )}
 
-          {/* Holographic Header */}
-          <FloatingTitle />
+          {/* 3. Floating Status Badge */}
+          <StatusIndicator />
+
+          {/* 4. Thinking Bubble status block */}
+          <ThinkingBubble />
+
+          {/* 5. Main Screen Render Logic */}
+          {activeScreen === 'home' ? (
+            <>
+              {/* Centered Large Microphone and Waves */}
+              <VoiceControls />
+
+              {/* Holographic Header */}
+              <FloatingTitle />
+            </>
+          ) : (
+            /* Floating centered viewport card for notes/tasks/chat/etc. */
+            <div className="relative z-20 flex items-center justify-center w-full h-full pt-4 pb-24">
+              <div className="w-full h-full md:w-[600px] md:h-[82vh] md:rounded-[28px] md:border md:border-white/[0.08] md:shadow-[0_24px_60px_rgba(0,0,0,0.6)] overflow-hidden animate-fade-in">
+                <UnifiedPanelView />
+              </div>
+            </div>
+          )}
+
+          {/* 6. Single Unified Floating Bottom Navbar */}
+          <UnifiedBottomNavbar />
         </>
-      ) : (
-        /* Floating centered viewport card for notes/tasks/chat/etc. */
-        <div className="relative z-20 flex items-center justify-center w-full h-full pt-4 pb-24">
-          <div className="w-full h-full md:w-[600px] md:h-[82vh] md:rounded-[28px] md:border md:border-white/[0.08] md:shadow-[0_24px_60px_rgba(0,0,0,0.6)] overflow-hidden animate-fade-in">
-            <UnifiedPanelView />
-          </div>
-        </div>
       )}
-
-      {/* 6. Single Unified Floating Bottom Navbar */}
-      {showApp && <UnifiedBottomNavbar />}
     </div>
   )
 }
