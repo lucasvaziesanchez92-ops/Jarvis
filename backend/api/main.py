@@ -27,7 +27,10 @@ from backend.core.exceptions import (
     app_error_handler,
 )
 from backend.core.rate_limiter import limiter
-from backend.api.routers import chat, notes, todos, calendar, email, threads, messages, agent, diagnostics, search, tts, personas, backup, stt, auth, llm, voice, files, auth_google, gmail, drive, wiki, chat_smoke
+from backend.api.routers import chat, notes, todos, calendar, email, threads, messages, agent, diagnostics, search, tts, personas, backup, stt, auth, llm, voice, files, auth_google, gmail, drive, chat_smoke
+
+# Wiki router is loaded LAZILY (ChromaDB + sentence-transformers ~300MB)
+# to keep Railway free tier (1GB RAM) under the OOM threshold.
 
 
 # -- Initialize Structured Logging -------------------------------
@@ -52,16 +55,9 @@ async def lifespan(app: FastAPI):
         os.environ["LANGSMITH_PROJECT"] = "jarvis"
         logger.info("LangSmith observability enabled")
 
-    # Build agent graph synchronously at startup (Railway healthcheck waits up to 120s)
-    import threading
-    def _warm_graph():
-        try:
-            from backend.api.dependencies import build_graph
-            build_graph()
-        except Exception as e:
-            logger.warning(f"Graph pre-build failed: {e}")
-    threading.Thread(target=_warm_graph, daemon=True).start()
-    logger.info("Agent graph pre-building in background...")
+    # Build agent graph LAZILY (Railway 1GB OOMs on pre-warm with 36 tools).
+    # The graph is built on first WS/agent request via get_jarvis_graph().
+    logger.info("Graph build deferred to first request (memory: lazy)")
 
     # NO pre-warm de TTS: causa descargas múltiples (60MB) cuando Railway
     # spawns varios workers. Lazy-load on first voice request.
@@ -234,8 +230,26 @@ app.include_router(gmail.router, prefix="/api/v1", tags=["gmail"])
 app.include_router(drive.router, prefix="/api/v1", tags=["drive"])
 # Calendar ya existe como router separado
 
-# Wiki / Obsidian Second Brain
-app.include_router(wiki.router, prefix="/api/v1", tags=["wiki"])
+# Wiki / Obsidian Second Brain — register an opt-in endpoint to load
+# ChromaDB only when the user actually visits the Wiki tab.
+_wiki_loaded = False
+
+
+@app.get("/api/v1/wiki/lazy_load", tags=["wiki"])
+async def wiki_lazy_load():
+    """Load the wiki router + ChromaDB on demand. Called when the user
+    opens the Wiki tab. Keeps startup memory under 1GB on Railway free tier."""
+    global _wiki_loaded
+    if not _wiki_loaded:
+        try:
+            from backend.api.routers import wiki
+            app.include_router(wiki.router, prefix="/api/v1", tags=["wiki"])
+            _wiki_loaded = True
+            return {"loaded": True, "message": "Wiki + ChromaDB ready"}
+        except Exception as e:
+            logger.warning(f"Wiki lazy-load failed: {e}")
+            return {"loaded": False, "error": str(e)}
+    return {"loaded": True, "message": "Already loaded"}
 
 
 # -- Legacy Routes (backward compatibility) --------------------

@@ -30,12 +30,16 @@ COPY web-next/public/models/brain.stl ./data/
 # client_secret.json is gitignored and not in the repo.
 # Railway deploys use GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars as fallback.
 # Ensure the data dir exists for the app
-RUN mkdir -p /app/data && chown -R app:app /app/data
 
+# Create system user/group first to avoid invalid user errors
 RUN addgroup --system app && adduser --system --group app
-RUN mkdir -p /app/data/logs /app/data/voices /app/data/chroma_wiki /app/data/chroma_db /app/data/sources /app/data/checkpoints && chown -R app:app /app/data
+
+# Create necessary directories and set correct ownership
+RUN mkdir -p /app/data/logs /app/data/voices /app/data/chroma_wiki /app/data/chroma_db /app/data/sources /app/data/checkpoints \
+    && chown -R app:app /app
+
 USER app
 
 EXPOSE 8000
 
-CMD python -m uvicorn backend.api.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive 120
+CMD ["sh", "-c", "python -m uvicorn backend.api.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive 120 --workers 1"]

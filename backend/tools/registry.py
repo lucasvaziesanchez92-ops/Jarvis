@@ -53,21 +53,13 @@ except Exception:
     _WEB_SEARCH_AVAILABLE = False
     web_search = None  # type: ignore
 
-# Semantic search — lazy import (langchain_chroma may be missing).
-try:
-    from backend.tools.semantic_search import (
-        search_notes_semantic,
-        search_wiki_semantic,
-        search_all_knowledge,
-        get_knowledge_stats,
-    )
-    _SEMANTIC_AVAILABLE = True
-except Exception:
-    _SEMANTIC_AVAILABLE = False
-    search_notes_semantic = None   # type: ignore
-    search_wiki_semantic = None    # type: ignore
-    search_all_knowledge = None    # type: ignore
-    get_knowledge_stats = None     # type: ignore
+# Semantic search — DEFERRED (langchain_chroma is heavy ~150MB).
+# Tools are loaded on first use, not at module import.
+_SEMANTIC_AVAILABLE = False
+search_notes_semantic = None   # type: ignore
+search_wiki_semantic = None    # type: ignore
+search_all_knowledge = None    # type: ignore
+get_knowledge_stats = None     # type: ignore
 
 # ── Core tools (always available) ──────────────────────────────
 CORE_TOOLS = [
