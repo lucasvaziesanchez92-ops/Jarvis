@@ -66,6 +66,10 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
                 "request_id": request_id,
             }
         },
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Credentials": "true",
+        },
     )
 
 
@@ -93,6 +97,10 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
                 "message": exc.detail,
                 "request_id": request_id,
             }
+        },
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Credentials": "true",
         },
     )
 

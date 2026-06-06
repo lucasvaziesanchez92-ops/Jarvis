@@ -160,6 +160,10 @@ async def google_not_configured_handler(request: Request, exc: GoogleNotConfigur
     return JSONResponse(
         status_code=503,
         content={"error": {"type": "google_not_configured", "message": str(exc)}},
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Credentials": "true",
+        },
     )
 
 
