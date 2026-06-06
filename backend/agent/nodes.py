@@ -29,7 +29,11 @@ def _trim_messages(messages: list, persona: str = "profesional"):
 def call_model_with_tools(
     state: JarvisState, llm_with_tools, extra_context: str = "",
 ) -> dict:
-    """Invoke LLM with bound tools + RAG context."""
+    """Invoke LLM with bound tools + RAG context.
+
+    If bind_tools call fails (model too slow, prompt too big, etc.),
+    fall back to a plain LLM call without tool descriptions.
+    """
     persona = state.get("persona", "profesional")
     base = list(state["messages"])
 
@@ -49,9 +53,16 @@ def call_model_with_tools(
         response = llm_breaker.call(llm_with_tools.invoke, trimmed)
     except Exception as e:
         err_msg = str(e)
-        logger.error(f"bind_tools falló ({type(e).__name__}: {err_msg[:150]})")
+        logger.warning(f"bind_tools falló ({type(e).__name__}: {err_msg[:150]}) — usando invoke plano")
         from backend.llm import get_llm
         llm = get_llm()
-        response = llm_breaker.call(llm.invoke, trimmed)
+        try:
+            response = llm_breaker.call(llm.invoke, trimmed)
+        except Exception as e2:
+            logger.error(f"plain LLM también falló: {e2}")
+            response = AIMessage(content=(
+                "Tuve un problema de latencia con mi modelo. "
+                "¿Podés reformular la pregunta o intentar de nuevo en unos segundos?"
+            ))
 
     return {"messages": [response]}

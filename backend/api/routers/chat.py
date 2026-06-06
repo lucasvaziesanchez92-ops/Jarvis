@@ -10,8 +10,14 @@ from loguru import logger
 from backend.api.dependencies import get_jarvis_graph
 from backend.models.chat import ChatRequest, ChatResponse, StreamChunk
 from backend.core.file_extractor import build_file_context
+from backend.agent.personalities import get_persona
 
 router = APIRouter()
+
+# Railway free tier proxy window = 30s. Cap the graph at 22s; fallback to plain
+# LLM (no tools) if the agent times out.
+_GRAPH_TIMEOUT = 22
+_PLAIN_TIMEOUT = 15
 
 
 class WebSocketCallback(BaseCallbackHandler):
@@ -115,13 +121,44 @@ async def ws_chat(websocket: WebSocket):
             try:
                 await send(StreamChunk(type="token", content="Pensando..."))
 
-                graph = get_jarvis_graph()
                 ping = asyncio.create_task(_keepalive(send, connected))
 
-                try:
-                    state = await asyncio.wait_for(
-                        graph.ainvoke(input_state, config=config), timeout=90
+                loop = asyncio.get_running_loop()
+                graph = get_jarvis_graph()
+
+                async def _run_graph():
+                    return await asyncio.wait_for(
+                        graph.ainvoke(input_state, config=config),
+                        timeout=_GRAPH_TIMEOUT,
                     )
+
+                try:
+                    state = await _run_graph()
+                except asyncio.TimeoutError:
+                    logger.warning("graph timeout — falling back to plain LLM")
+                    try:
+                        from backend.llm import get_llm
+                        llm = get_llm()
+                        persona = get_persona(persona_name := persona)
+                        sys_msg = SystemMessage(content=persona.system_prompt)
+                        user_msg = HumanMessage(content=full_message)
+
+                        async def _plain():
+                            return await asyncio.wait_for(
+                                llm.ainvoke([sys_msg, user_msg]),
+                                timeout=_PLAIN_TIMEOUT,
+                            )
+
+                        ai_resp = await _plain()
+                        state = {"messages": [ai_resp]}
+                    except Exception as e2:
+                        logger.error(f"plain LLM fallback failed: {e2}")
+                        await send(StreamChunk(type="token", content=(
+                            "Tuve un problema de latencia con mi modelo. "
+                            "¿Probás de nuevo en unos segundos?"
+                        )))
+                        await send(StreamChunk(type="done"))
+                        continue
                 finally:
                     ping.cancel()
 
@@ -129,15 +166,13 @@ async def ws_chat(websocket: WebSocket):
                 final = ai_msgs[-1] if ai_msgs else None
 
                 if final and final.content:
-                    await send(StreamChunk(type="done"))
+                    await send(StreamChunk(type="token", content=str(final.content)))
                 else:
                     await send(StreamChunk(type="token", content="Listo."))
-                    await send(StreamChunk(type="done"))
+                await send(StreamChunk(type="done"))
 
-            except asyncio.TimeoutError:
-                await send(StreamChunk(type="error", content="Timeout."))
             except Exception as e:
-                logger.error(f"WS error: {e}")
+                logger.error(f"WS error: {type(e).__name__}: {e}")
                 try:
                     await send(StreamChunk(type="error", content=str(e)[:500]))
                 except Exception:
