@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, RotateCcw, Check, AlertTriangle } from 'lucide-react';
 import { API_BASE } from '@/lib/api';
+import { useJarvisStore } from '@/store/jarvisStore';
 
 
 interface AppSettings {
@@ -40,6 +41,7 @@ export default function SettingsPanel() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [saved, setSaved] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'ok' | 'error'>('checking');
+  const { brainMode, setBrainMode } = useJarvisStore();
 
   useEffect(() => {
     fetch(`${settings.apiUrl}/api/v1/health`, { method: 'GET', signal: AbortSignal.timeout(3000) })
@@ -138,6 +140,26 @@ export default function SettingsPanel() {
             onChange={e => update('modelName', e.target.value)}
             className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 py-2 text-[13px] text-white/80 outline-none focus:border-cyan-400/30 btn-focus transition-all"
           />
+        </div>
+      </section>
+
+      {/* Visualizer Mode */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] tracking-[0.15em] uppercase text-white/30 font-medium">Visualización del Cerebro</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {['hologram', 'wireframe', 'solid', 'pbr', 'unlit', 'normal', 'toon', 'sketch'].map(mode => (
+            <button
+              key={mode}
+              onClick={() => setBrainMode(mode)}
+              className={`px-3 py-2 rounded-xl border text-[10px] font-bold tracking-wider uppercase transition-all active:scale-95 text-center cursor-pointer ${
+                brainMode === mode
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(68,204,221,0.2)]'
+                  : 'bg-white/[0.02] border-white/[0.08] text-white/60 hover:text-white hover:border-white/20'
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
         </div>
       </section>
 

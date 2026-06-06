@@ -324,7 +324,7 @@ export const useJarvisStore = create<JarvisStore>()(
 
   setBackendStatus: (backendStatus) => set({ backendStatus }),
 
-  setGoogleConnected: (googleConnected, googleEmail = null) => set({ googleConnected, googleEmail }),
+  setGoogleConnected: (googleConnected: boolean | null, googleEmail: string | null = null) => set({ googleConnected, googleEmail }),
   checkGoogleAuth: async (apiBase: string) => {
     try {
       const res = await fetch(`${apiBase}/auth/google/status`)

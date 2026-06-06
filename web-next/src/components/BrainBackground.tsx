@@ -75,15 +75,13 @@ const PERSONALITY_THEMES = {
   },
 }
 
-/* ── Ice Brain Mesh Component ──────────────────────────────── */
 function IceBrain() {
   const groupRef = useRef<THREE.Group>(null)
   const mainMeshRef = useRef<THREE.Mesh>(null)
   const innerMeshRef = useRef<THREE.Mesh>(null)
   const glowMeshRef = useRef<THREE.Mesh>(null)
-  // Remove unused refs
 
-  const { activityState, persona } = useJarvisStore()
+  const { activityState, persona, brainMode } = useJarvisStore()
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null)
 
   /* Load STL — relative proxy path or public fallback */
@@ -109,22 +107,56 @@ function IceBrain() {
     tryNext()
   }, [])
 
-  /* Ice brain component with mutable materials */
-  const materialRef = useRef<THREE.MeshPhysicalMaterial | null>(null)
+  /* Materials definitions */
   const innerMatRef = useRef<THREE.MeshPhysicalMaterial | null>(null)
   const glowMatRef = useRef<THREE.MeshBasicMaterial | null>(null)
 
-  /* Materials - mutable refs for useFrame */
-  const mainMaterial = useMemo(() => {
-    const m = new THREE.MeshPhysicalMaterial({
+  const materials = useMemo(() => {
+    // 1. Hologram (our custom Ice material)
+    const hologram = new THREE.MeshPhysicalMaterial({
       color: 0xd0e8e8, emissive: 0x2a1030, emissiveIntensity: 0.3, metalness: 0, roughness: 0.25,
       transmission: 0.6, thickness: 1.2, ior: 1.45, clearcoat: 0.8, clearcoatRoughness: 0.1,
       sheen: 0.5, sheenColor: new THREE.Color(0xff69b4), sheenRoughness: 0.5,
       specularIntensity: 1.0, specularColor: new THREE.Color(0xffffff),
       side: THREE.DoubleSide, flatShading: true, envMapIntensity: 0.5,
     })
-    materialRef.current = m
-    return m
+
+    // 2. Wireframe
+    const wireframe = new THREE.MeshBasicMaterial({
+      color: 0x44ccdd, wireframe: true, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending
+    })
+
+    // 3. Solid
+    const solid = new THREE.MeshStandardMaterial({
+      color: 0x88aabb, roughness: 0.8, metalness: 0.1, flatShading: true
+    })
+
+    // 4. PBR
+    const pbr = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, roughness: 0.1, metalness: 0.9, clearcoat: 1.0, clearcoatRoughness: 0.05
+    })
+
+    // 5. Unlit
+    const unlit = new THREE.MeshBasicMaterial({
+      color: 0x4488aa
+    })
+
+    // 6. Normal
+    const normal = new THREE.MeshNormalMaterial({
+      flatShading: true
+    })
+
+    // 7. Toon
+    const toon = new THREE.MeshToonMaterial({
+      color: 0x44ccdd
+    })
+
+    // 8. Sketch
+    const sketch = new THREE.MeshBasicMaterial({
+      color: 0x888888, wireframe: true, transparent: true, opacity: 0.15
+    })
+
+    return { hologram, wireframe, solid, pbr, unlit, normal, toon, sketch }
   }, [])
 
   const innerMaterial = useMemo(() => {
@@ -154,54 +186,65 @@ function IceBrain() {
     const pName = persona?.name || 'profesional'
     const theme = PERSONALITY_THEMES[pName as keyof typeof PERSONALITY_THEMES] || PERSONALITY_THEMES.profesional
     const stateColor = theme[activityState as keyof typeof theme] || theme.idle
-    const stateMeta = STATE_META[activityState as keyof typeof STATE_META] || STATE_META.idle
-
+    
     // Idle rotation
     groupRef.current.rotation.x = (-Math.PI / 2) + Math.sin(t * 0.15) * 0.05
     groupRef.current.rotation.z = (Math.PI / 3.5) + Math.cos(t * 0.1) * 0.03
 
-    // State-based material changes
     // Lerp colors dynamically
-    mainMaterial.color.lerp(new THREE.Color(stateColor.base), 0.05)
-    mainMaterial.emissive.lerp(new THREE.Color(stateColor.emissive), 0.05)
-    mainMaterial.sheenColor.lerp(new THREE.Color(stateColor.edge), 0.05)
+    const activeColor = new THREE.Color(stateColor.base)
+    const edgeColor = new THREE.Color(stateColor.edge)
+    const emissiveColor = new THREE.Color(stateColor.emissive)
 
-    if (innerMatRef.current) {
-      innerMatRef.current.color.lerp(new THREE.Color(stateColor.edge), 0.05)
-      innerMatRef.current.emissive.lerp(new THREE.Color(stateColor.edge), 0.05)
-    }
-
-    if (glowMatRef.current) {
-      glowMatRef.current.color.lerp(new THREE.Color(stateColor.edge), 0.05)
-    }
+    // Hologram
+    materials.hologram.color.lerp(activeColor, 0.05)
+    materials.hologram.emissive.lerp(emissiveColor, 0.05)
+    materials.hologram.sheenColor.lerp(edgeColor, 0.05)
 
     if (activityState === 'thinking') {
       const blink = (Math.sin(t * 3) + 1) / 2
-      mainMaterial.opacity = 0.5 + blink * 0.5
-      mainMaterial.transmission = 0.3 + blink * 0.5
-      mainMaterial.emissiveIntensity = 0.3 + blink * 0.5
-      if (innerMatRef.current) {
-        innerMatRef.current.opacity = 0.1 + blink * 0.4
-      }
+      materials.hologram.opacity = 0.5 + blink * 0.5
+      materials.hologram.transmission = 0.3 + blink * 0.5
+      materials.hologram.emissiveIntensity = 0.3 + blink * 0.5
     } else if (activityState === 'speaking') {
-      mainMaterial.opacity = 1
-      mainMaterial.transmission = 0
-      mainMaterial.emissiveIntensity = 1.0
-      if (innerMatRef.current) {
-        innerMatRef.current.opacity = 0.15
-      }
+      materials.hologram.opacity = 1
+      materials.hologram.transmission = 0
+      materials.hologram.emissiveIntensity = 1.0
     } else {
-      mainMaterial.opacity = 1
-      mainMaterial.transmission = 0.6
-      mainMaterial.emissiveIntensity = 0.3
-      if (innerMatRef.current) {
-        innerMatRef.current.opacity = 0.15
-      }
+      materials.hologram.opacity = 1
+      materials.hologram.transmission = 0.6
+      materials.hologram.emissiveIntensity = 0.3
     }
 
-    // Glow pulse
+    // Wireframe
+    materials.wireframe.color.lerp(edgeColor, 0.05)
+    materials.wireframe.opacity = 0.2 + (activityState === 'speaking' ? 0.3 : activityState === 'thinking' ? 0.15 * Math.sin(t * 4) + 0.25 : 0.1)
+
+    // Solid
+    materials.solid.color.lerp(activeColor, 0.05)
+
+    // PBR
+    materials.pbr.color.lerp(activeColor, 0.05)
+
+    // Unlit
+    materials.unlit.color.lerp(activeColor, 0.05)
+
+    // Toon
+    materials.toon.color.lerp(edgeColor, 0.05)
+
+    // Sketch
+    materials.sketch.color.lerp(edgeColor, 0.05)
+
+    // Glows
+    if (innerMatRef.current) {
+      innerMatRef.current.color.lerp(edgeColor, 0.05)
+      innerMatRef.current.emissive.lerp(edgeColor, 0.05)
+      innerMatRef.current.opacity = (brainMode === 'hologram' || brainMode === 'pbr') ? 0.15 : 0
+    }
+
     if (glowMatRef.current) {
-      glowMatRef.current.opacity = 0.15 + Math.sin(t * 0.8) * 0.05
+      glowMatRef.current.color.lerp(edgeColor, 0.05)
+      glowMatRef.current.opacity = (brainMode === 'hologram' || brainMode === 'pbr') ? (0.15 + Math.sin(t * 0.8) * 0.05) : 0
     }
   })
 
@@ -219,11 +262,13 @@ function IceBrain() {
   const maxDim = Math.max(size.x, size.y, size.z)
   const scale = 1.6 / maxDim
 
+  const activeMaterial = materials[brainMode as keyof typeof materials] || materials.hologram
+
   return (
     <group ref={groupRef} scale={scale}>
       {/* Main brain */}
       <mesh ref={mainMeshRef} geometry={geometry} castShadow receiveShadow>
-        <primitive object={mainMaterial} attach="material" />
+        <primitive object={activeMaterial} attach="material" />
       </mesh>
       {/* Inner glow */}
       <mesh ref={innerMeshRef} geometry={geometry} scale={[0.97, 0.97, 0.97]}>
