@@ -50,7 +50,8 @@ async def _transcribe(audio_bytes: bytes) -> str:
 # ── Module B: Agent Graph (TOOLS ENABLED) ─────────────────────────
 
 async def _chat_with_agent(transcript: str, session_id: str = "") -> tuple[str, bool]:
-    """Usa el agente completo con herramientas. Retorna (respuesta, tools_used)."""
+    """Usa el agente completo con herramientas. Retorna (respuesta, tools_used).
+    Timeout agresivo (25s) para que el proxy de Railway free tier no corte con 502."""
     from langchain_core.messages import HumanMessage
     from backend.api.dependencies import get_jarvis_graph
     graph = get_jarvis_graph()
@@ -65,7 +66,7 @@ async def _chat_with_agent(transcript: str, session_id: str = "") -> tuple[str, 
                 },
                 config=config,
             ),
-            timeout=60,
+            timeout=25,
         )
     except asyncio.TimeoutError:
         return "Me tardé demasiado procesando eso. ¿Podés repetirlo más breve?", False

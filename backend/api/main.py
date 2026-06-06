@@ -63,21 +63,8 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_warm_graph, daemon=True).start()
     logger.info("Agent graph pre-building in background...")
 
-    # Pre-download TTS model in background — skips if low memory (< 400MB free)
-    import psutil
-    def _warm_tts():
-        try:
-            mem = psutil.virtual_memory()
-            if mem.available < 400 * 1024 * 1024:
-                logger.info(f"TTS pre-warm skipped: only {mem.available // 1024 // 1024}MB available")
-                return
-            from backend.services.tts_service import TextToSpeechService
-            svc = TextToSpeechService()
-            svc._init_voice()
-            logger.info("TTS model pre-warmed successfully")
-        except Exception as e:
-            logger.warning(f"TTS pre-warm failed (ok, loads on first request): {e}")
-    threading.Thread(target=_warm_tts, daemon=True).start()
+    # NO pre-warm de TTS: causa descargas múltiples (60MB) cuando Railway
+    # spawns varios workers. Lazy-load on first voice request.
 
     yield
 

@@ -104,32 +104,74 @@ DEFAULT_VOICE = "es_ES-sharvard-medium"
 
 # ── Helper: descarga modelo si no existe ───────────────────────────────
 
+import fcntl as _fcntl
+
 def _download_file(url_or_path: str, dest: Path) -> None:
-    """Descarga un archivo si no existe. Soporta URLs directas o paths de HuggingFace."""
+    """Descarga un archivo si no existe. Soporta URLs directas o paths de HuggingFace.
+    Usa file lock para evitar descargas concurrentes del mismo archivo."""
     if dest.exists():
         return
 
     print(f"[TTS] Descargando {dest.name}...")
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    # Si es un path de HF (formato: rhasspy/piper-voices:path/to/file)
-    if url_or_path.startswith("rhasspy/"):
-        from huggingface_hub import hf_hub_download
-        parts = url_or_path.split(":", 1)
-        repo_id = parts[0]
-        file_path = parts[1] if len(parts) > 1 else ""
-        downloaded = hf_hub_download(repo_id=repo_id, filename=file_path, local_dir=str(dest.parent), local_dir_use_symlinks=False)
-        if Path(downloaded) != dest:
-            import shutil
-            shutil.move(downloaded, dest)
-    else:
-        # URL directa
-        import requests
-        r = requests.get(url_or_path, stream=True, timeout=120)
-        r.raise_for_status()
-        with open(dest, "wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
+    # File lock to prevent concurrent downloads (Railway spawns multiple workers)
+    lock_path = dest.with_suffix(dest.suffix + ".lock")
+    try:
+        with open(lock_path, "w") as lockfile:
+            try:
+                _fcntl.flock(lockfile.fileno(), _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+            except (BlockingIOError, OSError):
+                # Another worker is downloading — wait and check again
+                import time
+                time.sleep(1)
+                if dest.exists():
+                    return
+                # Try again with blocking lock
+                _fcntl.flock(lockfile.fileno(), _fcntl.LOCK_EX)
+
+            try:
+                if dest.exists():
+                    return
+
+                if url_or_path.startswith("rhasspy/"):
+                    from huggingface_hub import hf_hub_download
+                    parts = url_or_path.split(":", 1)
+                    repo_id = parts[0]
+                    file_path = parts[1] if len(parts) > 1 else ""
+                    downloaded = hf_hub_download(repo_id=repo_id, filename=file_path, local_dir=str(dest.parent), local_dir_use_symlinks=False)
+                    if Path(downloaded) != dest:
+                        import shutil
+                        shutil.move(downloaded, dest)
+                else:
+                    import requests
+                    r = requests.get(url_or_path, stream=True, timeout=120)
+                    r.raise_for_status()
+                    with open(dest, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+            finally:
+                _fcntl.flock(lockfile.fileno(), _fcntl.LOCK_UN)
+    except (AttributeError, OSError):
+        # Windows or non-fcntl platform — skip lock (works for dev)
+        if dest.exists():
+            return
+        if url_or_path.startswith("rhasspy/"):
+            from huggingface_hub import hf_hub_download
+            parts = url_or_path.split(":", 1)
+            repo_id = parts[0]
+            file_path = parts[1] if len(parts) > 1 else ""
+            downloaded = hf_hub_download(repo_id=repo_id, filename=file_path, local_dir=str(dest.parent), local_dir_use_symlinks=False)
+            if Path(downloaded) != dest:
+                import shutil
+                shutil.move(downloaded, dest)
+        else:
+            import requests
+            r = requests.get(url_or_path, stream=True, timeout=120)
+            r.raise_for_status()
+            with open(dest, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
 
     print(f"[TTS] Descarga completa: {dest}")
 
