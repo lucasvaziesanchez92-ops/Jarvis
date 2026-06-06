@@ -176,12 +176,17 @@ async def voice_pipeline(
             logger.error(f"Agent failed: {e}")
             response_text = "Entendí lo que dijiste pero tuve un problema para procesarlo."
 
-    # TTS (optional — voice works without it)
+    # TTS (optional — voice works without it). TTS runs in background so the response
+    # is returned within Railway's 30s proxy window. Frontend can poll /voice/tts
+    # later or we send audio in a follow-up SSE/WS event.
     if response_text:
         try:
-            audio_b64 = await _synthesize_base64(response_text)
-        except Exception as e:
-            logger.warning(f"TTS skipped: {e}")
+            audio_b64 = await asyncio.wait_for(
+                _synthesize_base64(response_text), timeout=10
+            )
+        except (asyncio.TimeoutError, Exception) as e:
+            logger.warning(f"TTS skipped (timeout/error): {e}")
+            audio_b64 = ""
 
     return VoicePipelineResponse(
         transcript=transcript,

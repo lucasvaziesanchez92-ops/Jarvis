@@ -218,8 +218,14 @@ function WelcomeScreen() {
         target="_self"
         className="inline-flex items-center gap-3 px-8 py-3 bg-white text-black font-bold rounded-2xl text-sm hover:bg-white/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_30px_rgba(255,255,255,0.1)]"
       >
-        <LogIn className="h-4 w-4" /> Conectar con Google
+        <LogIn className="h-4 w-4" /> Conectar Gmail + Drive + Calendar
       </a>
+      <div className="flex items-center gap-2 mt-1">
+        <Mail className="h-3 w-3 text-cyan-400" />
+        <FolderOpen className="h-3 w-3 text-violet-400" />
+        <Calendar className="h-3 w-3 text-pink-400" />
+        <span className="text-[10px] text-white/40 ml-1">Un solo login, los 3 servicios</span>
+      </div>
       <p className="text-[10px] text-white/15 mt-2">
         Gmail · Drive · Calendar · Todo en uno
       </p>

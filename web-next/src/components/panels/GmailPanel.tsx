@@ -109,12 +109,12 @@ export default function GmailPanel() {
           <Mail className="h-8 w-8 text-cyan-400/60" />
         </div>
         <div className="text-center space-y-2">
-          <h2 className="text-lg font-bold text-white/80">Conectá Gmail</h2>
-          <p className="text-sm text-white/40 max-w-sm">Autorizá a JARVIS para leer y enviar correos desde tu cuenta de Google.</p>
+          <h2 className="text-lg font-bold text-white/80">Conectá Google</h2>
+          <p className="text-sm text-white/40 max-w-sm">Autorizá a JARVIS para acceder a <b className="text-cyan-300">Gmail</b>, <b className="text-violet-300">Drive</b> y <b className="text-pink-300">Calendar</b> en un solo paso.</p>
         </div>
         <a href={`${API_BASE}/auth/google/login`}
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-black font-semibold rounded-xl text-sm hover:bg-white/90 transition-all hover:scale-[1.02] active:scale-[0.98]">
-          <Mail className="h-4 w-4" /> Conectar Gmail
+          <Mail className="h-4 w-4" /> Conectar Gmail + Drive + Calendar
         </a>
       </div>
     );
