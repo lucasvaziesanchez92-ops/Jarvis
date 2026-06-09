@@ -3,7 +3,11 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from loguru import logger
 
-from backend.services.google_auth import GoogleAuthService, save_tokens, get_refresh_token, get_user_info, delete_token
+from backend.services.google_auth import (
+    GoogleAuthService, GoogleNotConfiguredError,
+    save_tokens, get_refresh_token, get_user_info, delete_token,
+    _get_client_config,
+)
 
 router = APIRouter(prefix="/google", tags=["google"])
 
@@ -54,3 +58,30 @@ async def google_status():
 async def google_disconnect():
     delete_token("default_user")
     return {"connected": False}
+
+
+@router.get("/debug-config")
+async def debug_config():
+    """Diagnostic: shows what config the server is using RIGHT NOW.
+    Redacts the client_secret but shows its length, prefix, and suffix
+    so you can compare with what Google has on file."""
+    import os
+    cfg = _get_client_config()
+    if not cfg:
+        return {
+            "configured": False,
+            "reason": "No client_id/client_secret loaded from file or env vars",
+            "client_id_env_set": bool(os.getenv("GOOGLE_CLIENT_ID")),
+            "client_secret_env_set": bool(os.getenv("GOOGLE_CLIENT_SECRET")),
+        }
+    secret = cfg.get("client_secret", "")
+    return {
+        "configured": True,
+        "client_id": cfg.get("client_id"),
+        "client_id_matches_known": cfg.get("client_id") == "215682122179-8h57u5ctvbgtot79jasa27hnilrvbhl5.apps.googleusercontent.com",
+        "client_secret_length": len(secret),
+        "client_secret_prefix": secret[:10] if secret else "",
+        "client_secret_suffix": secret[-6:] if secret else "",
+        "auth_uri": cfg.get("auth_uri"),
+        "token_uri": cfg.get("token_uri"),
+    }
