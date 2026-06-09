@@ -5,6 +5,7 @@ import { Send, Bot, User, Plus, MessageSquare, Pencil, Trash2, X, History, Paper
 import { useJarvisStore } from '@/store/jarvisStore';
 import { useJarvisChat } from '@/hooks/useJarvisChat';
 import { cn } from '@/lib/utils';
+import { API_BASE } from '@/lib/api';
 
 /* ── ChatModePanel v6 — Historial compacto + input grande ───────────
    Sidebar de historial colapsable, textarea ancho y alto, mensajes
@@ -85,7 +86,7 @@ export default function ChatModePanel() {
       form.append('folder', 'chat_attachments');
       form.append('generate_url', 'false');
 
-      const res = await fetch('/api/files/upload', {
+      const res = await fetch(`${API_BASE}/api/files/upload`, {
         method: 'POST',
         body: form,
       });

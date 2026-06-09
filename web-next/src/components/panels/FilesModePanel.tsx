@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Upload, FileText, Trash2, HelpCircle, AlertCircle, Sparkles, CheckCircle, RefreshCw, File, FileCode, FileImage, FileAudio, FolderOpen, Download, X, Image, Music } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { cn } from '@/lib/utils';
+import { API_BASE } from '@/lib/api';
 
 interface RailwayFile {
   key: string;
@@ -61,7 +62,7 @@ export default function FilesModePanel() {
 
   const checkRailway = async () => {
     try {
-      const res = await fetch('/api/files/health');
+      const res = await fetch(`${API_BASE}/api/files/health`);
       const data = await res.json();
       setRailwayStatus(data.configured ? 'connected' : 'disconnected');
     } catch {
@@ -72,7 +73,7 @@ export default function FilesModePanel() {
   const fetchFiles = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/files/list');
+      const res = await fetch(`${API_BASE}/api/files/list`);
       if (!res.ok) throw new Error('Error al listar archivos');
       const data = await res.json();
       setFiles(data.files || []);
@@ -107,7 +108,7 @@ export default function FilesModePanel() {
       formData.append('generate_url', 'true');
 
       try {
-        const res = await fetch('/api/files/upload', { method: 'POST', body: formData });
+        const res = await fetch(`${API_BASE}/api/files/upload`, { method: 'POST', body: formData });
         if (res.ok) {
           uploaded++;
         } else {

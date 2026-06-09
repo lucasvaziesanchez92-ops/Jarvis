@@ -2,6 +2,8 @@
 
 import { useRef, useMemo, useState, useEffect, Suspense } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import * as THREE from 'three'
 import { useJarvisStore } from '@/store/jarvisStore'
@@ -469,28 +471,27 @@ export default function BrainBackground() {
     <div className="fixed inset-0 z-0">
       <Canvas
         camera={{ position: [3, 0, 4], fov: 45, near: 0.1, far: 100 }}
-        gl={{
-          antialias: false,
-          alpha: true,
-          powerPreference: 'low-power',
-        }}
-        // Cap DPR at 1 to halve pixel shader work on retina displays.
-        dpr={[1, 1]}
+        gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
+        shadows
       >
         <color attach="background" args={['#0a0a0f']} />
         <fog attach="fog" args={['#0a0a0f', 6, 20]} />
-        {/* OrbitControls removed from background — it was eating CPU
-            recalculating damping on every frame even when the user
-            wasn't interacting. The brain rotates on its own. */}
+        <OrbitControls
+          enableDamping
+          dampingFactor={0.05}
+          minDistance={1.5}
+          maxDistance={8}
+          target={[0, 0, 0]}
+        />
         <Suspense fallback={null}>
           <StageLights />
           <IceBrain />
           <ParticleField />
           <ThoughtBubbles />
         </Suspense>
-        {/* EffectComposer + Bloom removed: it ran a fullscreen
-            shader pass every frame. The 'glow' look is now achieved
-            with cheaper emissive materials + additive blending. */}
+        <EffectComposer>
+          <Bloom intensity={0.6} luminanceThreshold={0.2} luminanceSmoothing={0.9} />
+        </EffectComposer>
       </Canvas>
     </div>
   )

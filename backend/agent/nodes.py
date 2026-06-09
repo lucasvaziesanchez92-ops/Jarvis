@@ -41,12 +41,14 @@ def call_model_with_tools(
     # If a tool was actually executed, its ToolMessage will appear in the
     # conversation. Otherwise, the LLM must explicitly say so.
     tool_contract = (
-        "REGLAS CRÍTICAS SOBRE HERRAMIENTAS:\n"
-        "1. Si decidís usar una herramienta, emití el tool_call. NO describas su resultado en texto hasta ver el ToolMessage correspondiente.\n"
-        "2. Si una herramienta falla, decí 'No pude ejecutar X porque Y'. NO inventes un resultado exitoso.\n"
-        "3. Si el usuario pide algo concreto (crear nota, mandar mail, agendar evento) y vos no llamás a la tool, no podés afirmar que lo hiciste. Decí 'voy a hacerlo' o 'lo hago' SOLO cuando estés por emitir el tool_call.\n"
-        "4. NUNCA digas 'listo, ya está guardado/creado/enviado' si no viste un ToolMessage confirmándolo.\n"
-        "5. Si la herramienta devuelve error (credenciales faltantes, módulo no disponible, etc.), reportá el error tal cual al usuario, no finjas éxito."
+        "REGLAS CRÍTICAS SOBRE HERRAMIENTAS (LEER CON ATENCIÓN):\n"
+        "1. SI TENÉS herramientas disponibles en tu lista, USALAS cuando el usuario pida algo concreto. NO digas 'no tengo herramientas' si las ves en tu lista.\n"
+        "2. Para Drive de Google: usá search_drive / list_drive_files. Para Gmail: list_gmail / search_gmail. Para Calendar: list_calendar_google / create_calendar_event_google.\n"
+        "3. Si decidís usar una herramienta, emití el tool_call. NO describas su resultado en texto hasta ver el ToolMessage correspondiente.\n"
+        "4. Si una herramienta falla, decí 'No pude ejecutar X porque Y'. NO inventes un resultado exitoso.\n"
+        "5. Si el usuario pide algo concreto (crear nota, listar archivos, mandar mail, agendar evento) y vos no llamás a la tool, no podés afirmar que lo hiciste.\n"
+        "6. NUNCA digas 'listo, ya está guardado/creado/enviado' si no viste un ToolMessage confirmándolo.\n"
+        "7. Si NO ves una herramienta en tu lista (Drive/Gmail/Calendar), decí 'esa función no está disponible ahora' en vez de inventar."
     )
 
     if extra_context and base:

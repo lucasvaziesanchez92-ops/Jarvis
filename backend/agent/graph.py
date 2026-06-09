@@ -64,14 +64,43 @@ def agent_node(state: JarvisState) -> dict:
             break
 
     if last_user_msg:
-        tools = _get_router().route(last_user_msg, top_k=15)
+        tools = _get_router().route(last_user_msg, top_k=10)
         persona_names = {t.name for t in persona_tools}
         tools = [t for t in tools if t.name in persona_names]
-        critical = {"create_note", "create_todo", "wiki_query", "create_calendar_event", "send_email", "web_search"}
+
+        # Keyword-boost: if the user mentions Drive/Gmail/Calendar/Google
+        # explicitly, make sure the relevant Google tools are in the
+        # list. The TF-IDF router sometimes misses them because of the
+        # large number of competing tool descriptions.
+        q_lower = last_user_msg.lower()
+        keyword_tool_map = {
+            ("drive", "google drive", "archivo", "archivos", "fichero", "ficheros", "documento", "documentos"): [
+                "search_drive", "list_drive_files", "list_drive_folder",
+                "read_drive_file", "get_drive_file_info", "upload_drive_file",
+                "delete_drive_file", "analyze_drive_image",
+            ],
+            ("mail", "gmail", "correo", "correos", "email", "emails", "inbox", "bandeja"): [
+                "list_gmail", "search_gmail", "send_gmail",
+            ],
+            ("calendar", "calendario", "evento", "eventos", "reunión", "reunion", "agenda", "agendar", "agendame"): [
+                "list_calendar_google", "create_calendar_event_google",
+            ],
+        }
+        for keywords, tool_names in keyword_tool_map.items():
+            if any(kw in q_lower for kw in keywords):
+                for tn in tool_names:
+                    for pt in persona_tools:
+                        if pt.name == tn and pt not in tools:
+                            tools.append(pt)
+                            break
+
+        # Always include the most-used critical tools
+        critical = {"create_note", "create_todo", "wiki_query", "web_search"}
         for critical_name in critical:
             for pt in persona_tools:
                 if pt.name == critical_name and pt not in tools:
                     tools.append(pt)
+        tools = tools[:15]
     else:
         tools = persona_tools[:15]
 
