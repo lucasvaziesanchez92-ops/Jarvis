@@ -32,16 +32,25 @@ def _get_client_config() -> dict:
     global _client_config_cache
     if _client_config_cache is None:
         if CLIENT_SECRET_FILE.exists():
-            _client_config_cache = json.loads(CLIENT_SECRET_FILE.read_text())["web"]
+            cfg = json.loads(CLIENT_SECRET_FILE.read_text())["web"]
+            # Strip whitespace from loaded values — they can sneak in from
+            # copy-paste, env var editors that pad with spaces, etc.
+            _client_config_cache = {
+                k: v.strip() if isinstance(v, str) else v for k, v in cfg.items()
+            }
         else:
-            client_id = os.getenv("GOOGLE_CLIENT_ID", "")
-            client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
+            # CRITICAL: strip whitespace from env vars. Railway's variable
+            # editor can add a leading space, Google rejects any client_secret
+            # with non-stripped whitespace ("invalid_client"). This single bug
+            # bit us for a full day.
+            client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+            client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
             if client_id and client_secret:
                 _client_config_cache = {
                     "client_id": client_id,
                     "client_secret": client_secret,
-                    "auth_uri": os.getenv("GOOGLE_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
-                    "token_uri": os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+                    "auth_uri": os.getenv("GOOGLE_AUTH_URI", "https://accounts.google.com/o/oauth2/auth").strip(),
+                    "token_uri": os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token").strip(),
                 }
             else:
                 _client_config_cache = {}
