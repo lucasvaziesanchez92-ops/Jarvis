@@ -41,14 +41,24 @@ def call_model_with_tools(
     # If a tool was actually executed, its ToolMessage will appear in the
     # conversation. Otherwise, the LLM must explicitly say so.
     tool_contract = (
-        "REGLAS CRÍTICAS SOBRE HERRAMIENTAS (LEER CON ATENCIÓN):\n"
-        "1. SI TENÉS herramientas disponibles en tu lista, USALAS cuando el usuario pida algo concreto. NO digas 'no tengo herramientas' si las ves en tu lista.\n"
-        "2. Para Drive de Google: usá search_drive / list_drive_files. Para Gmail: list_gmail / search_gmail. Para Calendar: list_calendar_google / create_calendar_event_google.\n"
-        "3. Si decidís usar una herramienta, emití el tool_call. NO describas su resultado en texto hasta ver el ToolMessage correspondiente.\n"
-        "4. Si una herramienta falla, decí 'No pude ejecutar X porque Y'. NO inventes un resultado exitoso.\n"
-        "5. Si el usuario pide algo concreto (crear nota, listar archivos, mandar mail, agendar evento) y vos no llamás a la tool, no podés afirmar que lo hiciste.\n"
+        "REGLAS CRÍTICAS SOBRE HERRAMIENTAS (NO IGNORAR):\n"
+        "1. SI TENÉS herramientas en tu lista, USALAS cuando el usuario pida algo concreto. NUNCA digas 'no tengo herramientas' sin antes mirar la lista.\n"
+        "2. MAPA DE HERRAMIENTAS DE GOOGLE (cuando el usuario dice 'mi drive', 'archivo', 'mail', 'correo', 'calendario', 'evento'):\n"
+        "   - Drive de Google: search_drive, list_drive_files, list_drive_folder, read_drive_file, get_drive_file_info, upload_drive_file, delete_drive_file, analyze_drive_image\n"
+        "   - Gmail: list_gmail, search_gmail, send_gmail\n"
+        "   - Calendar: list_calendar_google, create_calendar_event_google\n"
+        "3. Para otras acciones:\n"
+        "   - Notas: create_note, list_notes, get_note, update_note, delete_note\n"
+        "   - Tareas (todos): create_todo, list_todos, complete_todo, update_todo, delete_todo\n"
+        "   - Memoria: search_memory, save_memory, list_memories, delete_memory\n"
+        "   - Wiki: wiki_query, wiki_save_research, wiki_ingest\n"
+        "   - Web: web_search\n"
+        "   - Tiempo: get_current_time, get_current_date\n"
+        "4. Si decidís usar una herramienta, emití el tool_call. NO describas su resultado en texto hasta ver el ToolMessage correspondiente.\n"
+        "5. Si una herramienta falla, decí 'No pude ejecutar X porque Y'. NO inventes un resultado exitoso.\n"
         "6. NUNCA digas 'listo, ya está guardado/creado/enviado' si no viste un ToolMessage confirmándolo.\n"
-        "7. Si NO ves una herramienta en tu lista (Drive/Gmail/Calendar), decí 'esa función no está disponible ahora' en vez de inventar."
+        "7. Si la herramienta devuelve error (credenciales faltantes, módulo no disponible, etc.), reportá el error tal cual al usuario, no finjas éxito.\n"
+        "8. NUNCA ejecutes la misma tool_call dos veces en la misma respuesta. Una tool_call por acción, en paralelo si son independientes."
     )
 
     if extra_context and base:

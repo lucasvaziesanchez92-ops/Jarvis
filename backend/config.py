@@ -28,7 +28,14 @@ class Settings(BaseSettings):
     lm_studio_base_url: str = Field(default="http://127.0.0.1:1234/v1", alias="LM_STUDIO_BASE_URL")
     lm_studio_model: str = Field(default="qwen/qwen2.5-vl-7b", alias="LM_STUDIO_MODEL")
 
-    # LLM Provider: "bedrock" or "ollama" or "lm_studio"
+    # OpenAI (or any OpenAI-compatible API: OpenRouter, Together, Groq, etc.)
+    # gpt-4o-mini is the best cheap model for tool-calling — fast, accurate,
+    # handles 30+ tools without hallucinating.
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
+    openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
+
+    # LLM Provider: "bedrock" or "ollama" or "lm_studio" or "openai"
     llm_provider: str = Field(default="ollama", alias="LLM_PROVIDER")
 
     # Storage
