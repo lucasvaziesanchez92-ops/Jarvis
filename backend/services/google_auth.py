@@ -204,11 +204,16 @@ class GoogleAuthService:
             scopes=SCOPES,
         )
         if expires_at:
+            # Always set expiry as UTC-aware to avoid
+            # "can't compare offset-naive and offset-aware datetimes"
+            # when the Google client compares creds.expiry to datetime.utcnow().
             creds.expiry = datetime.fromtimestamp(expires_at, tz=timezone.utc)
         if not creds.valid and creds.refresh_token:
             logger.info("Refrescando access token...")
             creds.refresh(google.auth.transport.requests.Request())
-            _update_access_token_in_db(refresh_token, creds.token, creds.expiry.timestamp())
+            if creds.expiry and creds.expiry.tzinfo is None:
+                creds.expiry = creds.expiry.replace(tzinfo=timezone.utc)
+            _update_access_token_in_db(refresh_token, creds.token, creds.expiry.timestamp() if creds.expiry else 0)
         return creds
 
     @staticmethod
