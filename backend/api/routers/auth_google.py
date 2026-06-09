@@ -36,7 +36,16 @@ async def google_callback(code: str = Query(...), state: str = Query(None), requ
 
     user_id = "default_user"
     email = tokens.get("email", "")
-    save_tokens(user_id, tokens["refresh_token"], email)
+    # CRITICAL: also save access_token + expires_at. Without these, the
+    # token is saved but immediately unusable, causing 403 'unregistered
+    # callers' on every Drive/Gmail/Calendar call.
+    save_tokens(
+        user_id=user_id,
+        refresh_token=tokens["refresh_token"],
+        email=email,
+        access_token=tokens.get("access_token", ""),
+        expires_at=tokens.get("expires_at", 0),
+    )
     logger.info(f"Google OAuth connected for {email}")
 
     frontend_url = "https://frontend-production-6465.up.railway.app"

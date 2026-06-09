@@ -165,6 +165,21 @@ class GoogleAuthService:
         if "error" in body:
             raise ValueError(body.get("error_description", body["error"]))
 
+        # Fetch user email from the userinfo endpoint so we can show
+        # the connected account in the UI. Best effort: if it fails
+        # we just save without an email.
+        email = ""
+        try:
+            info_resp = requests.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {body['access_token']}"},
+                timeout=10,
+            )
+            if info_resp.status_code == 200:
+                email = info_resp.json().get("email", "")
+        except Exception:
+            pass
+
         return {
             "access_token": body["access_token"],
             "refresh_token": body.get("refresh_token", ""),
@@ -174,6 +189,7 @@ class GoogleAuthService:
             ),
             "token_uri": self.token_uri,
             "scopes": body.get("scope", "").split(),
+            "email": email,
         }
 
     @staticmethod
