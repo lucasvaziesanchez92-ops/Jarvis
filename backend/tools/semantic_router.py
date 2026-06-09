@@ -22,7 +22,8 @@ _STOPWORDS = frozenset(
     "a al de del el en es la las los para por que se su un una y con "
     "the a an to of in for on with i me my you your we our it its "
     "is are was were be been being do does did this that these those"
-).split()
+    .split()
+)
 
 
 def _tokenize(text: str) -> List[str]:
