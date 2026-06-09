@@ -5,12 +5,22 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Optional
 
-import boto3
-from botocore.exceptions import ClientError
+# boto3 is OPTIONAL: only required if S3 backups are enabled. We defer
+# the import so the module can be loaded on Railway without boto3
+# installed (saves ~50MB in the slim production build).
 
 from backend.config import settings
 
 logger = __import__('loguru').logger
+
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+    _BOTO3_AVAILABLE = True
+except ImportError:
+    boto3 = None  # type: ignore
+    ClientError = Exception  # type: ignore
+    _BOTO3_AVAILABLE = False
 
 
 class BackupConfig:
@@ -52,6 +62,11 @@ def _get_backup_config() -> BackupConfig:
 
 def _get_s3_client(config: BackupConfig):
     """Crear cliente S3 segun el provider."""
+    if not _BOTO3_AVAILABLE:
+        raise RuntimeError(
+            "boto3 not installed. Backup features require boto3. "
+            "Add it to requirements if you need S3 backups."
+        )
     if config.provider == "backblaze":
         endpoint = config.endpoint or f"https://s3.{config.region}.backblazeb2.com"
         return boto3.client(
