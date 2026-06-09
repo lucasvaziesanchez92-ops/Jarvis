@@ -11,8 +11,15 @@ Uso:
     "emotion": "neutral",
     "speed": 1.0,
   }
-  
+
   Response: audio/wav
+
+LAZY LOADING:
+  El módulo backend.services.tts_service importa `piper` y `onnxruntime`
+  (200MB+ de RAM). En Railway free tier (512MB) eso OOM-killea el proceso
+  al startup. Por eso NO importamos tts_service a nivel de módulo: se
+  hace dentro de cada endpoint. Si TTS no está instalado, los endpoints
+  devuelven 503 en vez de romper el proceso entero.
 """
 
 import io
@@ -20,9 +27,24 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.services.tts_service import get_tts_service, TextToSpeechService
-
 router = APIRouter(prefix="/tts", tags=["tts"])
+
+
+def _get_tts_service_or_503():
+    """Importa tts_service on-demand. Si no está disponible, 503 limpio."""
+    try:
+        from backend.services.tts_service import (
+            get_tts_service,
+            TextToSpeechService,
+            VOICE_CATALOG,
+        )
+        return get_tts_service, TextToSpeechService, VOICE_CATALOG
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"TTS no disponible en este deploy (Piper/onnxruntime no instalados). "
+                   f"Usá Web Speech API en el frontend. Error: {e}",
+        )
 
 
 # ── Models ────────────────────────────────────────────────────────
@@ -48,8 +70,9 @@ async def tts_synthesize(request: TTSRequest):
     """Sintetiza texto a audio."""
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Texto vacío")
-    
+
     try:
+        _, TextToSpeechService, _ = _get_tts_service_or_503()
         tts = TextToSpeechService(voice_id=request.voice_id)
         emotion_config = _map_emotion(request.emotion)
         length_scale = max(0.5, min(2.0, 2.0 - request.speed))
@@ -100,7 +123,8 @@ async def tts_synthesize_stream(request: TTSRequest):
     de que termine la generación completa."""
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Texto vacío")
-    
+
+    _, TextToSpeechService, _ = _get_tts_service_or_503()
     tts = TextToSpeechService(voice_id=request.voice_id)
     tts._init_voice()  # FIX: initialize voice before streaming
     
@@ -130,8 +154,8 @@ async def tts_synthesize_stream(request: TTSRequest):
 @router.get("/voices")
 async def tts_list_voices():
     """Lista todas las voces disponibles."""
-    from backend.services.tts_service import VOICE_CATALOG
-    
+    _, _, VOICE_CATALOG = _get_tts_service_or_503()
+
     voices = []
     for voice_id, info in VOICE_CATALOG.items():
         voices.append({
@@ -156,11 +180,12 @@ async def tts_upload_voice(request: Request):
     body = await request.body()
     if len(body) < 1000:
         raise HTTPException(status_code=400, detail="Archivo de audio demasiado pequeño")
-    
+
+    get_tts_service, _, _ = _get_tts_service_or_503()
     from backend.services.tts_service import VOICES_DIR
     sample_path = VOICES_DIR / "user_voice_sample.wav"
     sample_path.write_bytes(body)
-    
+
     tts = get_tts_service()
     tts.set_voice_reference(sample_path)
     

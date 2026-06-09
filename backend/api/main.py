@@ -27,7 +27,29 @@ from backend.core.exceptions import (
     app_error_handler,
 )
 from backend.core.rate_limiter import limiter
-from backend.api.routers import chat, notes, todos, calendar, email, threads, messages, agent, diagnostics, search, tts, personas, backup, stt, auth, llm, voice, files, auth_google, gmail, drive, chat_smoke
+
+# Routers: import with fallback. Heavy ones (TTS/STT) can be missing in
+# slim Railway builds — we register them only if importable so a broken
+# optional dep no longer kills the whole app at startup.
+from backend.api.routers import (
+    chat, notes, todos, calendar, email, threads, messages, agent,
+    diagnostics, search, personas, backup, auth, llm, voice, files,
+    auth_google, gmail, drive, chat_smoke,
+)
+try:
+    from backend.api.routers import tts  # piper + onnxruntime, ~200MB
+    _tts_available = True
+except Exception as _e:
+    logger.warning(f"tts router not loaded (skip): {_e}")
+    tts = None
+    _tts_available = False
+try:
+    from backend.api.routers import stt  # faster-whisper, ~300MB
+    _stt_available = True
+except Exception as _e:
+    logger.warning(f"stt router not loaded (skip): {_e}")
+    stt = None
+    _stt_available = False
 
 # Wiki router is loaded LAZILY (ChromaDB + sentence-transformers ~300MB)
 # to keep Railway free tier (1GB RAM) under the OOM threshold.
@@ -155,7 +177,15 @@ async def google_not_configured_handler(request: Request, exc: GoogleNotConfigur
 @app.get("/api/v1/health")
 async def health():
     """Basic health check."""
-    return {"status": "ok", "service": "jarvis", "version": "2.0.0"}
+    return {
+        "status": "ok",
+        "service": "jarvis",
+        "version": "2.0.0",
+        "optional_routers": {
+            "tts": _tts_available,
+            "stt": _stt_available,
+        },
+    }
 
 
 @app.get("/api/v1/health/ready")
@@ -206,7 +236,8 @@ app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(agent.router, prefix="/api/v1", tags=["agent"])
 app.include_router(diagnostics.router, prefix="/api/v1", tags=["diagnostics"])
 app.include_router(chat_smoke.router, prefix="/api/v1", tags=["diagnostics"])
-app.include_router(tts.router, prefix="/api/v1", tags=["tts"])
+if tts is not None:
+    app.include_router(tts.router, prefix="/api/v1", tags=["tts"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(notes.router, prefix="/api/v1/notes", tags=["notes"])
 app.include_router(todos.router, prefix="/api/v1/todos", tags=["todos"])
@@ -217,7 +248,8 @@ app.include_router(messages.router, prefix="/api/v1/messages", tags=["messages"]
 app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(personas.router, prefix="/api/v1", tags=["personas"])
 app.include_router(backup.router, prefix="/api/v1", tags=["backup"])
-app.include_router(stt.router, prefix="/api/v1", tags=["stt"])
+if stt is not None:
+    app.include_router(stt.router, prefix="/api/v1", tags=["stt"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
 
