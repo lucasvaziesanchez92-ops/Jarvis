@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 
 from backend.services.memory_service import memory_service
+from backend.tools.registry import get_tool_status
 
 router = APIRouter(prefix="/diagnostics", tags=["diagnostics"])
 
@@ -28,3 +29,14 @@ async def agent_cleanup(compact_days: int = 30):
 async def memory_categories():
     """List all memory categories with counts."""
     return memory_service.list_categories()
+
+
+@router.get("/tools")
+async def tools_status():
+    """List which tools the LLM currently has access to.
+
+    Critical: Google tools (Gmail, Drive, Calendar) only appear here if
+    OAuth is fully configured. If they don't appear, the LLM is NOT shown
+    them and cannot hallucinate their execution.
+    """
+    return get_tool_status()
