@@ -1,4 +1,5 @@
 """Graph — semantic tool routing + token budget + parallel tools."""
+import json
 from typing import Literal
 
 from langgraph.graph import StateGraph, START, END
