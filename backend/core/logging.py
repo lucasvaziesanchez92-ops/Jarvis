@@ -15,20 +15,27 @@ except PermissionError:
 
 
 def _fmt_console(record: dict) -> str:
-    """Custom formatter that safely handles missing request_id, JSON in messages, and angle brackets in function names."""
-    import re
-    extra = record.get("extra", {})
-    if hasattr(extra, "get"):
-        rid = extra.get("request_id", "N/A")
-    else:
-        rid = "N/A"
-    time_str = record["time"].strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-    level_name = record["level"].name if hasattr(record["level"], "name") else str(record["level"])
-    raw_msg = str(record["message"])
-    safe_msg = raw_msg.replace("{", "{{").replace("}", "}}")
-    func_name = str(record.get("function", "?")).replace("<", r"\<").replace(">", r"\>")
-    mod_name = str(record.get("name", "N/A"))
+    """Custom formatter that safely handles missing request_id, JSON in messages, and angle brackets in function names.
+
+    CRITICAL: must NEVER raise — if it raises, loguru's internal format() call
+    propagates the exception into the request path and produces 500s on what
+    should be a clean error log. We catch everything and return a plain string.
+    """
     try:
+        import re
+        extra = record.get("extra", {})
+        if hasattr(extra, "get"):
+            rid = extra.get("request_id", "N/A")
+        else:
+            rid = "N/A"
+        time_str = record["time"].strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        level_name = record["level"].name if hasattr(record["level"], "name") else str(record["level"])
+        raw_msg = str(record["message"])
+        # Escape braces so loguru's internal format() doesn't try to interpret
+        # JSON-like substrings in the message as placeholders.
+        safe_msg = raw_msg.replace("{", "{{").replace("}", "}}")
+        func_name = str(record.get("function", "?")).replace("<", r"\<").replace(">", r"\>")
+        mod_name = str(record.get("name", "N/A"))
         return (
             f"<green>{time_str}</green> | "
             f"<level>{level_name: <8}</level> | "
@@ -37,11 +44,23 @@ def _fmt_console(record: dict) -> str:
             f"<level>{safe_msg}</level>\n"
         )
     except Exception:
-        return f"<green>{time_str}</green> | <level>{level_name: <8}</level> | {raw_msg[:500]}\n"
+        # If ANYTHING in formatting fails, return a minimal safe string.
+        # This MUST NOT raise — a failure here would propagate into the
+        # request path and turn normal error logs into 500 responses.
+        try:
+            return f"[log-fmt-error] {str(record.get('message', ''))[:500]}\n"
+        except Exception:
+            return "[log-fmt-error] <unprintable>\n"
 
 
 def setup_logging() -> None:
-    """Configure loguru with structured JSON logging and request ID support."""
+    """Configure loguru with structured JSON logging and request ID support.
+
+    catch=True on all handlers so a malformed log message (e.g. containing
+    JSON-like `{}` that confuses loguru's internal format()) can NEVER
+    propagate into the request path. Without this, an error during logging
+    turns into a 500 response — see git history of the OOM saga.
+    """
     # Remove default handler
     logger.remove()
 
@@ -51,6 +70,7 @@ def setup_logging() -> None:
         level="INFO",
         format=_fmt_console,
         colorize=True,
+        catch=True,  # NEVER raise from a log call
     )
 
     # File handler — JSON format for production/ELK stack
@@ -61,7 +81,8 @@ def setup_logging() -> None:
         retention="30 days",
         compression="zip",
         serialize=True,  # JSON format
-        enqueue=True,  # Thread-safe
+        enqueue=True,    # Thread-safe
+        catch=True,
     )
 
     # Error-only file
@@ -73,6 +94,7 @@ def setup_logging() -> None:
         compression="zip",
         serialize=True,
         enqueue=True,
+        catch=True,
     )
 
 

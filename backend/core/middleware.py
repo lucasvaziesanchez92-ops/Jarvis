@@ -9,6 +9,19 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 
+def _safe_log(level: str, request_logger, msg: str, **kwargs) -> None:
+    """Loguru format() crashes on messages containing '{...}' literals (e.g. JSON
+    error responses). We escape braces before formatting to avoid KeyError and
+    let logging NEVER raise into the request path."""
+    try:
+        safe_msg = msg.replace("{", "{{").replace("}", "}}")
+        getattr(request_logger, level)(safe_msg, **kwargs)
+    except Exception:
+        # Last resort: stderr
+        import sys
+        print(f"[log-fail] {level}: {msg[:300]}", file=sys.stderr)
+
+
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Generate and propagate X-Request-ID for distributed tracing."""
 
@@ -45,22 +58,27 @@ class RequestResponseLoggingMiddleware(BaseHTTPMiddleware):
             client=request.client.host if request.client else "unknown",
         )
 
-        request_logger.info("Request started")
+        _safe_log("info", request_logger, "Request started")
 
         try:
             response = await call_next(request)
             process_time = time.perf_counter() - start_time
 
-            request_logger.info(
-                f"Response: {response.status_code} in {process_time:.4f}s"
+            _safe_log(
+                "info",
+                request_logger,
+                f"Response: {response.status_code} in {process_time:.4f}s",
             )
 
             return response
 
         except Exception as exc:
             process_time = time.perf_counter() - start_time
-            request_logger.error(
-                f"Error after {process_time:.4f}s: {exc}",
+            # Build a safe message — str(exc) can contain JSON with braces.
+            _safe_log(
+                "error",
+                request_logger,
+                f"Error after {process_time:.4f}s: {type(exc).__name__}: {str(exc)[:300]}",
                 exc_info=True,
             )
             raise
