@@ -1,4 +1,5 @@
 """FastAPI dependency — graph pre-built at startup, shared across requests."""
+import traceback
 from loguru import logger
 
 _jarvis_graph = None
@@ -15,7 +16,8 @@ def build_graph():
         _graph_ok = True
         logger.info(f"Agent graph ready: {len(ALL_TOOLS)} tools loaded")
     except Exception as e:
-        logger.error(f"Graph build failed: {e}")
+        logger.error(f"Graph build failed: {type(e).__name__}: {e}")
+        logger.error(traceback.format_exc())
 
 def get_jarvis_graph():
     global _jarvis_graph
