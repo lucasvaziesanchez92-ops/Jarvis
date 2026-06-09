@@ -108,16 +108,20 @@ def tool_node(state: JarvisState) -> dict:
     tools_executed = state.get("tools_executed", [])
 
     if not (hasattr(last, "tool_calls") and last.tool_calls):
+        logger.warning(f"tool_node: no tool_calls in last message ({type(last).__name__})")
         return {"messages": []}
 
     tool_map = {t.name: t for t in ALL_TOOLS}
     result = []
     for tc in last.tool_calls:
         name = tc["name"]
+        args = tc.get("args", {})
+        logger.info(f"tool_node: executing {name}({json.dumps(args, default=str)[:200]})")
         t = tool_map.get(name)
         if t:
             try:
                 out = str(t.invoke(tc["args"]))
+                logger.info(f"tool_node: {name} returned {len(out)} chars: {out[:200]}")
                 result.append(ToolMessage(content=out, tool_call_id=tc["id"], name=name))
                 if name not in tools_executed:
                     tools_executed.append(name)
@@ -125,6 +129,7 @@ def tool_node(state: JarvisState) -> dict:
                 logger.error(f"Tool '{name}' crashed: {type(ex).__name__}: {ex}", exc_info=True)
                 result.append(ToolMessage(content=f"Error: {type(ex).__name__}: {str(ex)[:200]}", tool_call_id=tc["id"], name=name))
         else:
+            logger.error(f"tool_node: tool '{name}' not found in registry ({len(tool_map)} tools loaded)")
             result.append(ToolMessage(
                 content=f"Herramienta '{name}' no encontrada. Disponibles: {', '.join(sorted(tool_map.keys()))[:200]}",
                 tool_call_id=tc["id"], name=name,

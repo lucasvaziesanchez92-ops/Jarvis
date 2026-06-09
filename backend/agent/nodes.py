@@ -37,6 +37,18 @@ def call_model_with_tools(
     persona = state.get("persona", "profesional")
     base = list(state["messages"])
 
+    # Inject tool-usage contract: the LLM must not hallucinate results.
+    # If a tool was actually executed, its ToolMessage will appear in the
+    # conversation. Otherwise, the LLM must explicitly say so.
+    tool_contract = (
+        "REGLAS CRÍTICAS SOBRE HERRAMIENTAS:\n"
+        "1. Si decidís usar una herramienta, emití el tool_call. NO describas su resultado en texto hasta ver el ToolMessage correspondiente.\n"
+        "2. Si una herramienta falla, decí 'No pude ejecutar X porque Y'. NO inventes un resultado exitoso.\n"
+        "3. Si el usuario pide algo concreto (crear nota, mandar mail, agendar evento) y vos no llamás a la tool, no podés afirmar que lo hiciste. Decí 'voy a hacerlo' o 'lo hago' SOLO cuando estés por emitir el tool_call.\n"
+        "4. NUNCA digas 'listo, ya está guardado/creado/enviado' si no viste un ToolMessage confirmándolo.\n"
+        "5. Si la herramienta devuelve error (credenciales faltantes, módulo no disponible, etc.), reportá el error tal cual al usuario, no finjas éxito."
+    )
+
     if extra_context and base:
         ctx = HumanMessage(content=(
             "[INFORMACIÓN RELEVANTE DE TU MEMORIA EXTERNA]\n" + extra_context
@@ -45,7 +57,7 @@ def call_model_with_tools(
     else:
         enriched = base
 
-    system = SystemMessage(content=_get_persona_prompt(persona))
+    system = SystemMessage(content=_get_persona_prompt(persona) + "\n\n" + tool_contract)
     messages = [system] + enriched
     trimmed = _trim_messages(messages, persona)
 
