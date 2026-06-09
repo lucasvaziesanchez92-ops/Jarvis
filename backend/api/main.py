@@ -7,6 +7,12 @@ from contextlib import asynccontextmanager
 # Suppress Pydantic V1 compatibility warnings (Python 3.14 + langchain v1)
 warnings.filterwarnings("ignore", message="Core Pydantic V1 functionality", category=UserWarning)
 
+# Memory tracing — log RSS at key import points to diagnose OOM kills
+# on Railway free tier (512MB). Remove once stable.
+def _rss_mb() -> float:
+    import psutil
+    return round(psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024, 1)
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -14,6 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from loguru import logger
+logger.info(f"[mem] after fastapi imports: {_rss_mb()} MB")
 
 from backend.config import settings
 from backend.core.logging import setup_logging
@@ -27,15 +34,25 @@ from backend.core.exceptions import (
     app_error_handler,
 )
 from backend.core.rate_limiter import limiter
+logger.info(f"[mem] after core imports: {_rss_mb()} MB")
 
 # Routers: import with fallback. Heavy ones (TTS/STT) can be missing in
 # slim Railway builds — we register them only if importable so a broken
 # optional dep no longer kills the whole app at startup.
 from backend.api.routers import (
-    chat, notes, todos, calendar, email, threads, messages, agent,
+    chat, notes, todos, calendar, email, threads, messages,
     diagnostics, search, personas, backup, auth, llm, voice, files,
     auth_google, gmail, drive, chat_smoke,
 )
+logger.info(f"[mem] after non-agent routers: {_rss_mb()} MB")
+try:
+    from backend.api.routers import agent  # langgraph graph build, heaviest
+    _agent_available = True
+    logger.info(f"[mem] after agent router: {_rss_mb()} MB")
+except Exception as _e:
+    logger.warning(f"agent router not loaded (skip): {_e}")
+    agent = None
+    _agent_available = False
 try:
     from backend.api.routers import tts  # piper + onnxruntime, ~200MB
     _tts_available = True
@@ -68,6 +85,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"LLM Provider: {settings.llm_provider}")
     logger.info(f"Data Directory: {settings.data_dir}")
     logger.info(f"LangSmith: {'enabled' if settings.enable_langsmith else 'disabled'}")
+    logger.info(f"[mem] startup: {_rss_mb()} MB")
     logger.info("=" * 60)
 
     # Enable LangSmith observability if configured
@@ -177,6 +195,10 @@ async def google_not_configured_handler(request: Request, exc: GoogleNotConfigur
 @app.get("/api/v1/health")
 async def health():
     """Basic health check."""
+    import os
+    import psutil
+    proc = psutil.Process(os.getpid())
+    mem = proc.memory_info()
     return {
         "status": "ok",
         "service": "jarvis",
@@ -185,6 +207,11 @@ async def health():
             "tts": _tts_available,
             "stt": _stt_available,
         },
+        "memory_mb": {
+            "rss": round(mem.rss / 1024 / 1024, 1),
+            "vms": round(mem.vms / 1024 / 1024, 1),
+        },
+        "pid": os.getpid(),
     }
 
 
@@ -233,7 +260,8 @@ async def liveness_check():
 # -- API v1 Routes -------------------------------------------
 
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
-app.include_router(agent.router, prefix="/api/v1", tags=["agent"])
+if agent is not None:
+    app.include_router(agent.router, prefix="/api/v1", tags=["agent"])
 app.include_router(diagnostics.router, prefix="/api/v1", tags=["diagnostics"])
 app.include_router(chat_smoke.router, prefix="/api/v1", tags=["diagnostics"])
 if tts is not None:
