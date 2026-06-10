@@ -91,8 +91,10 @@ function IceBrain() {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
     const { persona: p, activityState: st } = personaStateRef.current;
-    const theme = getPersonalityTheme(p || 'profesional', st || 'idle');
-    const meta = STATE_META[(st as keyof typeof STATE_META) || 'idle'] || STATE_META.idle;
+    const pName = typeof p === 'string' ? p : (p && (p as any).name) || 'profesional';
+    const stName = typeof st === 'string' ? st : 'idle';
+    const theme = getPersonalityTheme(pName, stName);
+    const meta = STATE_META[stName as keyof typeof STATE_META] || STATE_META.idle;
 
     groupRef.current.rotation.y = t * 0.15;
 
