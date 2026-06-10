@@ -104,6 +104,12 @@ function spawnParticles(
 export default function BrainVisual({ width = 400, height = 360 }: { width?: number; height?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { activityState } = useJarvisStore();
+  // Keep activityState in a ref so the render loop reads the current
+  // value WITHOUT re-mounting the whole canvas + requestAnimationFrame
+  // every time the state changes (which was happening 5-10x per chat
+  // message and freezing the UI).
+  const activityStateRef = useRef(activityState);
+  useEffect(() => { activityStateRef.current = activityState; }, [activityState]);
   const particlesRef = useRef<Particle[]>([]);
   const frameRef = useRef(0);
 
@@ -125,11 +131,25 @@ export default function BrainVisual({ width = 400, height = 360 }: { width?: num
     const scale = Math.min(width, height);
 
     let animId: number;
+    let lastTime = performance.now();
+    let frameAccum = 0;
+    const FRAME_MS = 1000 / 30; // cap at 30 FPS — the brain doesn't need 60
 
     function render() {
+      const now = performance.now();
+      const delta = now - lastTime;
+      lastTime = now;
+
+      // Throttle to 30 FPS so we don't burn CPU on every screen refresh.
+      if (delta < FRAME_MS) {
+        animId = requestAnimationFrame(render);
+        return;
+      }
+      frameAccum += delta;
+      const t = frameAccum * 0.001;
       frameRef.current++;
-      const t = frameRef.current * 0.016;
-      const colors = STATE_COLORS[activityState] || STATE_COLORS.idle;
+
+      const colors = STATE_COLORS[activityStateRef.current] || STATE_COLORS.idle;
 
       ctx.clearRect(0, 0, width, height);
 
@@ -212,7 +232,11 @@ export default function BrainVisual({ width = 400, height = 360 }: { width?: num
 
     render();
     return () => cancelAnimationFrame(animId);
-  }, [width, height, activityState]);
+    // Note: activityState is NOT in deps — we use activityStateRef so the
+    // render loop keeps running smoothly across state transitions instead
+    // of tearing down + recreating the entire canvas 5-10x per chat message.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height]);
 
   return (
     <canvas
