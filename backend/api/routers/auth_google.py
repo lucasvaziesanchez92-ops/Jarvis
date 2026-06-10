@@ -36,6 +36,15 @@ async def google_callback(code: str = Query(...), state: str = Query(None), requ
 
     user_id = "default_user"
     email = tokens.get("email", "")
+    
+    # Whitelist check
+    import os
+    allowed_emails_env = os.getenv("ALLOWED_EMAILS", "vaziesanchezlucas@gmail.com")
+    allowed_emails = [e.strip().lower() for e in allowed_emails_env.split(",") if e.strip()]
+    if email.lower() not in allowed_emails:
+        logger.warning(f"Unauthorized Google login attempt from: {email}")
+        raise HTTPException(status_code=403, detail="Tu correo no está autorizado para acceder a JARVIS.")
+
     # CRITICAL: also save access_token + expires_at. Without these, the
     # token is saved but immediately unusable, causing 403 'unregistered
     # callers' on every Drive/Gmail/Calendar call.
