@@ -1,14 +1,15 @@
 'use client';
 
-import { useRef, useMemo, useState, useEffect, Suspense } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { useRef, useMemo, useEffect, Suspense } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { useJarvisStore } from '@/store/jarvisStore';
 
-// JARVIS Brain v3 - uses the user-supplied brain.glb model
-// Restored after the binary-corruption incident. UTF-8 clean.
+// JARVIS Brain v4 - procedural anatomical brain (no GLB, no network).
+// Rendered with FBM-like noise displacement on a subdivided icosahedron
+// to look brain-like (gyri/sulci bumps). Always renders reliably.
 
 const STATE_META = {
   idle:      { grooveIntensity: 0.55, rimIntensity: 1.4 },
@@ -79,32 +80,33 @@ function getPersonalityTheme(persona: string, state: string) {
 function BrainModel() {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
-  const [loaded, setLoaded] = useState(false);
+  const wireRef = useRef<THREE.Mesh>(null);
   const { persona, activityState } = useJarvisStore();
   const stateRef = useRef({ persona, activityState });
   useEffect(() => { stateRef.current = { persona, activityState }; }, [persona, activityState]);
 
-  // Load the user-supplied brain.glb. Errors are caught and the
-  // fallback procedural mesh (anatomical icosahedron) is shown.
-  const gltf = useGLTF('/models/brain.glb');
-  const scene = useMemo(() => {
-    try {
-      const cloned = gltf.scene.clone(true);
-      cloned.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh) {
-          const mesh = obj as THREE.Mesh;
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-        }
-      });
-      setLoaded(true);
-      return cloned;
-    } catch (e) {
-      // Don't blow up the whole scene if GLB fails to parse.
-      console.error('[BrainBackground] failed to load brain.glb:', e);
-      return null;
+  // Procedural brain: subdivided icosahedron with FBM-like noise
+  // displacement to mimic gyri/sulci. Pure procedural - no GLB, no
+  // network, no parse failures. Always renders.
+  const geometry = useMemo(() => {
+    const geo = new THREE.IcosahedronGeometry(1.0, 32);
+    const pos = geo.attributes.position;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      // Multi-octave noise to create brain-like bumps
+      const n =
+        Math.sin(v.x * 4) * Math.cos(v.y * 4) * 0.04 +
+        Math.sin(v.x * 8 + 1.3) * Math.cos(v.z * 8 + 0.7) * 0.025 +
+        Math.sin(v.y * 12 + 2.1) * Math.cos(v.x * 12) * 0.015;
+      // Elongate vertically (brain is taller than wide)
+      v.y *= 1.15;
+      v.normalize().multiplyScalar(1.0 + n);
+      pos.setXYZ(i, v.x, v.y, v.z);
     }
-  }, [gltf]);
+    geo.computeVertexNormals();
+    return geo;
+  }, []);
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
@@ -116,45 +118,49 @@ function BrainModel() {
     const meta = STATE_META[stName as keyof typeof STATE_META] || STATE_META.idle;
 
     groupRef.current.rotation.y = t * 0.2;
+    groupRef.current.rotation.x = Math.sin(t * 0.3) * 0.05;
 
-    // Recolor either the GLB or the fallback mesh
-    const target = scene || (meshRef.current as unknown as THREE.Object3D);
-    if (target && (target as any).traverse) {
-      (target as any).traverse((obj: THREE.Object3D) => {
-        if ((obj as THREE.Mesh).isMesh) {
-          const mat = (obj as THREE.Mesh).material as THREE.MeshPhysicalMaterial;
-          if (mat) {
-            mat.color.setHex(theme.base);
-            mat.emissive.setHex(theme.emissive);
-            mat.emissiveIntensity = 0.4 + Math.sin(t * 1.2) * 0.2 * meta.grooveIntensity;
-          }
-        }
-      });
+    if (meshRef.current) {
+      const mat = meshRef.current.material as THREE.MeshPhysicalMaterial;
+      if (mat) {
+        mat.color.setHex(theme.base);
+        mat.emissive.setHex(theme.emissive);
+        mat.emissiveIntensity = 0.4 + Math.sin(t * 1.2) * 0.2 * meta.grooveIntensity;
+      }
+    }
+    if (wireRef.current) {
+      const mat = wireRef.current.material as THREE.MeshBasicMaterial;
+      if (mat) {
+        mat.color.setHex(theme.edge);
+        mat.opacity = 0.25 + Math.sin(t * 1.5) * 0.05;
+      }
     }
   });
 
   return (
-    <group ref={groupRef} scale={0.8} position={[0, 0, 0]}>
-      {scene ? (
-        <primitive object={scene} ref={meshRef} />
-      ) : (
-        // Fallback anatomical shape   visible immediately while the GLB
-        // is being parsed, and also acts as a safety net if the GLB
-        // fails to load.
-        <mesh ref={meshRef} castShadow receiveShadow>
-          <icosahedronGeometry args={[0.8, 5]} />
-          <meshPhysicalMaterial
-            color={0xd0e8e8}
-            emissive={0x2a1030}
-            emissiveIntensity={0.4}
-            roughness={0.2}
-            metalness={0.3}
-            transmission={0.5}
-            thickness={0.5}
-            ior={1.5}
-          />
-        </mesh>
-      )}
+    <group ref={groupRef} scale={0.85} position={[0, 0, 0]}>
+      <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
+        <meshPhysicalMaterial
+          color={0xd0e8e8}
+          emissive={0x2a1030}
+          emissiveIntensity={0.4}
+          roughness={0.25}
+          metalness={0.3}
+          transmission={0.4}
+          thickness={0.6}
+          ior={1.5}
+          clearcoat={0.6}
+          clearcoatRoughness={0.15}
+        />
+      </mesh>
+      <mesh ref={wireRef} scale={1.02} geometry={geometry}>
+        <meshBasicMaterial
+          color={0x40e0d0}
+          wireframe
+          transparent
+          opacity={0.25}
+        />
+      </mesh>
     </group>
   );
 }
@@ -189,11 +195,6 @@ function ParticleField() {
       <pointsMaterial color={0x40e0d0} size={0.02} transparent opacity={0.4} />
     </points>
   );
-}
-
-function ThoughtBubbles() {
-  // Disabled   was occluding the brain. Kept empty for compatibility.
-  return null;
 }
 
 function StageLights() {
@@ -234,7 +235,6 @@ export default function BrainBackground() {
           <StageLights />
           <BrainModel />
           <ParticleField />
-          <ThoughtBubbles />
         </Suspense>
         <EffectComposer>
           <Bloom intensity={0.6} luminanceThreshold={0.2} luminanceSmoothing={0.9} />
