@@ -29,11 +29,15 @@ from backend.tools.memory import search_memory, save_memory, list_memories, dele
 # Google Suite (lazy import — requires OAuth)
 try:
     from backend.tools.google_suite import (
-        search_gmail, send_gmail, list_gmail,
+        # Gmail
+        search_gmail, send_gmail, list_gmail, get_gmail_detail,
+        delete_gmail_message, trash_gmail_message,
+        # Drive
         search_drive, list_drive_files, list_drive_folder,
         read_drive_file, get_drive_file_info,
         upload_drive_file, delete_drive_file,
         analyze_drive_image,
+        # Calendar (Google)
         list_calendar_google, create_calendar_event_google,
     )
     _GOOGLE_SUITE_IMPORTABLE = True
@@ -42,6 +46,9 @@ except Exception:
     search_gmail = None        # type: ignore
     send_gmail = None          # type: ignore
     list_gmail = None          # type: ignore
+    get_gmail_detail = None    # type: ignore
+    delete_gmail_message = None # type: ignore
+    trash_gmail_message = None  # type: ignore
     search_drive = None        # type: ignore
     list_drive_files = None    # type: ignore
     list_drive_folder = None   # type: ignore
@@ -52,6 +59,32 @@ except Exception:
     analyze_drive_image = None # type: ignore
     list_calendar_google = None              # type: ignore
     create_calendar_event_google = None      # type: ignore
+
+# Calendar (full CRUD — local tools/calendar.py, with different naming)
+try:
+    from backend.tools.calendar import (
+        create_calendar_event, list_calendar_events,
+        update_calendar_event, delete_calendar_event,
+    )
+    _CALENDAR_TOOLS_IMPORTABLE = True
+except Exception:
+    _CALENDAR_TOOLS_IMPORTABLE = False
+    create_calendar_event = None  # type: ignore
+    list_calendar_events = None   # type: ignore
+    update_calendar_event = None  # type: ignore
+    delete_calendar_event = None  # type: ignore
+
+# Storage tools (Railway Object Storage / local fallback)
+try:
+    from backend.tools.storage import (
+        list_storage_files, read_storage_file, delete_storage_file,
+    )
+    _STORAGE_TOOLS_IMPORTABLE = True
+except Exception:
+    _STORAGE_TOOLS_IMPORTABLE = False
+    list_storage_files = None    # type: ignore
+    read_storage_file = None     # type: ignore
+    delete_storage_file = None   # type: ignore
 
 # Web search — lazy import (playwright may be missing).
 try:
@@ -114,13 +147,28 @@ if _SEMANTIC_AVAILABLE:
 _GOOGLE_TOOLS = []
 if _GOOGLE_SUITE_IMPORTABLE and _google_oauth_configured():
     _GOOGLE_TOOLS = [
-        list_gmail, search_gmail, send_gmail,
+        list_gmail, search_gmail, send_gmail, get_gmail_detail,
+        delete_gmail_message, trash_gmail_message,
         search_drive, list_drive_files, list_drive_folder,
         read_drive_file, get_drive_file_info,
         upload_drive_file, delete_drive_file,
         analyze_drive_image,
         list_calendar_google, create_calendar_event_google,
     ]
+
+# Calendar CRUD — always included (local tools/calendar.py),
+# but each tool returns a clean 503 if Google isn't configured.
+_CALENDAR_TOOLS = []
+if _CALENDAR_TOOLS_IMPORTABLE:
+    _CALENDAR_TOOLS = [
+        list_calendar_events, create_calendar_event,
+        update_calendar_event, delete_calendar_event,
+    ]
+
+# Storage tools — always included (work with local fallback too)
+_STORAGE_TOOLS = []
+if _STORAGE_TOOLS_IMPORTABLE:
+    _STORAGE_TOOLS = [list_storage_files, read_storage_file, delete_storage_file]
 
 # ── Extended tools — email (legacy) + memory ───────────────────
 EXTENDED_TOOLS = [
@@ -129,7 +177,7 @@ EXTENDED_TOOLS = [
 ]
 
 # ── All tools combined, filtered clean ──────────────────────────
-ALL_TOOLS = [t for t in CORE_TOOLS + _GOOGLE_TOOLS + EXTENDED_TOOLS if t is not None]
+ALL_TOOLS = [t for t in CORE_TOOLS + _GOOGLE_TOOLS + _CALENDAR_TOOLS + _STORAGE_TOOLS + EXTENDED_TOOLS if t is not None]
 
 
 def get_tool_status() -> dict:
@@ -144,6 +192,8 @@ def get_tool_status() -> dict:
         "semantic_search_available": _SEMANTIC_AVAILABLE,
         "core_tools": [t.name for t in CORE_TOOLS],
         "google_tools": [t.name for t in _GOOGLE_TOOLS],
+        "calendar_tools": [t.name for t in _CALENDAR_TOOLS],
+        "storage_tools": [t.name for t in _STORAGE_TOOLS],
         "extended_tools": [t.name for t in EXTENDED_TOOLS],
         "all_tools": [t.name for t in ALL_TOOLS],
         "total": len(ALL_TOOLS),
