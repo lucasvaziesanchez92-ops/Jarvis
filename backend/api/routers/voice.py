@@ -43,9 +43,17 @@ async def _transcribe(audio_bytes: bytes) -> str:
     response = client.audio.transcriptions.create(
         model=settings.groq_stt_model,
         file=("audio.webm", io.BytesIO(audio_bytes), "audio/webm"),
-        language=None,
+        language="es",
     )
-    return response.text
+    
+    text = response.text.strip()
+    # Filter common Whisper hallucinations on silent/noisy audio
+    lower_text = text.lower()
+    hallucinations = ["thank you.", "thank you", "thanks.", "gracias.", "gracias", "subtitles", "amara.org", "suscríbete"]
+    if lower_text in hallucinations or len(text) < 2:
+        return ""
+        
+    return text
 
 # ── Module B: Agent Graph (TOOLS ENABLED) ─────────────────────────
 
