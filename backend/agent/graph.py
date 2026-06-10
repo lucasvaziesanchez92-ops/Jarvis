@@ -64,14 +64,27 @@ def agent_node(state: JarvisState) -> dict:
             break
 
     if last_user_msg:
-        tools = _get_router().route(last_user_msg, top_k=10)
+        tools = _get_router().route(last_user_msg, top_k=8)
         persona_names = {t.name for t in persona_tools}
         tools = [t for t in tools if t.name in persona_names]
 
+        # ALWAYS include all available Google tools if OAuth is configured.
+        # The TF-IDF router otherwise drops them on generic queries like
+        # "test all your tools", and the LLM hallucinates that the tools
+        # don't exist. Better to show the LLM every available tool than
+        # to filter too aggressively.
+        for pt in persona_tools:
+            if pt.name.startswith(("list_gmail", "search_gmail", "send_gmail",
+                                    "list_drive", "search_drive", "read_drive",
+                                    "get_drive", "upload_drive", "delete_drive",
+                                    "analyze_drive", "list_calendar_google",
+                                    "create_calendar_event_google")):
+                if pt not in tools:
+                    tools.append(pt)
+
         # Keyword-boost: if the user mentions Drive/Gmail/Calendar/Google
         # explicitly, make sure the relevant Google tools are in the
-        # list. The TF-IDF router sometimes misses them because of the
-        # large number of competing tool descriptions.
+        # list. (Now redundant with the above, kept for clarity.)
         q_lower = last_user_msg.lower()
         keyword_tool_map = {
             ("drive", "google drive", "archivo", "archivos", "fichero", "ficheros", "documento", "documentos"): [
