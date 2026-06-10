@@ -6,10 +6,11 @@ Model choice rationale (see session: research/2026-06-10):
     those names against the schema and falls back to a "no tool"
     response. Caused the user to report "el LLM miente sobre sus
     tools".
-  - qwen3.5:32b is the official Ollama-recommended model for
-    tool-calling as of 2026-06 (https://ollama.com/search?c=tools).
-    It supports the OpenAI-compatible tool_choice API and emits
-    clean tool names. Default to it.
+  - qwen3.5:32b was second try — does NOT EXIST in Ollama Cloud
+    (only :397b tag is published, too big for free tier RAM).
+  - devstral-small-2:24b is the new default: 24B params, 51GB
+    on disk, validated by Mistral for tool-calling / agentic
+    workflows. Available in Ollama Cloud.
   - Set temperature=0 (was 0.2) — at 0.2 the model occasionally
     invents tools it doesn't have (LangGraph issue #7845).
 """

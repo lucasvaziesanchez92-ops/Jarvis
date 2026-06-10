@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # Ollama (Local/Cloud LLM)
     ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
-    ollama_model: str = Field(default="qwen3.5:32b", alias="OLLAMA_MODEL_ID")
+    ollama_model: str = Field(default="devstral-small-2:24b", alias="OLLAMA_MODEL_ID")
     ollama_api_key: str = Field(default="", alias="OLLAMA_API_KEY")
 
     # LM Studio (OpenAI-compatible local LLM)
