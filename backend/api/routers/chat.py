@@ -24,6 +24,17 @@ router = APIRouter()
 _session_history: dict[str, list] = defaultdict(list)
 _MAX_HISTORY = 20  # messages per session
 
+def _prune_history(messages: list, max_msgs: int) -> list:
+    """Safely truncates history without breaking ToolMessage/AIMessage pairs.
+    Always starts the truncated history with a HumanMessage."""
+    if len(messages) <= max_msgs:
+        return messages
+    start_idx = len(messages) - max_msgs
+    for i in range(start_idx, len(messages)):
+        if getattr(messages[i], "type", "") == "human":
+            return messages[i:]
+    return messages[-max_msgs:]
+
 # Railway free tier proxy window = 30s. Cap the graph at 22s; fallback
 # to plain LLM (no tools) if the agent times out. Keeping this low
 # because the user sees a fast fallback message instead of staring at
@@ -197,7 +208,7 @@ async def ws_chat(websocket: WebSocket):
                 # responses). The graph returns the FULL state
                 # (history + new turn), so we replace, not append.
                 if state.get("messages"):
-                    _session_history[session_id] = list(state["messages"])[-_MAX_HISTORY:]
+                    _session_history[session_id] = _prune_history(list(state["messages"]), _MAX_HISTORY)
 
             except Exception as e:
                 logger.exception("WS error in chat loop")
