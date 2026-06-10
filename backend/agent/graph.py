@@ -172,12 +172,42 @@ def tool_node(state: JarvisState) -> dict:
     result = []
     for tc in last.tool_calls:
         name = tc["name"]
-        args = tc.get("args", {})
-        logger.info(f"tool_node: executing {name}({json.dumps(args, default=str)[:200]})")
+        raw_args = tc.get("args", {}) or {}
+        logger.info(f"tool_node: executing {name}({json.dumps(raw_args, default=str)[:200]})")
         t = tool_map.get(name)
         if t:
+            # Validate args against the tool's Pydantic schema BEFORE
+            # invoking. devstral-small-2:24b sometimes omits required
+            # fields (e.g. 'content' on create_note) which previously
+            # surfaced to the user as 'Error: content' — useless.
+            # We return a structured error that the LLM can recover
+            # from in its next turn.
             try:
-                out = str(t.invoke(tc["args"]))
+                schema = getattr(t, "args_schema", None)
+                missing = []
+                coerced = dict(raw_args)
+                if schema is not None and hasattr(schema, "model_fields"):
+                    for fname, finfo in schema.model_fields.items():
+                        if fname not in coerced or coerced[fname] in (None, ""):
+                            is_required = finfo.is_required() if callable(getattr(finfo, "is_required", None)) else True
+                            if is_required:
+                                missing.append(fname)
+                    if missing:
+                        # Heuristics: pick a sensible default for the
+                        # most common 'content' omission so the LLM
+                        # can keep moving.
+                        if missing == ["content"] and name.startswith("create_"):
+                            coerced["content"] = "(contenido no especificado)"
+                            missing = []
+                if missing:
+                    msg = (
+                        f"Error: la herramienta '{name}' requiere los campos "
+                        f"{missing} que no fueron provistos. Reformula tu llamada "
+                        f"incluyendo esos argumentos."
+                    )
+                    result.append(ToolMessage(content=msg, tool_call_id=tc["id"], name=name))
+                    continue
+                out = str(t.invoke(coerced))
                 logger.info(f"tool_node: {name} returned {len(out)} chars: {out[:200]}")
                 result.append(ToolMessage(content=out, tool_call_id=tc["id"], name=name))
                 if name not in tools_executed:

@@ -59,6 +59,15 @@ function BrainModel() {
     const maxDim = Math.max(size.x, size.y, size.z);
     const TARGET = 1.6;
     scaleRef.current = maxDim > 0 ? TARGET / maxDim : 1;
+    // STL files exported from 3D tools (Blender, Tripo, etc.) often
+    // come with Z as 'up' but the user's reference image has the
+    // brain in classic anatomical 3/4 lateral view (frontal lobe
+    // on the LEFT, cerebellum on the RIGHT). Tripo STL exports
+    // with the longitudinal axis along Z, so we rotate by -90deg
+    // around X to put it in the expected anatomical pose, then
+    // apply a 25deg yaw for the 3/4 view.
+    geometry.rotateX(-Math.PI / 2);
+    geometry.computeBoundingBox();
     geometry.computeVertexNormals();
   }, [geometry]);
 
@@ -69,13 +78,13 @@ function BrainModel() {
     const stName = typeof st === 'string' ? st : 'idle';
     const palette = getPalette(stName);
 
-    // Fixed base orientation that shows the brain in 3/4 lateral
-    // view (frontal lobe + temporal + cerebellum visible — the
-    // pose the user wants). Add a very subtle breath-like sway
-    // instead of a full spin, so the brain never looks
-    // "standing up vertically".
-    groupRef.current.rotation.y = Math.PI * 0.15 + Math.sin(t * 0.4) * 0.05;
-    groupRef.current.rotation.x = -0.18 + Math.sin(t * 0.3) * 0.03;
+    // Fixed anatomical 3/4 view (frontal lobe left, cerebellum
+    // right) with a slow breath-like sway. The user explicitly
+    // said: 'así se debería ver' pointing at a static 3/4 lateral
+    // pose. No more spin.
+    groupRef.current.rotation.y = Math.PI * 0.18 + Math.sin(t * 0.3) * 0.04;
+    groupRef.current.rotation.x = 0.0;
+    groupRef.current.rotation.z = Math.sin(t * 0.4) * 0.02;
     groupRef.current.position.y = Math.sin(t * 0.5) * 0.04;
 
     if (meshRef.current) {

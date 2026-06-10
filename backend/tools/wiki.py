@@ -11,14 +11,20 @@ def wiki_query(query: str) -> str:
         from backend.services.wiki_engine import search_vault
         results = search_vault(query, n_results=5)
         if not results:
-            return "No encontré información relevante en tu segundo cerebro sobre eso."
+            return (
+                "Tu segundo cerebro está vacío o no hay notas relevantes para esa consulta. "
+                "Si tenés archivos .md en data/sources/, indexalos con /api/v1/wiki/reindex."
+            )
         lines = []
         for r in results:
             score_pct = round((1 - r.get("score", 1.0)) * 100, 1) if r.get("score") else 0
             lines.append(f"**{r.get('title', 'Nota')}** ({score_pct}% match)\n{r.get('content', '')[:300]}")
         return "\n\n".join(lines)
     except Exception as e:
-        return f"Error buscando en el wiki: {e}. Probá indexar con /api/v1/wiki/reindex."
+        return (
+            "El wiki no está indexado todavía. Subí archivos .md con "
+            "wiki_save_research o ejecutá /api/v1/wiki/reindex para empezar."
+        )
 
 
 @tool
