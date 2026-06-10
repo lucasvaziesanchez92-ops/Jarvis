@@ -155,10 +155,9 @@ async def ws_chat(websocket: WebSocket):
                         ai_resp = await _plain()
                         state = {"messages": [ai_resp]}
                     except Exception as e2:
-                        logger.error(f"plain LLM fallback failed: {e2}")
+                        logger.error(f"plain LLM fallback failed: {type(e2).__name__}: {e2}")
                         await send(StreamChunk(type="token", content=(
-                            "Tuve un problema de latencia con mi modelo. "
-                            "¿Probás de nuevo en unos segundos?"
+                            f"Error técnico con el modelo: {type(e2).__name__}: {str(e2)[:200]}"
                         )))
                         await send(StreamChunk(type="done"))
                         continue

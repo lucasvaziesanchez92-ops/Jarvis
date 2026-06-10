@@ -1,5 +1,6 @@
 """LangGraph nodes — single agent with native bind_tools.
 minimax-m2.7:cloud soporta function calling via OpenAI-compatible API."""
+import traceback
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -102,16 +103,18 @@ def call_model_with_tools(
         response = llm_breaker.call(llm_with_tools.invoke, trimmed)
     except Exception as e:
         err_msg = str(e)
-        logger.warning(f"bind_tools falló ({type(e).__name__}: {err_msg[:150]}) — usando invoke plano")
+        logger.error(f"bind_tools falló en agent_node: {type(e).__name__}: {err_msg[:500]}")
+        logger.error(traceback.format_exc()[:1500])
         from backend.llm import get_llm
         llm = get_llm()
         try:
             response = llm_breaker.call(llm.invoke, trimmed)
         except Exception as e2:
-            logger.error(f"plain LLM también falló: {e2}")
+            logger.error(f"plain LLM también falló: {type(e2).__name__}: {e2}")
+            import traceback as tb
+            logger.error(tb.format_exc()[:1500])
             response = AIMessage(content=(
-                "Tuve un problema de latencia con mi modelo. "
-                "¿Podés reformular la pregunta o intentar de nuevo en unos segundos?"
+                f"Error técnico con el modelo. Detalle: {type(e2).__name__}: {str(e2)[:200]}"
             ))
 
     return {"messages": [response]}
