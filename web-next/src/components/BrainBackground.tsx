@@ -2,13 +2,12 @@
 
 import { useRef, useMemo, useState, useEffect, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, useGLTF } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { useJarvisStore } from '@/store/jarvisStore';
 
-// JARVIS Brain v2 - Ice Material + Particles + States
+// JARVIS Brain v3 - uses the user-supplied brain.glb model
 // Restored after the binary-corruption incident. UTF-8 clean.
 
 const STATE_META = {
@@ -77,88 +76,70 @@ function getPersonalityTheme(persona: string, state: string) {
   return p[state as keyof typeof p] || p.idle;
 }
 
-function IceBrain() {
+function BrainModel() {
   const groupRef = useRef<THREE.Group>(null);
-  const mainMeshRef = useRef<THREE.Mesh>(null);
-  const innerMeshRef = useRef<THREE.Mesh>(null);
-  const glowMeshRef = useRef<THREE.Mesh>(null);
-
+  const meshRef = useRef<THREE.Mesh>(null);
   const { persona, activityState } = useJarvisStore();
-  const personaStateRef = useRef({ persona, activityState });
-  useEffect(() => { personaStateRef.current = { persona, activityState }; }, [persona, activityState]);
+  const stateRef = useRef({ persona, activityState });
+  useEffect(() => { stateRef.current = { persona, activityState }; }, [persona, activityState]);
+
+  // Load the user-supplied brain.glb
+  const gltf = useGLTF('/models/brain.glb');
+  const scene = useMemo(() => {
+    const cloned = gltf.scene.clone(true);
+    cloned.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mesh = obj as THREE.Mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        // Apply a material that we can recolor per personality/state
+        if (!mesh.material || (mesh.material as any).isShared) {
+          mesh.material = new THREE.MeshPhysicalMaterial({
+            color: 0xd0e8e8,
+            emissive: 0x2a1030,
+            emissiveIntensity: 0.5,
+            roughness: 0.15,
+            metalness: 0.2,
+            transmission: 0.6,
+            thickness: 0.5,
+            ior: 1.5,
+            clearcoat: 0.5,
+            clearcoatRoughness: 0.2,
+          });
+        }
+      }
+    });
+    return cloned;
+  }, [gltf]);
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
-    const { persona: p, activityState: st } = personaStateRef.current;
+    const { persona: p, activityState: st } = stateRef.current;
     const pName = typeof p === 'string' ? p : (p && (p as any).name) || 'profesional';
     const stName = typeof st === 'string' ? st : 'idle';
     const theme = getPersonalityTheme(pName, stName);
     const meta = STATE_META[stName as keyof typeof STATE_META] || STATE_META.idle;
 
-    groupRef.current.rotation.y = t * 0.15;
+    // Slow rotation
+    groupRef.current.rotation.y = t * 0.2;
 
-    if (mainMeshRef.current) {
-      const mat = mainMeshRef.current.material as THREE.MeshPhysicalMaterial;
-      if (mat) {
-        mat.color.setHex(theme.base);
-        mat.emissive.setHex(theme.emissive);
-        mat.emissiveIntensity = 0.5 + Math.sin(t * 1.2) * 0.2 * meta.grooveIntensity;
+    // Recolor the materials in the scene
+    scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mat = (obj as THREE.Mesh).material as THREE.MeshPhysicalMaterial;
+        if (mat) {
+          mat.color.setHex(theme.base);
+          mat.emissive.setHex(theme.emissive);
+          mat.emissiveIntensity = 0.4 + Math.sin(t * 1.2) * 0.2 * meta.grooveIntensity;
+        }
       }
-    }
-    if (innerMeshRef.current) {
-      const mat = innerMeshRef.current.material as THREE.MeshStandardMaterial;
-      if (mat) {
-        mat.color.setHex(theme.base);
-        mat.emissive.setHex(theme.edge);
-        mat.emissiveIntensity = 0.3 + Math.sin(t * 2) * 0.15 * meta.rimIntensity;
-      }
-    }
-    if (glowMeshRef.current) {
-      const mat = glowMeshRef.current.material as THREE.MeshBasicMaterial;
-      if (mat) {
-        mat.color.setHex(theme.edge);
-        mat.opacity = 0.3 + Math.sin(t * 1.5) * 0.1;
-      }
-    }
+    });
   });
 
   return (
-    <group ref={groupRef}>
-      <mesh ref={mainMeshRef} castShadow receiveShadow>
-        <icosahedronGeometry args={[1.2, 4]} />
-        <meshPhysicalMaterial
-          color={0xd0e8e8}
-          emissive={0x2a1030}
-          emissiveIntensity={0.5}
-          roughness={0.15}
-          metalness={0.2}
-          transmission={0.6}
-          thickness={0.5}
-          ior={1.5}
-          clearcoat={0.5}
-          clearcoatRoughness={0.2}
-        />
-      </mesh>
-      <mesh ref={innerMeshRef}>
-        <icosahedronGeometry args={[0.9, 2]} />
-        <meshStandardMaterial
-          color={0x40e0d0}
-          emissive={0x40e0d0}
-          emissiveIntensity={0.3}
-          transparent
-          opacity={0.6}
-        />
-      </mesh>
-      <mesh ref={glowMeshRef} scale={1.5}>
-        <icosahedronGeometry args={[1.2, 1]} />
-        <meshBasicMaterial
-          color={0x40e0d0}
-          wireframe
-          transparent
-          opacity={0.3}
-        />
-      </mesh>
+    <group ref={groupRef} scale={1.5}>
+      <primitive object={scene} ref={meshRef} />
     </group>
   );
 }
@@ -259,7 +240,7 @@ export default function BrainBackground() {
         />
         <Suspense fallback={null}>
           <StageLights />
-          <IceBrain />
+          <BrainModel />
           <ParticleField />
           <ThoughtBubbles />
         </Suspense>
