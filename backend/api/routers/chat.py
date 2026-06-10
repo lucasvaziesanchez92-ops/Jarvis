@@ -14,10 +14,11 @@ from backend.agent.personalities import get_persona
 
 router = APIRouter()
 
-# Railway free tier proxy window = 30s. Cap the graph at 22s; fallback to plain
-# LLM (no tools) if the agent times out.
-_GRAPH_TIMEOUT = 22
-_PLAIN_TIMEOUT = 15
+# Railway free tier proxy window = 30s. The Ollama cloud large models
+# (qwen2.5:72b, gpt-oss:120b) can take 15-30s on first-token. Cap the
+# graph at 60s; fall back to plain LLM (no tools) on timeout.
+_GRAPH_TIMEOUT = 60
+_PLAIN_TIMEOUT = 30
 
 
 class WebSocketCallback(BaseCallbackHandler):

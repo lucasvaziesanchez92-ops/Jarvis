@@ -13,8 +13,8 @@ def get_llm() -> BaseChatModel:
         model=settings.ollama_model,
         api_key=settings.ollama_api_key,
         base_url=f"{settings.ollama_base_url.rstrip('/')}/v1",
-        temperature=0.5,
+        temperature=0.2,  # lower = better for tool-calling
         streaming=True,
-        max_tokens=512,
-        timeout=httpx.Timeout(connect=8.0, read=25.0, write=8.0, pool=5.0),
+        max_tokens=2048,  # raised from 512 — tool schemas + responses need more room
+        timeout=httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=10.0),
     )
