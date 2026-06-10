@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, MicOff, Square, Volume2, VolumeX } from 'lucide-react'
 import { useJarvisStore } from '@/store/jarvisStore'
+import { speak as ttsSpeak, stop as ttsStop, onTTSEvent } from '@/lib/tts'
 
 const API = '/api'
 
@@ -19,6 +20,19 @@ export default function VoiceControls() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  // Sync activity state with TTS events (so the UI shows
+  // 'speaking' even when Web Speech API is the one playing).
+  useEffect(() => {
+    const off = onTTSEvent((e) => {
+      if (e.type === 'start') {
+        setActivityState('speaking')
+      } else if (e.type === 'end' || e.type === 'error') {
+        setActivityState('idle')
+      }
+    })
+    return () => off()
+  }, [setActivityState])
   const chunksRef = useRef<Blob[]>([])
   const audioElRef = useRef<HTMLAudioElement | null>(null)
   const transcriptRef = useRef('')
@@ -231,7 +245,13 @@ export default function VoiceControls() {
             setScreen('chat')
           })
         } else {
-          setActivityState('idle')
+          // No audio from backend (e.g. Orpheus TTS not available):
+          // fall back to Web Speech API in the browser. This way
+          // JARVIS always speaks, regardless of which TTS the
+          // backend can produce.
+          if (responseRef.current) {
+            ttsSpeak(responseRef.current)
+          }
           setScreen('chat')
         }
       } else {

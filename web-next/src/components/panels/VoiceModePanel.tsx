@@ -1,22 +1,34 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Mic, Square, Volume2, AlertCircle, Loader2 } from 'lucide-react';
+import { Mic, Square, Volume2, AlertCircle, Loader2, Pause, Play } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { useJarvisChat } from '@/hooks/useJarvisChat';
+import {
+  speak as ttsSpeak,
+  stop as ttsStop,
+  pause as ttsPause,
+  resume as ttsResume,
+  isSpeaking as ttsIsSpeaking,
+  isPausedNow as ttsIsPaused,
+  onTTSEvent,
+  isSupported as ttsIsSupported,
+} from '@/lib/tts';
 
-/* ── VoiceModePanel v9 — Voz conectada al Chat real ───────────────────
-   1. Graba tu voz con Web Speech API (Chrome STT)
-   2. Manda el texto al agente via WebSocket chat
-   3. Escucha nuevas respuestas del asistente y las lee en voz alta
-   4. NO depende de flags globales — usa el store de mensajes
+/* ── VoiceModePanel v10 — Voz + Chat integrados, robusto ───────────
+   - Web Speech API STT para grabar tu voz (Chrome/Edge)
+   - Web Speech API TTS para responder (módulo lib/tts)
+   - Pausa/Reanuda la voz con un botón
+   - Envía al agente via WebSocket
+   - Muestra transcripción en vivo
+   - NO depende de flags globales — usa el store de mensajes
    ──────────────────────────────────────────────────────────────────── */
 
 export default function VoiceModePanel() {
   const { setActivityState } = useJarvisStore();
   const { sendMessage: wsSend, isConnected, messages } = useJarvisChat();
 
-  const [status, setStatus] = useState<'idle'|'recording'|'thinking'|'speaking'|'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'recording' | 'thinking' | 'speaking' | 'paused' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [transcript, setTranscript] = useState('');
   const [recordingTime, setRecordingTime] = useState(0);
@@ -24,17 +36,38 @@ export default function VoiceModePanel() {
 
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
-  // Ref para trackear qué mensajes ya fueron leidos por voz
   const spokenIdsRef = useRef<Set<string>>(new Set());
 
-  // Cleanup
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopTimer();
-      recognitionRef.current?.abort?.();
-      window.speechSynthesis?.cancel();
+      try { recognitionRef.current?.abort?.(); } catch {}
+      ttsStop();
     };
   }, []);
+
+  // Subscribe to TTS events to update status
+  useEffect(() => {
+    const off = onTTSEvent((e) => {
+      if (e.type === 'start') {
+        setStatus('speaking');
+        setActivityState('speaking');
+      } else if (e.type === 'end') {
+        setStatus('idle');
+        setActivityState('idle');
+      } else if (e.type === 'pause') {
+        setStatus('paused');
+      } else if (e.type === 'resume') {
+        setStatus('speaking');
+      } else if (e.type === 'error') {
+        // Don't fail loudly — TTS just didn't work, but text is on screen
+        setStatus('idle');
+        setActivityState('idle');
+      }
+    });
+    return () => off();
+  }, [setActivityState]);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -45,68 +78,22 @@ export default function VoiceModePanel() {
     timerRef.current = setInterval(() => setRecordingTime((p) => p + 1), 1000);
   }, []);
 
-  // Efecto: cuando llega respuesta del asistente, hablarla
+  // Auto-speak new assistant messages
   useEffect(() => {
     if (messages.length === 0) return;
     const last = messages[messages.length - 1];
     if (last.role !== 'assistant' || last.isStreaming) return;
     if (spokenIdsRef.current.has(last.id)) return;
+    if (!ttsIsSupported()) return;
 
-    // Marcar como leido y hablar
     spokenIdsRef.current.add(last.id);
-    speakText(last.content);
+    ttsSpeak(last.content);
   }, [messages]);
 
-  const cleanForSpeech = useCallback((text: string): string => {
-    return text
-      // Strip markdown formatting
-      .replace(/```[\s\S]*?```/g, ' bloque de código ')  // fenced code blocks
-      .replace(/`([^`]+)`/g, '$1')                        // inline code
-      .replace(/\*\*([^*]+)\*\*/g, '$1')                    // bold
-      .replace(/\*([^*]+)\*/g, '$1')                        // italic
-      .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')                // underscore italic/bold
-      .replace(/~~([^~]+)~~/g, '$1')                        // strikethrough
-      .replace(/^#{1,6}\s+/gm, '')                          // headings
-      .replace(/^[-*+]\s+/gm, '')                           // bullet list markers
-      .replace(/^\d+\.\s+/gm, '')                           // numbered list markers
-      .replace(/^>\s*/gm, '')                               // blockquotes
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')              // markdown links
-      // Strip HTML tags
-      .replace(/<[^>]+>/g, ' ')
-      // Strip emoji
-      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2700}-\u{27BF}]/gu, '')
-      // Strip common symbols that sound bad when read aloud
-      .replace(/[*_`#>~|]/g, ' ')
-      // Collapse whitespace
-      .replace(/\s+/g, ' ')
-      .trim();
-  }, []);
-
-  const speakText = useCallback((text: string) => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const cleaned = cleanForSpeech(text);
-    if (!cleaned) return;
-    const utter = new SpeechSynthesisUtterance(cleaned);
-    utter.lang = 'es-ES';
-    utter.rate = 1.0;
-    utter.pitch = 1.0;
-    const voces = window.speechSynthesis.getVoices();
-    // Prefer high-quality Spanish voices in this order: Paulina (es-MX), Monica (es-ES), then any es-*
-    const preferredNames = ['Paulina', 'Monica', 'Maria', 'Esperanza', 'Jorge', 'Diego'];
-    let chosenVoice = voces.find((v) => v.lang === 'es-MX' && preferredNames.includes(v.name));
-    if (!chosenVoice) chosenVoice = voces.find((v) => v.lang === 'es-ES' && preferredNames.includes(v.name));
-    if (!chosenVoice) chosenVoice = voces.find((v) => v.lang === 'es-MX' && v.localService);
-    if (!chosenVoice) chosenVoice = voces.find((v) => v.lang === 'es-ES' && v.localService);
-    if (!chosenVoice) chosenVoice = voces.find((v) => v.lang?.startsWith('es'));
-    if (chosenVoice) utter.voice = chosenVoice;
-    utter.onstart = () => { setStatus('speaking'); setActivityState('speaking'); };
-    utter.onend = () => { setStatus('idle'); setActivityState('idle'); };
-    utter.onerror = () => { setStatus('idle'); setActivityState('idle'); };
-    window.speechSynthesis.speak(utter);
-  }, [cleanForSpeech, setActivityState]);
-
   const startListening = useCallback(async () => {
+    setErrorMsg('');
+
+    // Permission
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       setHasPermission(true);
@@ -117,10 +104,13 @@ export default function VoiceModePanel() {
 
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
-      setErrorMsg('Tu navegador no soporta Speech API. Usa Chrome o Edge.');
+      setErrorMsg('Tu navegador no soporta Speech Recognition. Usa Chrome o Edge.');
       setStatus('error');
       return;
     }
+
+    // If TTS is currently speaking, stop it (user is about to talk)
+    ttsStop();
 
     const rec = new SR();
     rec.lang = 'es-ES';
@@ -130,7 +120,6 @@ export default function VoiceModePanel() {
 
     let finalTranscript = '';
     setTranscript('');
-    setErrorMsg('');
     setStatus('recording');
     setActivityState('listening');
     startTimer();
@@ -147,23 +136,29 @@ export default function VoiceModePanel() {
     };
 
     rec.onerror = (event: any) => {
-      if (event.error === 'no-speech') return;
-      setErrorMsg(`Error: ${event.error}`);
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      setErrorMsg(`Error de microfono: ${event.error}`);
+      setStatus('error');
+      stopTimer();
     };
 
     rec.onend = () => {
-      if (status === 'recording') {
+      // If user didn't manually stop, auto-restart
+      if (status === 'recording' && recognitionRef.current === rec) {
         try { rec.start(); } catch { /* */ }
       }
     };
 
     rec.start();
-  }, [setActivityState, startTimer, status]);
+  }, [setActivityState, startTimer, stopTimer, status]);
 
   const stopListening = useCallback(() => {
     stopTimer();
-    recognitionRef.current?.stop?.();
+    const rec = recognitionRef.current;
     recognitionRef.current = null;
+    if (rec) {
+      try { rec.onend = null; rec.stop(); } catch {}
+    }
 
     const text = transcript.trim();
     if (!text) {
@@ -173,16 +168,28 @@ export default function VoiceModePanel() {
     }
 
     if (!isConnected) {
-      setErrorMsg('Chat offline. El agente no puede responder ahora.');
+      setErrorMsg('Chat offline. Conectate a Google primero.');
       setStatus('error');
       return;
     }
 
-    // Enviar al chat real del agente
+    // Send to agent
     setStatus('thinking');
     setActivityState('thinking');
+    setTranscript('');
     wsSend(text);
   }, [stopTimer, transcript, isConnected, wsSend, setActivityState]);
+
+  // Pause/resume TTS
+  const toggleTTS = useCallback(() => {
+    if (ttsIsPaused()) {
+      ttsResume();
+    } else if (ttsIsSpeaking()) {
+      ttsPause();
+    } else {
+      // Nothing playing — no-op
+    }
+  }, []);
 
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
@@ -194,8 +201,14 @@ export default function VoiceModePanel() {
         <p className="text-[13px] text-white/40">
           Necesito permiso para usar el microfono.
           <br />
-          Hace click en el candado arriba a la izquierda y permití el acceso.
+          Hace click en el candado arriba a la izquierda y permiti el acceso.
         </p>
+        <button
+          onClick={() => { setHasPermission(true); startListening(); }}
+          className="mt-2 px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[12px] hover:bg-cyan-500/30"
+        >
+          Reintentar
+        </button>
       </div>
     );
   }
@@ -203,30 +216,47 @@ export default function VoiceModePanel() {
   return (
     <div className="flex flex-col h-full items-center justify-center gap-5 px-4">
       {/* Main button */}
-      <button
-        onClick={status === 'recording' ? stopListening : startListening}
-        disabled={status === 'thinking' || status === 'speaking'}
-        className={`relative w-[92px] h-[92px] rounded-full flex items-center justify-center transition-all duration-300 ${
-          status === 'thinking' || status === 'speaking'
-            ? 'bg-gradient-to-br from-cyan-500 to-blue-600 opacity-60 cursor-not-allowed'
-            : status === 'recording'
-              ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-[0_0_30px_rgba(255,68,68,0.5)] animate-pulse'
-              : 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-[0_0_30px_rgba(0,212,255,0.4)] hover:scale-105'
-        }`}
-      >
-        {status === 'recording' && (
-          <span className="absolute inset-0 rounded-full border-2 border-white/20 animate-recording-ring" />
+      <div className="relative">
+        <button
+          onClick={status === 'recording' ? stopListening : startListening}
+          disabled={status === 'thinking'}
+          className={`relative w-[92px] h-[92px] rounded-full flex items-center justify-center transition-all duration-300 ${
+            status === 'thinking'
+              ? 'bg-gradient-to-br from-cyan-500 to-blue-600 opacity-60 cursor-not-allowed'
+              : status === 'recording'
+                ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-[0_0_30px_rgba(255,68,68,0.5)] animate-pulse'
+                : 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-[0_0_30px_rgba(0,212,255,0.4)] hover:scale-105'
+          }`}
+        >
+          {status === 'recording' && (
+            <span className="absolute inset-0 rounded-full border-2 border-white/20 animate-recording-ring" />
+          )}
+          {status === 'thinking' ? (
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          ) : status === 'speaking' || status === 'paused' ? (
+            <Volume2 className="w-8 h-8 text-white animate-pulse" />
+          ) : status === 'recording' ? (
+            <Square className="w-7 h-7 text-white fill-white" />
+          ) : (
+            <Mic className="w-8 h-8 text-white" />
+          )}
+        </button>
+
+        {/* Pause/Resume TTS button (small, bottom-right) */}
+        {(status === 'speaking' || status === 'paused') && (
+          <button
+            onClick={toggleTTS}
+            className="absolute -bottom-2 -right-2 w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20"
+            title={status === 'paused' ? 'Reanudar voz' : 'Pausar voz'}
+          >
+            {status === 'paused' ? (
+              <Play className="w-4 h-4 text-white fill-white" />
+            ) : (
+              <Pause className="w-4 h-4 text-white fill-white" />
+            )}
+          </button>
         )}
-        {status === 'thinking' ? (
-          <Loader2 className="w-8 h-8 text-white animate-spin" />
-        ) : status === 'speaking' ? (
-          <Volume2 className="w-8 h-8 text-white animate-pulse" />
-        ) : status === 'recording' ? (
-          <Square className="w-7 h-7 text-white fill-white" />
-        ) : (
-          <Mic className="w-8 h-8 text-white" />
-        )}
-      </button>
+      </div>
 
       {/* Timer */}
       {status === 'recording' && (
@@ -238,9 +268,10 @@ export default function VoiceModePanel() {
       {/* Status text */}
       <p className="text-[11px] text-cyan-400/50 tracking-[0.2em] uppercase text-center">
         {status === 'idle' && (isConnected ? 'Toca el microfono para hablar con JARVIS' : 'Chat offline')}
-        {status === 'recording' && 'Escuchando... hace click para detener'}
+        {status === 'recording' && 'Escuchando... toca para detener'}
         {status === 'thinking' && 'JARVIS esta pensando...'}
         {status === 'speaking' && 'JARVIS responde en voz alta...'}
+        {status === 'paused' && 'Voz pausada — toca play para continuar'}
         {status === 'error' && 'Error'}
       </p>
 
@@ -251,6 +282,13 @@ export default function VoiceModePanel() {
         </span>
       )}
 
+      {/* TTS availability hint */}
+      {!ttsIsSupported() && (
+        <p className="text-[10px] text-yellow-400/60 text-center max-w-xs">
+          Tu navegador no soporta Web Speech API. Usa Chrome o Edge para escuchar las respuestas.
+        </p>
+      )}
+
       {/* Error */}
       {errorMsg && (
         <div className="w-full max-w-sm glass-strong rounded-xl p-3">
@@ -258,7 +296,7 @@ export default function VoiceModePanel() {
         </div>
       )}
 
-      {/* Transcript */}
+      {/* Live transcript */}
       {transcript && (
         <div className="w-full glass-strong rounded-xl p-4">
           <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/50 mb-1">Escuche</p>

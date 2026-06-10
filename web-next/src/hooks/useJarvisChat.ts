@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { API_BASE } from '@/lib/api';
+import { speak as ttsSpeak, stop as ttsStop, onTTSEvent } from '@/lib/tts';
 
 export interface ChatMessage {
   id: string;
@@ -178,40 +179,9 @@ function ensureConnection() {
           useJarvisStore.setState({ chatMessages: [...msgs.slice(0, -1), { ...last, isStreaming: false }] });
           store.setLastAssistantText(last.content);
           store.setActivityState('idle');
-          // Auto-TTS when voice is enabled
-          if (window.speechSynthesis && useJarvisStore.getState().voiceEnabled) {
-            // Strip markdown, code, HTML, emoji before TTS — they sound
-            // awful when read aloud (literal backticks, hashes, etc).
-            const cleaned = last.content
-              .replace(/```[\s\S]*?```/g, ' bloque de código ')
-              .replace(/`([^`]+)`/g, '$1')
-              .replace(/\*\*([^*]+)\*\*/g, '$1')
-              .replace(/\*([^*]+)\*/g, '$1')
-              .replace(/^#{1,6}\s+/gm, '')
-              .replace(/^[-*+]\s+/gm, '')
-              .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
-              .replace(/\s+/g, ' ')
-              .trim();
-            if (!cleaned) return;
-            const utter = new SpeechSynthesisUtterance(cleaned);
-            utter.lang = 'es-ES';
-            utter.rate = 1.0;
-            const voces = window.speechSynthesis.getVoices();
-            // Prefer high-quality Spanish voices
-            const preferred = ['Paulina', 'Monica', 'Maria', 'Esperanza', 'Jorge', 'Diego'];
-            let chosen = voces.find((v) => v.lang === 'es-MX' && preferred.includes(v.name))
-                     || voces.find((v) => v.lang === 'es-ES' && preferred.includes(v.name))
-                     || voces.find((v) => v.lang === 'es-MX' && v.localService)
-                     || voces.find((v) => v.lang === 'es-ES' && v.localService)
-                     || voces.find((v) => v.lang?.startsWith('es'));
-            if (chosen) utter.voice = chosen;
-            utter.onstart = () => store.setActivityState('speaking');
-            utter.onend = () => store.setActivityState('idle');
-            utter.onerror = () => store.setActivityState('idle');
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(utter);
+          // Auto-TTS when voice is enabled (robust module in lib/tts.ts)
+          if (useJarvisStore.getState().voiceEnabled) {
+            ttsSpeak(last.content);
           }
         }
       }
@@ -336,3 +306,4 @@ export function useJarvisChat() {
     hasError: status === 'error',
   };
 }
+
