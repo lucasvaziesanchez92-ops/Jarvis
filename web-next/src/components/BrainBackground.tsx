@@ -138,7 +138,7 @@ function BrainModel() {
   });
 
   return (
-    <group ref={groupRef} scale={1.5}>
+    <group ref={groupRef} scale={0.8} position={[0, 0, 0]}>
       <primitive object={scene} ref={meshRef} />
     </group>
   );
@@ -146,12 +146,12 @@ function BrainModel() {
 
 function ParticleField() {
   const pointsRef = useRef<THREE.Points>(null);
-  const count = 200;
+  const count = 80;
 
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      const r = 2.5 + Math.random() * 1.5;
+      const r = 4.5 + Math.random() * 1.5;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
@@ -163,7 +163,7 @@ function ParticleField() {
 
   useFrame(({ clock }) => {
     if (!pointsRef.current) return;
-    pointsRef.current.rotation.y = clock.getElapsedTime() * 0.05;
+    pointsRef.current.rotation.y = clock.getElapsedTime() * 0.03;
   });
 
   return (
@@ -171,37 +171,14 @@ function ParticleField() {
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
-      <pointsMaterial color={0x40e0d0} size={0.03} transparent opacity={0.6} />
+      <pointsMaterial color={0x40e0d0} size={0.02} transparent opacity={0.4} />
     </points>
   );
 }
 
 function ThoughtBubbles() {
-  const groupRef = useRef<THREE.Group>(null);
-  const count = 6;
-
-  useFrame(({ clock }) => {
-    if (!groupRef.current) return;
-    const t = clock.getElapsedTime();
-    groupRef.current.children.forEach((bubble, i) => {
-      const offset = (i / count) * Math.PI * 2;
-      bubble.position.y = Math.sin(t * 0.5 + offset) * 0.3 + 1.5;
-      bubble.position.x = Math.cos(t * 0.3 + offset) * 1.5;
-      const scale = 0.05 + Math.abs(Math.sin(t + offset)) * 0.08;
-      (bubble as THREE.Mesh).scale.setScalar(scale);
-    });
-  });
-
-  return (
-    <group ref={groupRef}>
-      {Array.from({ length: count }).map((_, i) => (
-        <mesh key={i}>
-          <sphereGeometry args={[1, 8, 8]} />
-          <meshBasicMaterial color={0x00d4ff} transparent opacity={0.4} />
-        </mesh>
-      ))}
-    </group>
-  );
+  // Disabled — was occluding the brain. Kept empty for compatibility.
+  return null;
 }
 
 function StageLights() {
@@ -219,7 +196,7 @@ export default function BrainBackground() {
   return (
     <div className="fixed inset-0 z-0">
       <Canvas
-        camera={{ position: [3, 0, 4], fov: 45, near: 0.1, far: 100 }}
+        camera={{ position: [2, 0, 3], fov: 60, near: 0.1, far: 100 }}
         gl={{
           antialias: true,
           alpha: true,
