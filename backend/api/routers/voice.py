@@ -48,9 +48,12 @@ async def _transcribe(audio_bytes: bytes) -> str:
     
     text = response.text.strip()
     # Filter common Whisper hallucinations on silent/noisy audio
-    lower_text = text.lower()
-    hallucinations = ["thank you.", "thank you", "thanks.", "gracias.", "gracias", "subtitles", "amara.org", "suscríbete"]
-    if lower_text in hallucinations or len(text) < 2:
+    lower_text = text.lower().replace(".", "").replace(",", "").replace("!", "").strip()
+    hallucinations = [
+        "thank you", "thanks", "gracias", "muchas gracias", "thank you very much",
+        "thanks for watching", "subtitles", "amaraorg", "suscribete", "suscribete al canal"
+    ]
+    if lower_text in hallucinations or len(lower_text) < 2:
         return ""
         
     return text
