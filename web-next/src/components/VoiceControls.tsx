@@ -233,11 +233,19 @@ export default function VoiceControls() {
         transcriptRef.current = data.transcript || ''
         responseRef.current = data.response_text || ''
 
+        // Si el transcript está vacío (ej. filtro de alucinaciones de Whisper), ignoramos silenciosamente
+        if (!transcriptRef.current) {
+          setActivityState('idle')
+          return
+        }
+
         setLastUserText(transcriptRef.current)
         setLastAssistantText(responseRef.current)
 
         appendChatMessage({ id: makeId(), role: 'user', content: transcriptRef.current })
-        appendChatMessage({ id: makeId(), role: 'assistant', content: responseRef.current })
+        if (responseRef.current) {
+          appendChatMessage({ id: makeId(), role: 'assistant', content: responseRef.current })
+        }
 
         if (data.audio_base64) {
           setActivityState('speaking')

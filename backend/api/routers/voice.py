@@ -201,7 +201,7 @@ async def voice_pipeline(
 
     return VoicePipelineResponse(
         transcript=transcript,
-        response_text=response_text or "Procesado.",
+        response_text=response_text,
         audio_base64=audio_b64,
         session_id=session_id,
     )
