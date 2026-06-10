@@ -1,4 +1,5 @@
 """Structured logging configuration using loguru + structlog."""
+import os
 import sys
 from pathlib import Path
 
