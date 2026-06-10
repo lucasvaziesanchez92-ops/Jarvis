@@ -28,8 +28,8 @@ _MAX_HISTORY = 20  # messages per session
 # to plain LLM (no tools) if the agent times out. Keeping this low
 # because the user sees a fast fallback message instead of staring at
 # "Pensando..." for a minute.
-_GRAPH_TIMEOUT = 22
-_PLAIN_TIMEOUT = 15
+_GRAPH_TIMEOUT = 55
+_PLAIN_TIMEOUT = 30
 
 
 class WebSocketCallback(BaseCallbackHandler):

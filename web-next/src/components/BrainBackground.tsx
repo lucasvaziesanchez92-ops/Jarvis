@@ -1,95 +1,87 @@
 'use client';
 
-import { useRef, useMemo, useEffect } from 'react';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
-// Minimal brain 3D: just the user-supplied STL, rotated to the
-// anatomical 3/4 lateral view (frontal lobe on the left,
-// cerebellum on the right — matching the user's reference image).
-// No particles, no bloom, no postprocessing, no animation. The
-// user said 'el cerebro esta mal colocado' so the only thing we
-// show is the brain in the right pose with the right color.
+// Brain 3D using the user's GLB model (1.6MB) which has materials
+// already built in. The user said 'el cerebro esta mal' so we
+// load the original high-quality model and apply a fixed anatomical
+// pose. We force every material to the JARVIS pink/magenta color
+// so the brain matches the UI theme regardless of what colors
+// the GLB shipped with.
 
-const PINK = 0xe91e63;
-const PINK_SHEEN = 0xff80ab;
+const PINK = '#e91e63';
+const PINK_BRIGHT = '#ff80ab';
 
 function BrainModel() {
   const groupRef = useRef<THREE.Group>(null);
-  const meshRef = useRef<THREE.Mesh>(null);
-  const scaleRef = useRef<number>(1);
+  const gltf = useGLTF('/models/brain.glb');
 
-  const geometry = useLoader(STLLoader, '/models/brain.stl');
-
-  useEffect(() => {
-    geometry.computeBoundingBox();
-    const bb = geometry.boundingBox;
-    if (!bb) return;
-    const center = new THREE.Vector3();
-    bb.getCenter(center);
-    geometry.translate(-center.x, -center.y, -center.z);
-    const size = new THREE.Vector3();
-    bb.getSize(size);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    scaleRef.current = maxDim > 0 ? 1.6 / maxDim : 1;
-    // STL exports often come with the longitudinal axis along Z.
-    // We rotate it -90deg around X so the brain is in the classic
-    // anatomical pose (face pointing forward, not 'standing up
-    // vertically' as the user reported).
-    geometry.rotateX(-Math.PI / 2);
-    geometry.computeBoundingBox();
-    geometry.computeVertexNormals();
-  }, [geometry]);
+  // Traverse and recolor every material to the JARVIS pink
+  // palette. The original GLB ships with reddish materials which
+  // is what the user reported ('esta peor', 'no me gusto').
+  gltf.scene.traverse((child: THREE.Object3D) => {
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m) => {
+        if (!m) return;
+        if ((m as THREE.MeshStandardMaterial).color) {
+          (m as THREE.MeshStandardMaterial).color = new THREE.Color(PINK);
+        }
+        if ((m as THREE.MeshStandardMaterial).emissive) {
+          (m as THREE.MeshStandardMaterial).emissive = new THREE.Color(PINK_BRIGHT);
+          (m as THREE.MeshStandardMaterial).emissiveIntensity = 0.25;
+        }
+        if ((m as THREE.MeshStandardMaterial).roughness !== undefined) {
+          (m as THREE.MeshStandardMaterial).roughness = 0.4;
+        }
+        if ((m as THREE.MeshStandardMaterial).metalness !== undefined) {
+          (m as THREE.MeshStandardMaterial).metalness = 0.0;
+        }
+      });
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+    }
+  });
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
-    // Gentle 3/4 lateral pose, no full spin. The user explicitly
-    // said the brain should look like the reference (3/4 static).
-    groupRef.current.rotation.y = Math.PI * 0.18 + Math.sin(t * 0.3) * 0.04;
-    groupRef.current.rotation.x = 0;
-    groupRef.current.rotation.z = 0;
+    // Fixed 3/4 anatomical pose. Subtle breath-like sway, no spin.
+    groupRef.current.rotation.y = -0.3 + Math.sin(t * 0.3) * 0.04;
+    groupRef.current.rotation.x = 0.0 + Math.sin(t * 0.25) * 0.02;
   });
 
   return (
-    <group ref={groupRef} scale={scaleRef.current} position={[0, 0, 0]}>
-      <mesh ref={meshRef} geometry={geometry}>
-        <meshPhysicalMaterial
-          color={PINK}
-          emissive={PINK}
-          emissiveIntensity={0.15}
-          metalness={0}
-          roughness={0.35}
-          clearcoat={0.6}
-          clearcoatRoughness={0.2}
-          sheen={0.5}
-          sheenColor={PINK_SHEEN}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
+    <group ref={groupRef} position={[0, 0, 0]}>
+      <primitive object={gltf.scene} scale={2.2} position={[0, 0, 0]} />
     </group>
   );
 }
+
+useGLTF.preload('/models/brain.glb');
 
 export default function BrainBackground() {
   return (
     <div className="fixed inset-0 z-0 pointer-events-none">
       <Canvas
-        camera={{ position: [0, 0.2, 3.2], fov: 45, near: 0.1, far: 50 }}
+        camera={{ position: [0, 0.3, 4.5], fov: 35, near: 0.1, far: 50 }}
         gl={{
           antialias: true,
           alpha: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.2,
+          toneMappingExposure: 1.0,
         }}
         dpr={[1, 2]}
       >
-        <ambientLight intensity={0.55} />
-        <directionalLight position={[5, 5, 5]} intensity={0.7} color={0xffffff} />
-        <directionalLight position={[-3, 2, -2]} intensity={0.4} color={PINK_SHEEN} />
-        <pointLight position={[0, 2, 0]} intensity={0.4} color={0xff80ab} />
-        <pointLight position={[0, -2, 0]} intensity={0.3} color={0xe91e63} />
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[5, 5, 5]} intensity={0.8} color={'#ffffff'} />
+        <directionalLight position={[-3, 3, -2]} intensity={0.5} color={PINK_BRIGHT} />
+        <pointLight position={[0, 2, 3]} intensity={0.5} color={PINK_BRIGHT} />
+        <pointLight position={[0, -2, 1]} intensity={0.3} color={PINK} />
         <BrainModel />
       </Canvas>
     </div>
