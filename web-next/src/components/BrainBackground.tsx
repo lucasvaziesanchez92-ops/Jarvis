@@ -69,9 +69,14 @@ function BrainModel() {
     const stName = typeof st === 'string' ? st : 'idle';
     const palette = getPalette(stName);
 
-    // Slow rotation
-    groupRef.current.rotation.y = t * 0.25;
-    groupRef.current.rotation.x = Math.sin(t * 0.3) * 0.08;
+    // Fixed base orientation that shows the brain in 3/4 lateral
+    // view (frontal lobe + temporal + cerebellum visible — the
+    // pose the user wants). Add a very subtle breath-like sway
+    // instead of a full spin, so the brain never looks
+    // "standing up vertically".
+    groupRef.current.rotation.y = Math.PI * 0.15 + Math.sin(t * 0.4) * 0.05;
+    groupRef.current.rotation.x = -0.18 + Math.sin(t * 0.3) * 0.03;
+    groupRef.current.position.y = Math.sin(t * 0.5) * 0.04;
 
     if (meshRef.current) {
       const mat = meshRef.current.material as THREE.MeshPhysicalMaterial;

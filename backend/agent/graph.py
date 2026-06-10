@@ -11,9 +11,6 @@ from backend.agent.nodes import call_model_with_tools
 from backend.agent.rag_node import retrieval_node
 from backend.tools.semantic_router import ToolRouter
 
-from langgraph.checkpoint.memory import InMemorySaver
-checkpointer = InMemorySaver()
-
 MAX_TOOL_ITERATIONS = 5
 _router = None
 
@@ -87,16 +84,27 @@ def agent_node(state: JarvisState) -> dict:
         # list. (Now redundant with the above, kept for clarity.)
         q_lower = last_user_msg.lower()
         keyword_tool_map = {
-            ("drive", "google drive", "archivo", "archivos", "fichero", "ficheros", "documento", "documentos"): [
+            (
+                "drive", "google drive", "archivo", "archivos", "fichero", "ficheros",
+                "documento", "documentos", "imagen", "imagenes", "foto", "fotos",
+                "qr", "codigo qr", "código qr", "buscalo", "busca", "en mi drive",
+                "en mi unidad", "mi nube", "nube",
+            ): [
                 "search_drive", "list_drive_files", "list_drive_folder",
                 "read_drive_file", "get_drive_file_info", "upload_drive_file",
                 "delete_drive_file", "analyze_drive_image",
             ],
-            ("mail", "gmail", "correo", "correos", "email", "emails", "inbox", "bandeja", "mensaje", "mensajes"): [
+            (
+                "mail", "gmail", "correo", "correos", "email", "emails",
+                "inbox", "bandeja", "mensaje", "mensajes",
+            ): [
                 "list_gmail", "search_gmail", "send_gmail",
                 "get_gmail_detail", "delete_gmail_message", "trash_gmail_message",
             ],
-            ("calendar", "calendario", "evento", "eventos", "reunion", "reunión", "agenda", "agendar", "agendame", "cita", "citas"): [
+            (
+                "calendar", "calendario", "evento", "eventos", "reunion", "reunión",
+                "agenda", "agendar", "agendame", "cita", "citas",
+            ): [
                 "list_calendar_events", "create_calendar_event",
                 "update_calendar_event", "delete_calendar_event",
                 "list_calendar_google", "create_calendar_event_google",
@@ -192,6 +200,15 @@ def tool_node(state: JarvisState) -> dict:
 
 
 def build_autonomous_graph(tools=None):
+    """Build the agent graph.
+
+    NO checkpointer: the WS router already manages session history
+    in the frontend store. Using InMemorySaver here caused the
+    OpenAI error 'Not the same number of function calls and
+    responses' because the checkpointer re-injected old AIMessage
+    (with stale tool_calls) into the next turn's input, and the
+    new LLM tool_call didn't match.
+    """
     builder = StateGraph(JarvisState)
 
     builder.add_node("retrieval", retrieval_node)
@@ -203,7 +220,7 @@ def build_autonomous_graph(tools=None):
     builder.add_conditional_edges("agent", tools_condition)
     builder.add_edge("tools", "agent")
 
-    return builder.compile(checkpointer=checkpointer)
+    return builder.compile()
 
 
 _graph = None

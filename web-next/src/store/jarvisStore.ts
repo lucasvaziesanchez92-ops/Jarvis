@@ -179,7 +179,7 @@ export const useJarvisStore = create<JarvisStore>()(
   brainRenderer: '3d',
 
   micActive: false,
-  voiceEnabled: false,
+  voiceEnabled: true,
   visualizerAmplitude: 0,
 
   statusText: 'Neural Link Active',

@@ -1,6 +1,7 @@
 """Chat endpoints — agent graph with tools, keepalive for Railway."""
 import asyncio
 import json
+from collections import defaultdict
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
@@ -13,6 +14,14 @@ from backend.core.file_extractor import build_file_context
 from backend.agent.personalities import get_persona
 
 router = APIRouter()
+
+# Per-session in-memory message history. The graph no longer uses a
+# checkpointer (it caused 'Not the same number of function calls and
+# responses' by re-injecting stale tool_calls into the next turn).
+# We manage history here so each turn sees its own previous turn
+# exactly as the LLM produced it.
+_session_history: dict[str, list] = defaultdict(list)
+_MAX_HISTORY = 20  # messages per session
 
 # Railway free tier proxy window = 30s. Cap the graph at 22s; fallback
 # to plain LLM (no tools) if the agent times out. Keeping this low
@@ -108,8 +117,15 @@ async def ws_chat(websocket: WebSocket):
                 except Exception as e:
                     logger.warning(f"build_file_context failed: {e}")
 
+            # Build the input: prior session history (already in
+            # the exact shape the LLM produced, including
+            # AIMessage.tool_calls and ToolMessage pairs) plus the
+            # new user turn. This replaces the InMemorySaver
+            # checkpointer that was duplicating messages and
+            # breaking tool_call pairing.
+            history = list(_session_history[session_id])
             input_state = {
-                "messages": [HumanMessage(content=full_message)],
+                "messages": history + [HumanMessage(content=full_message)],
                 "session_id": session_id,
                 "persona": persona,
             }
@@ -172,6 +188,15 @@ async def ws_chat(websocket: WebSocket):
                 else:
                     await send(StreamChunk(type="token", content="Listo."))
                 await send(StreamChunk(type="done"))
+
+                # Persist this turn's full message list into the
+                # session history so the next turn sees the
+                # complete conversation (including AIMessage
+                # tool_calls paired with their ToolMessage
+                # responses). The graph returns the FULL state
+                # (history + new turn), so we replace, not append.
+                if state.get("messages"):
+                    _session_history[session_id] = list(state["messages"])[-_MAX_HISTORY:]
 
             except Exception as e:
                 logger.exception("WS error in chat loop")
