@@ -62,7 +62,7 @@ export default function FilesModePanel() {
 
   const checkRailway = async () => {
     try {
-      const res = await fetch(`/api/v1/files/health`);
+      const res = await fetch(`${API_BASE}/api/v1/files/health`);
       const data = await res.json();
       setRailwayStatus(data.configured ? 'connected' : 'disconnected');
     } catch {
@@ -73,7 +73,7 @@ export default function FilesModePanel() {
   const fetchFiles = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/v1/files/list`);
+      const res = await fetch(`${API_BASE}/api/v1/files/list`);
       if (!res.ok) throw new Error('Error al listar archivos');
       const data = await res.json();
       setFiles(data.files || []);
@@ -108,7 +108,7 @@ export default function FilesModePanel() {
       formData.append('generate_url', 'true');
 
       try {
-        const res = await fetch(`/api/v1/files/upload`, { method: 'POST', body: formData });
+        const res = await fetch(`${API_BASE}/api/v1/files/upload`, { method: 'POST', body: formData });
         if (res.ok) {
           uploaded++;
         } else {
@@ -134,7 +134,7 @@ export default function FilesModePanel() {
   const handleDeleteFile = async (key: string) => {
     if (!confirm('¿Eliminar este archivo del bucket?')) return;
     try {
-      const res = await fetch(`/api/v1/files/${encodeURIComponent(key)}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/v1/files/${encodeURIComponent(key)}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Error al eliminar');
       setFiles(prev => prev.filter(f => f.key !== key));
     } catch (err: any) {

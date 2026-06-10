@@ -20,12 +20,12 @@ import { useJarvisStore } from '@/store/jarvisStore';
 // Loads /models/brain.stl (302KB)   the user-supplied anatomical model.
 
 const PALETTE = {
-  idle:      { base: 0xd0e8e8, emissive: 0x2a1030, edge: 0x40e0d0 },
-  listening: { base: 0xc8e0e8, emissive: 0x2a3040, edge: 0x00ff88 },
-  thinking:  { base: 0xe8d0e0, emissive: 0x801030, edge: 0xff69b4 },
-  speaking:  { base: 0xd0e8e0, emissive: 0x1a4030, edge: 0x00d4ff },
-  error:     { base: 0xffa0a0, emissive: 0x401010, edge: 0xff4444 },
-  sleep:     { base: 0x8890a0, emissive: 0x101020, edge: 0x5566aa },
+  idle:      { base: 0xe91e63, emissive: 0x4a0830, edge: 0xff4081 },
+  listening: { base: 0xf06292, emissive: 0x4a1830, edge: 0xff80ab },
+  thinking:  { base: 0xff1744, emissive: 0x801030, edge: 0xff4081 },
+  speaking:  { base: 0xd81b60, emissive: 0x4a0830, edge: 0xff80ab },
+  error:     { base: 0xff5252, emissive: 0x801010, edge: 0xff8a80 },
+  sleep:     { base: 0xad1457, emissive: 0x3a1020, edge: 0xec407a },
 };
 
 function getPalette(state: string) {
@@ -110,8 +110,8 @@ function BrainModel() {
       {/* Main brain mesh - ice material */}
       <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
         <meshPhysicalMaterial
-          color={0xd0e8e8}
-          emissive={0x2a1030}
+          color={0xe91e63}
+          emissive={0x4a0830}
           emissiveIntensity={0.3}
           metalness={0}
           roughness={0.25}
@@ -121,7 +121,7 @@ function BrainModel() {
           clearcoat={0.8}
           clearcoatRoughness={0.1}
           sheen={0.5}
-          sheenColor={0xff69b4}
+          sheenColor={0xff80ab}
           side={THREE.DoubleSide}
         />
       </mesh>

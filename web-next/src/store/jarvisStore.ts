@@ -77,6 +77,7 @@ export interface JarvisStore {
   panelMode: PanelMode
   panelExpanded: boolean         // Panel completo vs minimizado
   brainMode: string
+  brainRenderer: '3d' | '2d' | 'none'
 
   /* ── Audio / Voice ── */
   micActive: boolean             // Micrófono grabando
@@ -113,6 +114,7 @@ export interface JarvisStore {
   /* ── Actions ── */
   setActivityState: (s: ActivityState) => void
   setBrainMode: (mode: string) => void
+  setBrainRenderer: (r: '3d' | '2d' | 'none') => void
   setPanelMode: (m: PanelMode) => void
   setScreen: (s: AppScreen) => void
   goBack: () => void
@@ -174,6 +176,7 @@ export const useJarvisStore = create<JarvisStore>()(
   panelMode: 'chat',
   panelExpanded: true,
   brainMode: 'hologram',
+  brainRenderer: '3d',
 
   micActive: false,
   voiceEnabled: false,
@@ -226,6 +229,7 @@ export const useJarvisStore = create<JarvisStore>()(
   togglePanelExpanded: () => set((s) => ({ panelExpanded: !s.panelExpanded })),
   setPanelExpanded: (panelExpanded) => set({ panelExpanded }),
   setBrainMode: (brainMode) => set({ brainMode }),
+  setBrainRenderer: (brainRenderer) => set({ brainRenderer }),
 
   setMicActive: (micActive) => set({ micActive }),
   setVoiceEnabled: (voiceEnabled) => set({ voiceEnabled }),
@@ -340,7 +344,7 @@ export const useJarvisStore = create<JarvisStore>()(
     panelMode: 'chat',
     panelExpanded: true,
     micActive: false,
-    voiceEnabled: false,
+  voiceEnabled: true,
     visualizerAmplitude: 0,
     statusText: 'Neural Link Active',
     thinkingBubbleVisible: false,
@@ -361,7 +365,8 @@ export const useJarvisStore = create<JarvisStore>()(
     chatSessionId: state.chatSessionId,
     voiceEnabled: state.voiceEnabled,
     brainMode: state.brainMode,
-    // chatMessages se persiste solo en chatHistory (no en cada token de streaming)
+    brainRenderer: state.brainRenderer,
+    chatHistory: state.chatHistory,
   }),
 }
 )
