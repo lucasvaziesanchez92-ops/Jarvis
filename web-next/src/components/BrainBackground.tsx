@@ -36,7 +36,7 @@ export default function BrainBackground() {
   }, [activityState]);
 
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none">
+    <div className="fixed inset-0 z-0 pointer-events-auto">
       <iframe
         ref={iframeRef}
         src="/brain-3d.html"
