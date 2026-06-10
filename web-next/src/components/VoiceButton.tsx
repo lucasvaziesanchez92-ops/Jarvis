@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 const API = '/api';
 
 export default function VoiceButton() {
-  const { setActivityState } = useJarvisStore();
+  const { setActivityState, chatSessionId } = useJarvisStore();
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -71,7 +71,7 @@ export default function VoiceButton() {
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
-      formData.append('session_id', 'voice-' + Date.now());
+      formData.append('session_id', chatSessionId || 'default');
       const res = await fetch(`${API}/voice`, { method: 'POST', body: formData });
       if (res.ok) {
         const data = await res.json();

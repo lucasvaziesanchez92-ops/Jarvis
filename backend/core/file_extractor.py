@@ -174,51 +174,18 @@ def _extract_image_with_groq_vision(data: bytes, filename: str) -> str:
 
     try:
         from groq import Groq
+        import groq
         client = Groq(api_key=groq_key)
         b64 = base64.b64encode(data).decode("ascii")
 
-        # Detect image MIME type
-        mime = "image/jpeg"
-        if data[:8] == b"\x89PNG\r\n\x1a\n":
-            mime = "image/png"
-        elif data[:4] == b"GIF8":
-            mime = "image/gif"
-        elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-            mime = "image/webp"
-
-        completion = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Analiza esta imagen en detalle en español. "
-                            "Describí todo lo que veas: objetos, personas, texto visible, "
-                            "colores, composición, contexto, relaciones espaciales. "
-                            "Si hay texto, transcribílo completo. Sé detallado pero conciso."
-                        ),
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{mime};base64,{b64}"},
-                    },
-                ],
-            }],
-            max_tokens=1000,
-            temperature=0.2,
-        )
-        description = completion.choices[0].message.content.strip()
-        return f"[🖼️ Análisis visual de {filename} ({len(data)} bytes)]:\n\n{description}"
-
-    except Exception as e:
-        # Fall back to placeholder if Groq Vision fails
+        # Groq discontinued their Vision endpoints. We must fallback immediately.
         return (
-            f"[🖼️ Imagen: {filename}. "
-            f"No pude analizarla con visión por IA ({type(e).__name__}: {str(e)[:200]}). "
-            f"Describí qué contiene y te ayudo.]"
+            f"[⚠️ Aviso del Sistema: Groq ha deshabilitado todos sus modelos de visión gratuita temporalmente. "
+            f"No puedo analizar el contenido visual de la imagen '{filename}'. "
+            f"Por favor, descríbeme con palabras lo que hay en la imagen para poder ayudarte.]"
         )
+    except Exception as e:
+        return f"[Error procesando imagen {filename} con Groq: {e}]"
 
 
 def _extract_image_placeholder(filename: str) -> str:
