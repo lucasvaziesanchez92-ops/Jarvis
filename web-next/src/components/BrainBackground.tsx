@@ -79,37 +79,31 @@ function getPersonalityTheme(persona: string, state: string) {
 function BrainModel() {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
+  const [loaded, setLoaded] = useState(false);
   const { persona, activityState } = useJarvisStore();
   const stateRef = useRef({ persona, activityState });
   useEffect(() => { stateRef.current = { persona, activityState }; }, [persona, activityState]);
 
-  // Load the user-supplied brain.glb
+  // Load the user-supplied brain.glb. Errors are caught and the
+  // fallback procedural mesh (anatomical icosahedron) is shown.
   const gltf = useGLTF('/models/brain.glb');
   const scene = useMemo(() => {
-    const cloned = gltf.scene.clone(true);
-    cloned.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        const mesh = obj as THREE.Mesh;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        // Apply a material that we can recolor per personality/state
-        if (!mesh.material || (mesh.material as any).isShared) {
-          mesh.material = new THREE.MeshPhysicalMaterial({
-            color: 0xd0e8e8,
-            emissive: 0x2a1030,
-            emissiveIntensity: 0.5,
-            roughness: 0.15,
-            metalness: 0.2,
-            transmission: 0.6,
-            thickness: 0.5,
-            ior: 1.5,
-            clearcoat: 0.5,
-            clearcoatRoughness: 0.2,
-          });
+    try {
+      const cloned = gltf.scene.clone(true);
+      cloned.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const mesh = obj as THREE.Mesh;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
         }
-      }
-    });
-    return cloned;
+      });
+      setLoaded(true);
+      return cloned;
+    } catch (e) {
+      // Don't blow up the whole scene if GLB fails to parse.
+      console.error('[BrainBackground] failed to load brain.glb:', e);
+      return null;
+    }
   }, [gltf]);
 
   useFrame(({ clock }) => {
@@ -121,25 +115,46 @@ function BrainModel() {
     const theme = getPersonalityTheme(pName, stName);
     const meta = STATE_META[stName as keyof typeof STATE_META] || STATE_META.idle;
 
-    // Slow rotation
     groupRef.current.rotation.y = t * 0.2;
 
-    // Recolor the materials in the scene
-    scene.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        const mat = (obj as THREE.Mesh).material as THREE.MeshPhysicalMaterial;
-        if (mat) {
-          mat.color.setHex(theme.base);
-          mat.emissive.setHex(theme.emissive);
-          mat.emissiveIntensity = 0.4 + Math.sin(t * 1.2) * 0.2 * meta.grooveIntensity;
+    // Recolor either the GLB or the fallback mesh
+    const target = scene || (meshRef.current as unknown as THREE.Object3D);
+    if (target && (target as any).traverse) {
+      (target as any).traverse((obj: THREE.Object3D) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const mat = (obj as THREE.Mesh).material as THREE.MeshPhysicalMaterial;
+          if (mat) {
+            mat.color.setHex(theme.base);
+            mat.emissive.setHex(theme.emissive);
+            mat.emissiveIntensity = 0.4 + Math.sin(t * 1.2) * 0.2 * meta.grooveIntensity;
+          }
         }
-      }
-    });
+      });
+    }
   });
 
   return (
     <group ref={groupRef} scale={0.8} position={[0, 0, 0]}>
-      <primitive object={scene} ref={meshRef} />
+      {scene ? (
+        <primitive object={scene} ref={meshRef} />
+      ) : (
+        // Fallback anatomical shape   visible immediately while the GLB
+        // is being parsed, and also acts as a safety net if the GLB
+        // fails to load.
+        <mesh ref={meshRef} castShadow receiveShadow>
+          <icosahedronGeometry args={[0.8, 5]} />
+          <meshPhysicalMaterial
+            color={0xd0e8e8}
+            emissive={0x2a1030}
+            emissiveIntensity={0.4}
+            roughness={0.2}
+            metalness={0.3}
+            transmission={0.5}
+            thickness={0.5}
+            ior={1.5}
+          />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -177,7 +192,7 @@ function ParticleField() {
 }
 
 function ThoughtBubbles() {
-  // Disabled — was occluding the brain. Kept empty for compatibility.
+  // Disabled   was occluding the brain. Kept empty for compatibility.
   return null;
 }
 
