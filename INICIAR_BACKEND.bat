@@ -5,7 +5,7 @@ color 0A
 echo BACKEND INICIANDO...
 echo Espera que diga 'Application startup complete'
 echo.
-.\venv\Scripts\python.exe -m uvicorn backend.api.main:app --host 127.0.0.1 --port 8001 --reload
+.\venv\Scripts\python.exe -m uvicorn backend.api.main:app --host 127.0.0.1 --port 8001 --reload --reload-dir backend
 echo.
 echo Backend cerrado. Presiona una tecla...
 pause

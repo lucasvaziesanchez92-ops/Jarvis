@@ -36,6 +36,7 @@ function BrainModel() {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const innerGlowRef = useRef<THREE.Mesh>(null);
+  const scaleRef = useRef<number>(1);
   const { persona, activityState } = useJarvisStore();
   const stateRef = useRef({ persona, activityState });
   useEffect(() => { stateRef.current = { persona, activityState }; }, [persona, activityState]);
@@ -43,15 +44,21 @@ function BrainModel() {
   // Load the user-supplied brain-simplified.stl (302KB anatomical model)
   const geometry = useLoader(STLLoader, '/models/brain.stl');
 
-  // Center the geometry (STL files often have weird origins)
+  // Compute bounding box, center the geometry, and derive a scale
+  // that makes the brain fit a target size of ~1.6 units. This
+  // works for any STL regardless of its native units.
   useEffect(() => {
     geometry.computeBoundingBox();
     const bb = geometry.boundingBox;
-    if (bb) {
-      const center = new THREE.Vector3();
-      bb.getCenter(center);
-      geometry.translate(-center.x, -center.y, -center.z);
-    }
+    if (!bb) return;
+    const center = new THREE.Vector3();
+    bb.getCenter(center);
+    geometry.translate(-center.x, -center.y, -center.z);
+    const size = new THREE.Vector3();
+    bb.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const TARGET = 1.6;
+    scaleRef.current = maxDim > 0 ? TARGET / maxDim : 1;
     geometry.computeVertexNormals();
   }, [geometry]);
 
@@ -99,7 +106,7 @@ function BrainModel() {
   });
 
   return (
-    <group ref={groupRef} scale={0.0018} position={[0, 0, 0]}>
+    <group ref={groupRef} scale={scaleRef.current} position={[0, 0, 0]}>
       {/* Main brain mesh - ice material */}
       <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
         <meshPhysicalMaterial
