@@ -226,7 +226,7 @@ def tool_node(state: JarvisState) -> dict:
                 if name not in tools_executed:
                     tools_executed.append(name)
             except Exception as ex:
-                logger.error(f"Tool '{name}' crashed: {type(ex).__name__}: {ex}", exc_info=True)
+                logger.error("Tool '{}' crashed: {}: {}", name, type(ex).__name__, str(ex), exc_info=True)
                 record_error("tool_node", ex, {"tool": name, "args": raw_args})
                 result.append(ToolMessage(content=f"Error: {type(ex).__name__}: {str(ex)[:200]}", tool_call_id=tc["id"], name=name))
         else:

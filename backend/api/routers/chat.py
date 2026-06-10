@@ -213,6 +213,6 @@ async def ws_chat(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.info("WS desconectado")
     except Exception as e:
-        logger.error(f"WS fatal: {e}")
+        logger.error("WS fatal: {}", str(e))
     finally:
         connected[0] = False

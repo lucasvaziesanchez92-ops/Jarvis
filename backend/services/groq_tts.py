@@ -1,16 +1,16 @@
 """
 Groq Cloud TTS - lightweight cloud-based text-to-speech.
 
-Uses Groq's Canopy Labs Orpheus model (English) or playai-tts
-(deprecated, may still work). ~1-2s latency, no model download,
-no on-prem compute. Much better than Piper for production (Piper
-needs 200MB ONNX models + onnxruntime, breaks Railway free tier).
+Uses Groq's playai-tts (English only, ~1-2s latency). No model
+download, no on-prem compute, no ONNX runtime. Much better than
+Piper for production (Piper needs 200MB ONNX models + onnxruntime,
+breaks Railway free tier).
 
 Falls back to a no-op if GROQ_API_KEY is not set.
 
-NOTE: playai-tts was deprecated 2025-12-31. Orpheus v1 (English
-only) is the recommended replacement. For Spanish TTS, the user
-should integrate ElevenLabs or open-source eSpeak-ng on the client.
+NOTE: playai-tts is English only. For Spanish TTS, the frontend
+falls back to the browser's Web Speech API (free, native, supports
+Paulina/Helena/Maria in es-ES/es-MX).
 """
 import os
 import io
@@ -21,24 +21,24 @@ from typing import Optional, List, Dict, Any
 logger = logging.getLogger(__name__)
 
 
-# Canopy Labs Orpheus v1 voices (English). Recommended replacement
-# for the deprecated playai-tts.
-ORPHEUS_VOICES = [
-    "tara",   # female, warm
-    "leah",   # female, balanced
-    "jess",   # female, energetic
-    "leo",    # male, warm
-    "dan",    # male, balanced
-    "mia",    # female, expressive
-    "zac",    # male, deep
-    "zoe",    # female, calm
+# Groq playai-tts voices (English only, available on Groq Cloud as of 2026-06).
+PLAYAI_VOICES = [
+    "Fritz-PlayAI",   # male, neutral — default
+    "Arista-PlayAI",  # female, warm
+    "Atlas-PlayAI",   # male, deep
+    "Basil-PlayAI",   # male, balanced
+    "Briggs-PlayAI",  # male, energetic
+    "Calvert-PlayAI", # male, calm
+    "Celestia-PlayAI",# female, expressive
+    "Clyde-PlayAI",   # male, deep
+    "Deedee-PlayAI",  # female, friendly
 ]
 
 # Default model + voice
-DEFAULT_MODEL = "canopylabs/orpheus-v1-english"
-DEFAULT_VOICE = os.getenv("GROQ_TTS_VOICE", "tara")
+DEFAULT_MODEL = "playai-tts"
+DEFAULT_VOICE = os.getenv("GROQ_TTS_VOICE", "Fritz-PlayAI")
 DEFAULT_FORMAT = os.getenv("GROQ_TTS_FORMAT", "wav")
-DEFAULT_SAMPLE_RATE = 24000  # Orpheus native rate
+DEFAULT_SAMPLE_RATE = 24000  # playai-tts native rate
 
 
 def is_configured() -> bool:
@@ -63,15 +63,14 @@ def synthesize(
     sample_rate: Optional[int] = None,
     model: Optional[str] = None,
 ) -> bytes:
-    """Synthesize text to speech using Groq Orpheus TTS.
+    """Synthesize text to speech using Groq playai-tts.
 
     Returns raw audio bytes (wav by default).
     Raises RuntimeError if the request fails.
 
-    Note: Orpheus v1 is English-only. For Spanish, the synthesis
-    will still go through but the voice sounds accented. Best UX
-    is to fall back to browser's Web Speech API (free, native) for
-    non-English languages.
+    Note: playai-tts is English-only. For Spanish, the frontend
+    falls back to the browser's Web Speech API (free, native,
+    supports es-ES and es-MX voices like Paulina and Helena).
     """
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
@@ -116,20 +115,20 @@ def synthesize_to_file(
 
 
 def list_voices() -> List[Dict[str, Any]]:
-    """Return the catalog of available Orpheus voices."""
+    """Return the catalog of available playai-tts voices."""
     return [
-        {"id": v, "engine": "orpheus", "provider": "groq", "language": "en"}
-        for v in ORPHEUS_VOICES
+        {"id": v, "engine": "playai", "provider": "groq", "language": "en"}
+        for v in PLAYAI_VOICES
     ]
 
 
 def get_status() -> Dict[str, Any]:
     """Diagnostic: whether TTS is ready to use."""
     return {
-        "engine": "groq-orpheus",
+        "engine": "groq-playai",
         "model": DEFAULT_MODEL,
         "configured": is_configured(),
         "default_voice": DEFAULT_VOICE,
-        "available_voices": len(ORPHEUS_VOICES),
-        "note": "English only. For Spanish TTS, use browser Web Speech API.",
+        "available_voices": len(PLAYAI_VOICES),
+        "note": "English only (playai-tts). For Spanish TTS, use browser Web Speech API.",
     }
