@@ -57,12 +57,14 @@
 
         // Material - Ice/Translucent with pink rim glow
         const brainMaterial = new THREE.MeshPhysicalMaterial({
-            color: 0xd0e8e8,
-            emissive: 0x2a1030,
-            emissiveIntensity: 0.3,
+            color: 0xff3399,
+            emissive: 0xff3399,
+            emissiveIntensity: 0.6,
             metalness: 0.0,
             roughness: 0.25,
-            transmission: 0.6,
+            transmission: 0.35,
+            transparent: true,
+            opacity: 0.7,
             thickness: 1.2,
             ior: 1.45,
             clearcoat: 0.8,
@@ -81,7 +83,7 @@
         // Inner glow
         const innerMat = new THREE.MeshPhysicalMaterial({
             color: 0xff80d0,
-            emissive: 0xff55aa,
+            emissive: 0xff3399,
             emissiveIntensity: 0.4,
             transparent: true,
             opacity: 0.15,
@@ -98,7 +100,7 @@
         composer.addPass(new RenderPass(scene, camera));
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            1.4, 0.4, 0.2
+            0.5, 0.4, 0.6
         );
         composer.addPass(bloomPass);
         const loader = new STLLoader();
@@ -163,7 +165,7 @@
         pointLight.position.set(0, -2, 0);
         scene.add(pointLight);
 
-        const topLight = new THREE.PointLight(0xff69b4, 0.4, 8);
+        const topLight = new THREE.PointLight(0xff80d0, 0.5, 8);
         topLight.position.set(0, 3, 0);
         scene.add(topLight);
 
