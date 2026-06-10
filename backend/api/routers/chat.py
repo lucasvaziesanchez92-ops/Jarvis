@@ -9,6 +9,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from loguru import logger
 
 from backend.api.dependencies import get_jarvis_graph
+from backend.api.routers.diagnostics import record_error
 from backend.models.chat import ChatRequest, ChatResponse, StreamChunk
 from backend.core.file_extractor import build_file_context
 from backend.agent.personalities import get_persona
@@ -200,6 +201,10 @@ async def ws_chat(websocket: WebSocket):
 
             except Exception as e:
                 logger.exception("WS error in chat loop")
+                record_error("ws_chat_loop", e, {
+                    "session_id": session_id,
+                    "message_preview": (message or "")[:200],
+                })
                 try:
                     await send(StreamChunk(type="error", content=str(e)[:500]))
                 except Exception:

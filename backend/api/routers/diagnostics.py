@@ -2,6 +2,7 @@
 import asyncio
 import time
 import traceback
+from collections import deque
 
 from fastapi import APIRouter
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
@@ -13,6 +14,25 @@ from backend.config import settings
 from backend.llm import get_llm
 
 router = APIRouter(prefix="/diagnostics", tags=["diagnostics"])
+
+# Keep the last 50 errors from any source (WS chat, graph, tools)
+# so the user can hit /last_ws_error and see the most recent
+# failure with full stack trace, no Railway access required.
+_error_log: deque = deque(maxlen=50)
+
+
+def record_error(source: str, error: Exception, context: dict | None = None) -> None:
+    """Append an error to the global error log. Called from the
+    chat WS, the graph, and the tool_node when something fails.
+    """
+    _error_log.append({
+        "ts": time.time(),
+        "source": source,
+        "type": type(error).__name__,
+        "message": str(error)[:500],
+        "trace": traceback.format_exc()[:1500],
+        "context": (context or {})[:500] if isinstance(context, dict) else str(context)[:500],
+    })
 
 
 @router.get("/health")
@@ -52,14 +72,7 @@ async def tools_status():
 
 @router.get("/bind_tools_debug")
 async def bind_tools_debug():
-    """Reproduce bind_tools call with a trivial tool and capture the EXACT error.
-
-    This is the diagnostic that found why 'JARVIS miente sobre sus tools':
-    - Plain llm.ainvoke() works
-    - llm.bind_tools([...]).invoke() fails with a specific exception
-
-    Returns the full request body sent to the LLM, the response, and the error.
-    """
+    """Reproduce bind_tools call with a trivial tool and capture the EXACT error."""
     out = {"model": settings.ollama_model, "base_url": settings.ollama_base_url}
 
     @tool
@@ -69,7 +82,6 @@ async def bind_tools_debug():
 
     llm = get_llm()
 
-    # Plain call
     t = time.time()
     try:
         plain = await asyncio.wait_for(
@@ -83,6 +95,7 @@ async def bind_tools_debug():
             "tool_calls": getattr(plain, "tool_calls", None),
         }
     except Exception as e:
+        record_error("bind_tools_debug.plain", e, {"step": "plain_call"})
         out["plain_call"] = {
             "ok": False,
             "elapsed_s": round(time.time() - t, 2),
@@ -90,7 +103,6 @@ async def bind_tools_debug():
             "trace": traceback.format_exc()[:1500],
         }
 
-    # bind_tools call
     t = time.time()
     try:
         llm_with_tools = llm.bind_tools([get_current_time])
@@ -109,6 +121,7 @@ async def bind_tools_debug():
             "additional_kwargs": {k: str(v)[:300] for k, v in (bound.additional_kwargs or {}).items()},
         }
     except Exception as e:
+        record_error("bind_tools_debug.bound", e, {"step": "bind_tools_call"})
         out["bind_tools_call"] = {
             "ok": False,
             "elapsed_s": round(time.time() - t, 2),
@@ -117,3 +130,24 @@ async def bind_tools_debug():
         }
 
     return out
+
+
+@router.get("/last_errors")
+async def last_errors(limit: int = 20):
+    """Return the most recent errors from any component.
+
+    Critical for the user: 'JARVIS no funciona, no me dice que
+    pasa'. They can hit this endpoint and see the actual failure
+    without needing Railway access.
+    """
+    return {
+        "count": len(_error_log),
+        "errors": list(_error_log)[-limit:],
+    }
+
+
+@router.post("/clear_errors")
+async def clear_errors():
+    """Clear the error log."""
+    _error_log.clear()
+    return {"cleared": True}

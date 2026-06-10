@@ -127,9 +127,15 @@ def agent_node(state: JarvisState) -> dict:
             for pt in persona_tools:
                 if pt.name == critical_name and pt not in tools:
                     tools.append(pt)
-        tools = tools[:15]
+        # NO MORE 15-tool cap. The previous cap was dropping Google
+        # tools the user expected ('buscalo en mi drive' was missing
+        # search_drive). The LLM is now able to handle 40+ tools
+        # (devstral-small-2:24b has 32k context, plenty for schemas).
+        # We still cap at len(persona_tools) so the persona's
+        # allowed set is respected.
+        tools = tools[: len(persona_tools)]
     else:
-        tools = persona_tools[:15]
+        tools = list(persona_tools)
 
     retrieved = "\n".join(state.get("retrieved_context", [])) if state.get("retrieved_context") else ""
 
@@ -159,6 +165,7 @@ def agent_node(state: JarvisState) -> dict:
 
 def tool_node(state: JarvisState) -> dict:
     from backend.tools.registry import ALL_TOOLS
+    from backend.api.routers.diagnostics import record_error
 
     messages = state["messages"]
     last = messages[-1]
@@ -214,6 +221,7 @@ def tool_node(state: JarvisState) -> dict:
                     tools_executed.append(name)
             except Exception as ex:
                 logger.error(f"Tool '{name}' crashed: {type(ex).__name__}: {ex}", exc_info=True)
+                record_error("tool_node", ex, {"tool": name, "args": raw_args})
                 result.append(ToolMessage(content=f"Error: {type(ex).__name__}: {str(ex)[:200]}", tool_call_id=tc["id"], name=name))
         else:
             logger.error(f"tool_node: tool '{name}' not found in registry ({len(tool_map)} tools loaded)")
