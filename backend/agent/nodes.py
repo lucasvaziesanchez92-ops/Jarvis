@@ -41,24 +41,23 @@ def call_model_with_tools(
     # If a tool was actually executed, its ToolMessage will appear in the
     # conversation. Otherwise, the LLM must explicitly say so.
     tool_contract = (
-        "REGLAS CRÍTICAS SOBRE HERRAMIENTAS (NO IGNORAR):\n"
-        "1. SI TENÉS herramientas en tu lista, USALAS cuando el usuario pida algo concreto. NUNCA digas 'no tengo herramientas' sin antes mirar la lista.\n"
-        "2. MAPA DE HERRAMIENTAS DE GOOGLE (cuando el usuario dice 'mi drive', 'archivo', 'mail', 'correo', 'calendario', 'evento'):\n"
-        "   - Drive de Google: search_drive, list_drive_files, list_drive_folder, read_drive_file, get_drive_file_info, upload_drive_file, delete_drive_file, analyze_drive_image\n"
-        "   - Gmail: list_gmail, search_gmail, send_gmail\n"
-        "   - Calendar: list_calendar_google, create_calendar_event_google\n"
-        "3. Para otras acciones:\n"
+        "REGLAS CRITICAS SOBRE HERRAMIENTAS (NO IGNORAR, SON ABSOLUTAS):\n"
+        "1. NUNCA digas 'no dispongo de herramienta', 'no tengo acceso', o 'no puedo'. Si la herramienta esta en tu lista, la tenes. Usala.\n"
+        "2. Solo di 'no puedo' cuando el ToolMessage retorno un error especifico (ej: 'error 403', 'credenciales faltantes'). NUNCA lo digas por iniciativa propia.\n"
+        "3. MAPA COMPLETO DE HERRAMIENTAS DISPONIBLES:\n"
         "   - Notas: create_note, list_notes, get_note, update_note, delete_note\n"
-        "   - Tareas (todos): create_todo, list_todos, complete_todo, update_todo, delete_todo\n"
+        "   - Tareas: create_todo, list_todos, complete_todo, update_todo, delete_todo\n"
         "   - Memoria: search_memory, save_memory, list_memories, delete_memory\n"
         "   - Wiki: wiki_query, wiki_save_research, wiki_ingest\n"
         "   - Web: web_search\n"
         "   - Tiempo: get_current_time, get_current_date\n"
-        "4. Si decidís usar una herramienta, emití el tool_call. NO describas su resultado en texto hasta ver el ToolMessage correspondiente.\n"
-        "5. Si una herramienta falla, decí 'No pude ejecutar X porque Y'. NO inventes un resultado exitoso.\n"
-        "6. NUNCA digas 'listo, ya está guardado/creado/enviado' si no viste un ToolMessage confirmándolo.\n"
-        "7. Si la herramienta devuelve error (credenciales faltantes, módulo no disponible, etc.), reportá el error tal cual al usuario, no finjas éxito.\n"
-        "8. NUNCA ejecutes la misma tool_call dos veces en la misma respuesta. Una tool_call por acción, en paralelo si son independientes."
+        "   - Gmail (Google): list_gmail, search_gmail, send_gmail, get_email\n"
+        "   - Drive (Google): search_drive, list_drive_files, list_drive_folder, read_drive_file, get_drive_file_info, upload_drive_file, delete_drive_file, analyze_drive_image\n"
+        "   - Calendar (Google): list_calendar_google, create_calendar_event_google\n"
+        "4. Despues de CADA tool_call, el sistema te va a dar un ToolMessage con el resultado. Si NO lo viste, no digas que ya lo hiciste.\n"
+        "5. Si la herramienta devuelve error, reporta el error EXACTO al usuario. NO finjas exito.\n"
+        "6. NUNCA inventes resultados. Si el ToolMessage dice 'error 403', eso es lo que reportas.\n"
+        "7. Si NO ves una herramienta en tu lista (porque no se cargo o no se incluyo), podes decir 'esa funcion no esta disponible en este momento'. Pero si SI la ves, usala sin dudar."
     )
 
     if extra_context and base:
