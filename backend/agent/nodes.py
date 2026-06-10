@@ -23,8 +23,39 @@ def _trim_messages(messages: list, persona: str = "profesional"):
         return messages
     system_msg = [m for m in messages if isinstance(m, SystemMessage)]
     other = [m for m in messages if not isinstance(m, SystemMessage)]
+
+    # Keep message order: NEVER orphan a ToolMessage. If the last
+    # kept message is a ToolMessage (role='tool'), we must also keep
+    # the AIMessage that produced its tool_call_id, otherwise the
+    # LLM sees 'tool' after 'user' and rejects with 400.
     keep = max_messages - len(system_msg)
-    return system_msg + other[-keep:]
+    trimmed_other = other[-keep:]
+    if trimmed_other and isinstance(trimmed_other[-1], ToolMessage):
+        # Find the AIMessage with matching tool_call_id in the
+        # already-kept or discarded window. Walk backwards through
+        # the original 'other' list.
+        target_id = trimmed_other[-1].tool_call_id
+        for j in range(len(other) - keep, -1, -1):
+            cand = other[j]
+            if isinstance(cand, AIMessage) and getattr(cand, "tool_calls", None):
+                ids = {tc.get("id") for tc in cand.tool_calls}
+                if target_id in ids:
+                    # Insert this AIMessage right before the
+                    # ToolMessage and re-trim.
+                    before = trimmed_other[:-1]
+                    after = trimmed_other[-1]
+                    if cand in before:
+                        idx = before.index(cand)
+                        trimmed_other = before + [after]
+                    else:
+                        # Need to evict an older message to make room
+                        trimmed_other = before + [cand, after]
+                    # Still might be over budget; drop the very
+                    # oldest non-essential message.
+                    while len(system_msg) + len(trimmed_other) > max_messages and len(trimmed_other) > 2:
+                        trimmed_other = trimmed_other[1:]
+                    break
+    return system_msg + trimmed_other
 
 
 def call_model_with_tools(
@@ -87,7 +118,15 @@ def call_model_with_tools(
         "Una tool_call por accion. En paralelo si son independientes."
     )
 
-    if extra_context and base:
+    # If the last message is a ToolMessage (role='tool'), we cannot
+    # put a HumanMessage or another user-role message after it.
+    # That would produce the OpenAI error 'Unexpected role tool
+    # after role user' (caught with devstral-small-2:24b on
+    # 2026-06-10). Inject the RAG context as a SystemMessage suffix
+    # in that case, or drop the extra context.
+    last_is_tool = bool(base) and isinstance(base[-1], ToolMessage)
+
+    if extra_context and base and not last_is_tool:
         ctx = HumanMessage(content=(
             "[INFORMACIÓN RELEVANTE DE TU MEMORIA EXTERNA]\n" + extra_context
         ))
