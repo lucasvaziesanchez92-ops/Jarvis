@@ -1,4 +1,18 @@
-"""Ollama Cloud LLM — singleton ChatOpenAI with connection reuse."""
+"""Ollama Cloud LLM — singleton ChatOpenAI with connection reuse.
+
+Model choice rationale (see session: research/2026-06-10):
+  - gpt-oss:120b was tried first but emits corrupted tool names
+    (Ollama issue #11704, closed by #11759). LangGraph can't match
+    those names against the schema and falls back to a "no tool"
+    response. Caused the user to report "el LLM miente sobre sus
+    tools".
+  - qwen3.5:32b is the official Ollama-recommended model for
+    tool-calling as of 2026-06 (https://ollama.com/search?c=tools).
+    It supports the OpenAI-compatible tool_choice API and emits
+    clean tool names. Default to it.
+  - Set temperature=0 (was 0.2) — at 0.2 the model occasionally
+    invents tools it doesn't have (LangGraph issue #7845).
+"""
 from functools import lru_cache
 
 import httpx
@@ -13,8 +27,11 @@ def get_llm() -> BaseChatModel:
         model=settings.ollama_model,
         api_key=settings.ollama_api_key,
         base_url=f"{settings.ollama_base_url.rstrip('/')}/v1",
-        temperature=0.2,  # lower = better for tool-calling
+        temperature=0,  # was 0.2 — at 0.2 qwen3.5 sometimes hallucinates tool names
         streaming=True,
-        max_tokens=2048,  # raised from 512 — tool schemas + responses need more room
+        max_tokens=2048,
         timeout=httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=10.0),
+        model_kwargs={
+            "tool_choice": "auto",  # let the model decide; if tools are present it must pick one
+        },
     )
