@@ -39,7 +39,7 @@ export default function BrainBackground() {
     <div className="fixed inset-0 z-0 pointer-events-auto">
       <iframe
         ref={iframeRef}
-        src="/brain-3d.html"
+        src="/brain_final.html"
         title="JARVIS Brain"
         className="w-full h-full border-0"
         style={{ background: 'transparent' }}
