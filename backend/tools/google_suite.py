@@ -280,10 +280,22 @@ def list_calendar_google(max_results: int = 10) -> str:
 
 
 @tool
-def create_calendar_event_google(summary: str, start_time: str, end_time: str, description: str = "", location: str = "") -> str:
-    """Create a Google Calendar event. Args: summary, start_time (ISO 8601), end_time (ISO 8601), optional description, optional location."""
+def create_calendar_event_google(summary: str = "Nueva Cita", start_time: str = "", end_time: str = "", description: str = "", location: str = "") -> str:
+    """Create a Google Calendar event. Args: summary, start_time (ISO 8601), end_time (optional ISO 8601), optional description, optional location."""
     from backend.services.calendar_service import create_event
     try:
+        if not start_time:
+            return "Error: start_time es requerido."
+        if not end_time:
+            # Default to 1 hour after start_time if not provided
+            from datetime import datetime, timedelta
+            try:
+                # Handle Z or timezone offsets by just taking the first 19 chars for simple 1-hour delta
+                base = start_time[:19]
+                dt = datetime.fromisoformat(base)
+                end_time = (dt + timedelta(hours=1)).isoformat() + (start_time[19:] if len(start_time) > 19 else "")
+            except Exception:
+                end_time = start_time
         result = create_event(summary, start_time, end_time, description, location)
         return f"Evento creado: {result['summary']} ({result['id']})"
     except RuntimeError as e:

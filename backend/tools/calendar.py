@@ -4,9 +4,9 @@ from langchain_core.tools import tool
 
 @tool
 def create_calendar_event(
-    title: str,
     start_datetime: str,
-    end_datetime: str,
+    end_datetime: str = "",
+    title: str = "Nueva Cita",
     description: str = "",
     location: str = "",
     calendar_id: str = "primary",
@@ -14,6 +14,14 @@ def create_calendar_event(
     """Create a calendar event. Datetimes must be ISO format (e.g. 2024-12-31T10:00:00)."""
     from backend.services.calendar_service import create_event
     try:
+        if not end_datetime:
+            from datetime import datetime, timedelta
+            try:
+                base = start_datetime[:19]
+                dt = datetime.fromisoformat(base)
+                end_datetime = (dt + timedelta(hours=1)).isoformat() + (start_datetime[19:] if len(start_datetime) > 19 else "")
+            except Exception:
+                end_datetime = start_datetime
         event = create_event(title, start_datetime, end_datetime, description, location)
         return f"Event created successfully: {event.get('id')}"
     except Exception as e:

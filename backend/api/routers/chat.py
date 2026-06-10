@@ -181,7 +181,7 @@ async def ws_chat(websocket: WebSocket):
                             )
 
                         ai_resp = await _plain()
-                        state = {"messages": [ai_resp]}
+                        state = {"messages": history + [HumanMessage(content=full_message), ai_resp]}
                     except Exception as e2:
                         logger.error(f"plain LLM fallback failed: {type(e2).__name__}: {e2}")
                         await send(StreamChunk(type="token", content=(
