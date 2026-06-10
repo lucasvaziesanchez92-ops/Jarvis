@@ -57,14 +57,14 @@
 
         // Material - Ice/Translucent with pink rim glow
         const brainMaterial = new THREE.MeshPhysicalMaterial({
-            color: 0xff3399,
-            emissive: 0xff3399,
-            emissiveIntensity: 0.6,
+            color: 0xffaacc,
+            emissive: 0xff80a0,
+            emissiveIntensity: 0.3,
             metalness: 0.0,
             roughness: 0.25,
-            transmission: 0.35,
+            transmission: 0.6,
             transparent: true,
-            opacity: 0.7,
+            opacity: 0.55,
             thickness: 1.2,
             ior: 1.45,
             clearcoat: 0.8,
@@ -100,7 +100,7 @@
         composer.addPass(new RenderPass(scene, camera));
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.5, 0.4, 0.6
+            0.3, 0.4, 0.7
         );
         composer.addPass(bloomPass);
         const loader = new STLLoader();

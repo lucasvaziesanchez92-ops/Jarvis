@@ -125,6 +125,10 @@ function initVoices() {
 export function cleanForSpeech(text: string): string {
   if (!text) return '';
   return text
+    // Remove thought blocks (e.g. <thought>...</thought>)
+    .replace(/<thought>[\s\S]*?<\/thought>/g, '')
+    // Remove bracketed action logs (e.g. [Consultando...])
+    .replace(/\[.*?\]/g, '')
     // Code blocks
     .replace(/```[\s\S]*?```/g, ' bloque de código ')
     .replace(/`([^`]+)`/g, '$1')

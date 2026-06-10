@@ -41,8 +41,8 @@ async def upload(file: UploadFile = File(...), folder: Optional[str] = Form(None
 @router.get("/download/{file_id}")
 async def download(file_id: str):
     try:
-        data, filename = drive_service.download_file(file_id)
-        return StreamingResponse(iter([data]), media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+        data, filename, mime = drive_service.download_file(file_id)
+        return StreamingResponse(iter([data]), media_type=mime or "application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
     except Exception as e:
         raise _handle_drive_error(e)
 

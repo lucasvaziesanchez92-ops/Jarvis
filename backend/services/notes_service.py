@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def _sync_to_vector(note_id: str, title: str, content: str, tags: List[str] | None = None):
     """Sync note to vector store. Non-blocking if Chroma fails."""
     try:
-        from backend.service.vector_service import index_note
+        from backend.services.vector_service import index_note
         index_note(note_id=note_id, title=title, content=content, tags=tags)
     except Exception as e:
         logger.warning(f"Vector sync failed for note {note_id}: {e}")
@@ -129,7 +129,7 @@ def update_note(note_id: str, title: str | None = None, content: str | None = No
 
 def delete_note(note_id: str) -> str:
     try:
-        from backend.service.vector_service import delete_note_from_index
+        from backend.services.vector_service import delete_note_from_index
         delete_note_from_index(note_id)
     except Exception as e:
         logger.warning(f"Vector delete sync failed for note {note_id}: {e}")

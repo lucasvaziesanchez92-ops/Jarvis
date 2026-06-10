@@ -86,7 +86,7 @@ export default function ChatModePanel() {
       form.append('folder', 'chat_attachments');
       form.append('generate_url', 'false');
 
-      const res = await fetch(`/api/v1/files/upload`, {
+      const res = await fetch(`/api/files/upload`, {
         method: 'POST',
         body: form,
       });
@@ -106,15 +106,10 @@ export default function ChatModePanel() {
     const msg = input.trim();
     if (!msg && attachments.length === 0 && preUploadedAttachments.length === 0) return;
 
-    // Show user message immediately
-    const userMessage = { id: crypto.randomUUID(), role: 'user' as const, content: msg || '[Archivo adjunto]' };
-    useJarvisStore.getState().appendChatMessage(userMessage);
-    setInput('');
-
-    // Upload files if any
+    setUploading(true);
     let uploadedFiles: Array<{key: string, filename: string}> = [...preUploadedAttachments];
+    
     if (attachments.length > 0) {
-      setUploading(true);
       try {
         const newUploaded = await uploadAttachments();
         uploadedFiles = [...uploadedFiles, ...newUploaded];
@@ -127,11 +122,20 @@ export default function ChatModePanel() {
         setAttachments([]);
         return;
       }
-      setUploading(false);
-      setAttachments([]);
     }
 
+    setUploading(false);
+    setAttachments([]);
     setPreUploadedAttachments([]);
+    setInput('');
+
+    const userMessage = { 
+      id: crypto.randomUUID(), 
+      role: 'user' as const, 
+      content: msg || (uploadedFiles.length > 0 ? '' : '[Archivo adjunto]'),
+      attachments: uploadedFiles
+    };
+    useJarvisStore.getState().appendChatMessage(userMessage);
 
     // Send via WebSocket with attachments
     wsSend(msg, uploadedFiles);
@@ -314,9 +318,28 @@ export default function ChatModePanel() {
                   )}
                 </div>
 
-                <div className={msg.role === 'user' ? 'text-white/90' : 'text-white/70'}>
-                  {msg.content}
+                <div className={msg.role === 'user' ? 'text-white/90' : 'text-white/70 whitespace-pre-wrap'}>
+                  {msg.role === 'assistant' 
+                    ? msg.content.replace(/<thought>[\s\S]*?<\/thought>/g, '')
+                    : msg.content}
                 </div>
+
+                {msg.role === 'assistant' && msg.content.includes('<thought>') && (
+                  <div className="mt-2 text-[10px] text-white/30 italic">
+                    [Procesamiento interno oculto]
+                  </div>
+                )}
+
+                {msg.attachments && msg.attachments.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {msg.attachments.map((att, i) => (
+                      <div key={i} className="flex items-center gap-1.5 bg-white/[0.08] rounded-lg px-2.5 py-1 text-[11px] text-white/80 border border-white/10">
+                        <Paperclip className="w-3 h-3 text-cyan-400/70" />
+                        <span className="truncate max-w-[150px]">{att.filename}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {msg.toolCalls && msg.toolCalls.length > 0 && (
                   <div className="mt-2 pt-1.5 border-t border-white/[0.06] space-y-1">

@@ -54,6 +54,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   isStreaming?: boolean
+  attachments?: Array<{key: string, filename: string, size?: number, content_type?: string}>
   toolCalls?: Array<{
     tool: string
     input: Record<string, unknown>
