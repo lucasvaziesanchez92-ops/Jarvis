@@ -36,20 +36,12 @@ def _fmt_console(record: dict) -> str:
         safe_msg = raw_msg.replace("{", "{{").replace("}", "}}")
         func_name = str(record.get("function", "?")).replace("<", r"\<").replace(">", r"\>")
         mod_name = str(record.get("name", "N/A"))
-        
-        exception_text = ""
-        if record.get("exception"):
-            import traceback
-            type_, value_, tb_ = record["exception"]
-            exception_text = "".join(traceback.format_exception(type_, value_, tb_))
-            exception_text = "\n" + exception_text.replace("{", "{{").replace("}", "}}").replace("<", r"\<").replace(">", r"\>")
-
         return (
             f"<green>{time_str}</green> | "
             f"<level>{level_name: <8}</level> | "
             f"<cyan>{rid: <36}</cyan> | "
             f"<bold>{mod_name}:{func_name}:{record['line']}</bold> - "
-            f"<level>{safe_msg}</level>{exception_text}\n"
+            f"<level>{safe_msg}</level>\n"
         )
     except Exception:
         # If ANYTHING in formatting fails, return a minimal safe string.
@@ -68,16 +60,9 @@ def setup_logging() -> None:
     JSON-like `{}` that confuses loguru's internal format()) can NEVER
     propagate into the request path. Without this, an error during logging
     turns into a 500 response — see git history of the OOM saga.
-
-    On Railway (and any ephemeral container) we disable file logging
-    to avoid wasting disk I/O on files that get nuked on every redeploy.
-    Set DISABLE_FILE_LOGGING=false to force-enable.
     """
     # Remove default handler
     logger.remove()
-
-    is_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT_NAME")) or bool(os.environ.get("RAILWAY_PROJECT_ID"))
-    disable_file = os.environ.get("DISABLE_FILE_LOGGING", "true" if is_railway else "false").lower() in ("1", "true", "yes")
 
     # Console handler — pretty format for development
     logger.add(
@@ -87,10 +72,6 @@ def setup_logging() -> None:
         colorize=True,
         catch=True,  # NEVER raise from a log call
     )
-
-    if disable_file:
-        logger.info("File logging disabled (Railway mode).")
-        return
 
     # File handler — JSON format for production/ELK stack
     logger.add(

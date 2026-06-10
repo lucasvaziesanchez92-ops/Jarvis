@@ -74,17 +74,3 @@ def send_email(to: str, subject: str, body: str, user_id: str = DEFAULT_USER) ->
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     sent = service.users().messages().send(userId="me", body={"raw": raw}).execute()
     return {"id": sent["id"], "thread_id": sent.get("threadId", ""), "status": "sent"}
-
-
-def delete_email(email_id: str, user_id: str = DEFAULT_USER) -> dict:
-    """Permanently delete a Gmail message. This cannot be undone."""
-    service = _get_gmail_service(user_id)
-    service.users().messages().delete(userId="me", id=email_id).execute()
-    return {"id": email_id, "status": "deleted"}
-
-
-def trash_email(email_id: str, user_id: str = DEFAULT_USER) -> dict:
-    """Move a Gmail message to trash (recoverable for 30 days)."""
-    service = _get_gmail_service(user_id)
-    service.users().messages().trash(userId="me", id=email_id).execute()
-    return {"id": email_id, "status": "trashed"}

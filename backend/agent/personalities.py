@@ -45,29 +45,18 @@ WIKI_TOOLS  = ["wiki_query", "wiki_save_research", "wiki_ingest"]
 TIME_TOOLS  = ["get_current_time", "get_current_date"]
 MEMORY_TOOLS = ["search_memory", "save_memory", "list_memories", "delete_memory"]
 SEARCH_TOOLS = ["web_search", "search_notes_semantic", "search_wiki_semantic", "search_all_knowledge"]
-CALENDAR_TOOLS = [
-    "list_calendar_events", "create_calendar_event",
-    "update_calendar_event", "delete_calendar_event",
-    "list_calendar_google", "create_calendar_event_google",
-]
-EMAIL_TOOLS = ["list_emails", "send_email", "search_emails", "send_email", "list_emails"]
-GMAIL_TOOLS = [
+CALENDAR_TOOLS = ["list_calendar_events", "create_calendar_event", "update_calendar_event", "delete_calendar_event"]
+EMAIL_TOOLS = ["search_emails", "send_email", "list_emails"]
+GOOGLE_TOOLS = [
     "list_gmail", "search_gmail", "send_gmail",
-    "get_gmail_detail", "delete_gmail_message", "trash_gmail_message",
-]
-DRIVE_TOOLS = [
     "search_drive", "list_drive_files", "list_drive_folder",
     "read_drive_file", "get_drive_file_info",
-    "upload_drive_file", "delete_drive_file", "analyze_drive_image",
+    "upload_drive_file", "delete_drive_file",
+    "analyze_drive_image",
+    "list_calendar_google", "create_calendar_event_google",
 ]
-STORAGE_TOOLS = ["list_storage_files", "read_storage_file", "delete_storage_file"]
-GOOGLE_TOOLS = GMAIL_TOOLS + DRIVE_TOOLS + CALENDAR_TOOLS + STORAGE_TOOLS
 
-ALL_ALLOWED = (
-    NOTES_TOOLS + TODOS_TOOLS + WIKI_TOOLS + TIME_TOOLS + MEMORY_TOOLS
-    + SEARCH_TOOLS + CALENDAR_TOOLS + EMAIL_TOOLS + GMAIL_TOOLS
-    + DRIVE_TOOLS + STORAGE_TOOLS + GOOGLE_TOOLS
-)
+ALL_ALLOWED = NOTES_TOOLS + TODOS_TOOLS + WIKI_TOOLS + TIME_TOOLS + MEMORY_TOOLS + SEARCH_TOOLS + CALENDAR_TOOLS + EMAIL_TOOLS + GOOGLE_TOOLS
 
 
 PERSONALIDADES = {

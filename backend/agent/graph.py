@@ -92,17 +92,11 @@ def agent_node(state: JarvisState) -> dict:
                 "read_drive_file", "get_drive_file_info", "upload_drive_file",
                 "delete_drive_file", "analyze_drive_image",
             ],
-            ("mail", "gmail", "correo", "correos", "email", "emails", "inbox", "bandeja", "mensaje", "mensajes"): [
+            ("mail", "gmail", "correo", "correos", "email", "emails", "inbox", "bandeja"): [
                 "list_gmail", "search_gmail", "send_gmail",
-                "get_gmail_detail", "delete_gmail_message", "trash_gmail_message",
             ],
-            ("calendar", "calendario", "evento", "eventos", "reunion", "reunión", "agenda", "agendar", "agendame", "cita", "citas"): [
-                "list_calendar_events", "create_calendar_event",
-                "update_calendar_event", "delete_calendar_event",
+            ("calendar", "calendario", "evento", "eventos", "reunión", "reunion", "agenda", "agendar", "agendame"): [
                 "list_calendar_google", "create_calendar_event_google",
-            ],
-            ("storage", "bucket", "subido", "subir archivo", "guardar archivo"): [
-                "list_storage_files", "read_storage_file", "delete_storage_file",
             ],
         }
         for keywords, tool_names in keyword_tool_map.items():

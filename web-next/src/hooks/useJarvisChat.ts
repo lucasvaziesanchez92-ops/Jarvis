@@ -109,11 +109,6 @@ function ensureConnection() {
 
       if (data.type === 'token' && data.content) {
         useJarvisStore.setState(s => {
-          const last = s.chatMessages[s.chatMessages.length - 1];
-          if (last && last.role === 'assistant' && last.isStreaming) {
-            const updated = { ...last, content: data.content };
-            return { chatMessages: [...s.chatMessages.slice(0, -1), updated] };
-          }
           const newStatus: ChatMessage = { id: makeId(), role: 'assistant', content: `▸ ${data.content}`, isStreaming: true };
           return { chatMessages: [...s.chatMessages, newStatus] };
         });
@@ -180,33 +175,12 @@ function ensureConnection() {
           store.setActivityState('idle');
           // Auto-TTS when voice is enabled
           if (window.speechSynthesis && useJarvisStore.getState().voiceEnabled) {
-            // Strip markdown, code, HTML, emoji before TTS — they sound
-            // awful when read aloud (literal backticks, hashes, etc).
-            const cleaned = last.content
-              .replace(/```[\s\S]*?```/g, ' bloque de código ')
-              .replace(/`([^`]+)`/g, '$1')
-              .replace(/\*\*([^*]+)\*\*/g, '$1')
-              .replace(/\*([^*]+)\*/g, '$1')
-              .replace(/^#{1,6}\s+/gm, '')
-              .replace(/^[-*+]\s+/gm, '')
-              .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
-              .replace(/\s+/g, ' ')
-              .trim();
-            if (!cleaned) return;
-            const utter = new SpeechSynthesisUtterance(cleaned);
+            const utter = new SpeechSynthesisUtterance(last.content);
             utter.lang = 'es-ES';
             utter.rate = 1.0;
-            const voces = window.speechSynthesis.getVoices();
-            // Prefer high-quality Spanish voices
-            const preferred = ['Paulina', 'Monica', 'Maria', 'Esperanza', 'Jorge', 'Diego'];
-            let chosen = voces.find((v) => v.lang === 'es-MX' && preferred.includes(v.name))
-                     || voces.find((v) => v.lang === 'es-ES' && preferred.includes(v.name))
-                     || voces.find((v) => v.lang === 'es-MX' && v.localService)
-                     || voces.find((v) => v.lang === 'es-ES' && v.localService)
-                     || voces.find((v) => v.lang?.startsWith('es'));
-            if (chosen) utter.voice = chosen;
+            const voices = window.speechSynthesis.getVoices();
+            const es = voices.find((v) => v.lang?.startsWith('es'));
+            if (es) utter.voice = es;
             utter.onstart = () => store.setActivityState('speaking');
             utter.onend = () => store.setActivityState('idle');
             utter.onerror = () => store.setActivityState('idle');

@@ -57,54 +57,21 @@ export default function VoiceModePanel() {
     speakText(last.content);
   }, [messages]);
 
-  const cleanForSpeech = useCallback((text: string): string => {
-    return text
-      // Strip markdown formatting
-      .replace(/```[\s\S]*?```/g, ' bloque de código ')  // fenced code blocks
-      .replace(/`([^`]+)`/g, '$1')                        // inline code
-      .replace(/\*\*([^*]+)\*\*/g, '$1')                    // bold
-      .replace(/\*([^*]+)\*/g, '$1')                        // italic
-      .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')                // underscore italic/bold
-      .replace(/~~([^~]+)~~/g, '$1')                        // strikethrough
-      .replace(/^#{1,6}\s+/gm, '')                          // headings
-      .replace(/^[-*+]\s+/gm, '')                           // bullet list markers
-      .replace(/^\d+\.\s+/gm, '')                           // numbered list markers
-      .replace(/^>\s*/gm, '')                               // blockquotes
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')              // markdown links
-      // Strip HTML tags
-      .replace(/<[^>]+>/g, ' ')
-      // Strip emoji
-      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2700}-\u{27BF}]/gu, '')
-      // Strip common symbols that sound bad when read aloud
-      .replace(/[*_`#>~|]/g, ' ')
-      // Collapse whitespace
-      .replace(/\s+/g, ' ')
-      .trim();
-  }, []);
-
   const speakText = useCallback((text: string) => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const cleaned = cleanForSpeech(text);
-    if (!cleaned) return;
-    const utter = new SpeechSynthesisUtterance(cleaned);
+    const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'es-ES';
     utter.rate = 1.0;
     utter.pitch = 1.0;
-    const voces = window.speechSynthesis.getVoices();
-    // Prefer high-quality Spanish voices in this order: Paulina (es-MX), Monica (es-ES), then any es-*
-    const preferredNames = ['Paulina', 'Monica', 'Maria', 'Esperanza', 'Jorge', 'Diego'];
-    let chosenVoice = voces.find((v) => v.lang === 'es-MX' && preferredNames.includes(v.name));
-    if (!chosenVoice) chosenVoice = voces.find((v) => v.lang === 'es-ES' && preferredNames.includes(v.name));
-    if (!chosenVoice) chosenVoice = voces.find((v) => v.lang === 'es-MX' && v.localService);
-    if (!chosenVoice) chosenVoice = voces.find((v) => v.lang === 'es-ES' && v.localService);
-    if (!chosenVoice) chosenVoice = voces.find((v) => v.lang?.startsWith('es'));
-    if (chosenVoice) utter.voice = chosenVoice;
+    const voices = window.speechSynthesis.getVoices();
+    const es = voices.find((v) => v.lang?.startsWith('es'));
+    if (es) utter.voice = es;
     utter.onstart = () => { setStatus('speaking'); setActivityState('speaking'); };
     utter.onend = () => { setStatus('idle'); setActivityState('idle'); };
     utter.onerror = () => { setStatus('idle'); setActivityState('idle'); };
     window.speechSynthesis.speak(utter);
-  }, [cleanForSpeech, setActivityState]);
+  }, [setActivityState]);
 
   const startListening = useCallback(async () => {
     try {

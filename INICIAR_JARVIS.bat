@@ -28,7 +28,7 @@ if exist "venv\Scripts\activate.bat" call venv\Scripts\activate.bat
 
 REM Start backend in new window
 echo [1/3] Starting backend on port 8000...
-start "JARVIS Backend" cmd /k "cd /d %~dp0&python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir backend"
+start "JARVIS Backend" cmd /k "cd /d %~dp0&python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload"
 
 timeout /t 5 > nul
 

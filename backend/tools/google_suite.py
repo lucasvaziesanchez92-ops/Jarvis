@@ -46,45 +46,6 @@ def list_gmail(max_results: int = 10) -> str:
 
 
 @tool
-def get_gmail_detail(email_id: str) -> str:
-    """Get the full body and headers of a single email by its ID. Use this after list_gmail to read the full content of a specific message."""
-    from backend.services.gmail_service import get_email
-    try:
-        msg = get_email(email_id)
-        return (
-            f"From: {msg['from']}\n"
-            f"To: {msg['to']}\n"
-            f"Date: {msg['date']}\n"
-            f"Subject: {msg['subject']}\n"
-            f"\n{msg['body']}"
-        )
-    except RuntimeError as e:
-        return str(e)
-
-
-@tool
-def delete_gmail_message(email_id: str) -> str:
-    """Permanently delete a Gmail message by its ID. This cannot be undone."""
-    from backend.services.gmail_service import delete_email
-    try:
-        result = delete_email(email_id)
-        return f"Correo {email_id} eliminado permanentemente."
-    except RuntimeError as e:
-        return str(e)
-
-
-@tool
-def trash_gmail_message(email_id: str) -> str:
-    """Move a Gmail message to trash (recoverable for 30 days). Use delete_gmail_message for permanent deletion."""
-    from backend.services.gmail_service import trash_email
-    try:
-        result = trash_email(email_id)
-        return f"Correo {email_id} movido a papelera."
-    except RuntimeError as e:
-        return str(e)
-
-
-@tool
 def search_drive(query: str) -> str:
     """Search files in Google Drive. Args: query keywords. Returns file names, IDs, and types."""
     from backend.services.drive_service import list_files

@@ -86,7 +86,7 @@ export default function ChatModePanel() {
       form.append('folder', 'chat_attachments');
       form.append('generate_url', 'false');
 
-      const res = await fetch(`/api/v1/files/upload`, {
+      const res = await fetch(`${API_BASE}/api/files/upload`, {
         method: 'POST',
         body: form,
       });
