@@ -1,15 +1,16 @@
 'use client';
 
 import { useRef, useMemo, useEffect, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { useJarvisStore } from '@/store/jarvisStore';
 
-// JARVIS Brain v4 - procedural anatomical brain (no GLB, no network).
-// Rendered with FBM-like noise displacement on a subdivided icosahedron
-// to look brain-like (gyri/sulci bumps). Always renders reliably.
+// JARVIS Brain v5 - loads the user-supplied brain-simplified.stl
+// (anatomical mesh from the agent project). Pure STL, no GLB, no
+// external dependencies. Loaded via STLLoader.
 
 const STATE_META = {
   idle:      { grooveIntensity: 0.55, rimIntensity: 1.4 },
@@ -85,28 +86,21 @@ function BrainModel() {
   const stateRef = useRef({ persona, activityState });
   useEffect(() => { stateRef.current = { persona, activityState }; }, [persona, activityState]);
 
-  // Procedural brain: subdivided icosahedron with FBM-like noise
-  // displacement to mimic gyri/sulci. Pure procedural - no GLB, no
-  // network, no parse failures. Always renders.
-  const geometry = useMemo(() => {
-    const geo = new THREE.IcosahedronGeometry(1.0, 32);
-    const pos = geo.attributes.position;
-    const v = new THREE.Vector3();
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i);
-      // Multi-octave noise to create brain-like bumps
-      const n =
-        Math.sin(v.x * 4) * Math.cos(v.y * 4) * 0.04 +
-        Math.sin(v.x * 8 + 1.3) * Math.cos(v.z * 8 + 0.7) * 0.025 +
-        Math.sin(v.y * 12 + 2.1) * Math.cos(v.x * 12) * 0.015;
-      // Elongate vertically (brain is taller than wide)
-      v.y *= 1.15;
-      v.normalize().multiplyScalar(1.0 + n);
-      pos.setXYZ(i, v.x, v.y, v.z);
+  // Load the user-supplied brain-simplified.stl. STL is a simple
+  // triangle soup   no Draco/KTX2 needed, just geometry.
+  const geometry = useLoader(STLLoader, '/models/brain.stl');
+
+  // Center the geometry (STL files often have weird origins)
+  useEffect(() => {
+    geometry.computeBoundingBox();
+    const bb = geometry.boundingBox;
+    if (bb) {
+      const center = new THREE.Vector3();
+      bb.getCenter(center);
+      geometry.translate(-center.x, -center.y, -center.z);
     }
-    geo.computeVertexNormals();
-    return geo;
-  }, []);
+    geometry.computeVertexNormals();
+  }, [geometry]);
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
@@ -138,7 +132,7 @@ function BrainModel() {
   });
 
   return (
-    <group ref={groupRef} scale={0.85} position={[0, 0, 0]}>
+    <group ref={groupRef} scale={0.0025} position={[0, 0, 0]}>
       <mesh ref={meshRef} castShadow receiveShadow geometry={geometry}>
         <meshPhysicalMaterial
           color={0xd0e8e8}
@@ -153,12 +147,12 @@ function BrainModel() {
           clearcoatRoughness={0.15}
         />
       </mesh>
-      <mesh ref={wireRef} scale={1.02} geometry={geometry}>
+      <mesh ref={wireRef} scale={1.005} geometry={geometry}>
         <meshBasicMaterial
           color={0x40e0d0}
           wireframe
           transparent
-          opacity={0.25}
+          opacity={0.2}
         />
       </mesh>
     </group>
