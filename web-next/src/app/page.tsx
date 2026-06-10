@@ -12,6 +12,7 @@ import { API_BASE } from '@/lib/api'
 
 /* ── Lazy-load panels + brain + bubble + voice ───────────────── */
 const BrainBackground = dynamic(() => import('@/components/BrainBackground'), { ssr: false })
+const BrainVisual     = dynamic(() => import('@/components/BrainVisual'),     { ssr: false })
 const ThinkingBubble  = dynamic(() => import('@/components/ThinkingBubble'),  { ssr: false })
 const VoiceControls   = dynamic(() => import('@/components/VoiceControls'),   { ssr: false })
 
@@ -238,7 +239,7 @@ function WelcomeScreen() {
    A fully unified iOS/macOS responsive application.
 ╚══════════════════════════════════════════════════════════════ */
 export default function RootPage() {
-  const { currentScreen, googleConnected, checkGoogleAuth } = useJarvisStore()
+  const { currentScreen, googleConnected, checkGoogleAuth, brainRenderer } = useJarvisStore()
   const activeScreen = currentScreen === 'home' ? 'home' : currentScreen
 
   useEffect(() => {
@@ -255,8 +256,16 @@ export default function RootPage() {
       {/* All app UI only renders when Google is connected */}
       {showApp && (
         <>
-          {/* 1. 3D Brain full screen background (Always active in z-0) */}
-          <BrainBackground />
+          {/* 1. Brain Background based on selected renderer */}
+          {brainRenderer === '3d' && <BrainBackground />}
+          {brainRenderer === '2d' && (
+            <div className="fixed inset-0 z-0 flex items-center justify-center bg-[#0a0a0f]">
+              <BrainVisual width={500} height={440} />
+            </div>
+          )}
+          {brainRenderer === 'none' && (
+            <div className="fixed inset-0 z-0 bg-[#0a0a0f]" />
+          )}
           
           {/* 2. Ambient backdrop overlay to adjust contrast when panels are loaded */}
           {activeScreen !== 'home' && (
@@ -281,7 +290,7 @@ export default function RootPage() {
           ) : (
             /* Floating centered viewport card for notes/tasks/chat/etc. */
             <div className="relative z-20 flex items-center justify-center w-full h-full pt-4 pb-24">
-              <div className="w-full h-full md:w-[600px] md:h-[82vh] md:rounded-[28px] md:border md:border-white/[0.08] md:shadow-[0_24px_60px_rgba(0,0,0,0.6)] overflow-hidden animate-fade-in">
+              <div className="w-full h-full md:w-[600px] md:h-[82vh] md:rounded-[28px] md:border md:border-white/[0.08] md:shadow-[0_24px_60px_rgba(0,0,0,0.6)] md:bg-[#0a0a0f]/95 backdrop-blur-md overflow-hidden animate-fade-in">
                 <UnifiedPanelView />
               </div>
             </div>

@@ -398,7 +398,7 @@ export default function ChatModePanel() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="flex items-center justify-center w-10 h-12 rounded-xl border border-white/[0.08] text-white/30 hover:text-white/60 hover:border-white/[0.15] transition-all shrink-0"
+                  className="flex items-center justify-center w-12 h-12 rounded-xl bg-pink-500/20 border-2 border-pink-400/50 text-pink-200 hover:bg-pink-500/30 hover:border-pink-300 transition-all shrink-0 shadow-lg shadow-pink-500/20"
                   title="Adjuntar archivo"
                 >
                   <Paperclip className="w-4 h-4" />

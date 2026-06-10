@@ -28,14 +28,32 @@ def _get_drive_service(user_id: str = DEFAULT_USER):
     return GoogleAuthService.build_drive(creds)
 
 
-def list_files(query: str = "", max_results: int = 50, folder_id: Optional[str] = None, user_id: str = DEFAULT_USER) -> list[dict]:
-    """List files. If folder_id is set, list children of that folder. Otherwise list from root."""
+def list_files(query: str = "", max_results: int = 50, folder_id: Optional[str] = None, mime_type: str = "", user_id: str = DEFAULT_USER) -> list[dict]:
+    """List files. If folder_id is set, list children of that folder. Otherwise list from root.
+
+    Args:
+        query: substring to match in file name or fullText.
+        max_results: cap.
+        folder_id: restrict to children of this folder.
+        mime_type: MIME-type filter. If set with no '/' suffix
+                   (e.g. 'image'), matches all MIME types starting
+                   with that prefix. If set WITH '/' (e.g.
+                   'image/png'), matches exactly that MIME type.
+    """
     service = _get_drive_service(user_id)
     q = "trashed = false"
     if folder_id:
         q += f" and '{folder_id}' in parents"
     if query:
-        q += f" and (name contains '{query}' or fullText contains '{query}')"
+        # Escape single quotes in user input
+        safe = query.replace("'", "\\'")
+        q += f" and (name contains '{safe}' or fullText contains '{safe}')"
+    if mime_type:
+        safe_mime = mime_type.replace("'", "\\'")
+        if "/" in safe_mime:
+            q += f" and mimeType = '{safe_mime}'"
+        else:
+            q += f" and mimeType contains '{safe_mime}/'"
     results = service.files().list(
         q=q,
         pageSize=max_results,

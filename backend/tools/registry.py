@@ -179,6 +179,35 @@ EXTENDED_TOOLS = [
 # ── All tools combined, filtered clean ──────────────────────────
 ALL_TOOLS = [t for t in CORE_TOOLS + _GOOGLE_TOOLS + _CALENDAR_TOOLS + _STORAGE_TOOLS + EXTENDED_TOOLS if t is not None]
 
+# ── Tool name aliases ────────────────────────────────────────────
+# devstral-small-2:24b frequently hallucinates tool names with
+# suffixes like 'search_drive_file', 'list_gmail_messages', or
+# 'get_drive_file' that don't exist in the schema. We expose
+# every real tool UNDER every common alias name so the LLM's
+# hallucination still resolves to the right function.
+TOOL_ALIASES: dict[str, str] = {
+    "search_drive_file":  "search_drive",
+    "search_drive_files": "search_drive",
+    "find_drive_file":    "search_drive",
+    "list_drive":         "list_drive_files",
+    "get_drive":          "get_drive_file_info",
+    "get_drive_file":     "get_drive_file_info",
+    "read_drive":         "read_drive_file",
+    "download_drive":     "read_drive_file",
+    "upload_drive":       "upload_drive_file",
+    "delete_drive":       "delete_drive_file",
+    "list_gmail_messages": "list_gmail",
+    "search_gmail_messages": "search_gmail",
+    "send_email_via_gmail": "send_gmail",
+    "list_calendar":      "list_calendar_google",
+    "list_calendar_google_events": "list_calendar_google",
+    "create_calendar":    "create_calendar_event_google",
+    "add_calendar_event": "create_calendar_event_google",
+    "analyze_image":      "analyze_drive_image",
+    "describe_image":     "analyze_drive_image",
+    "get_weather":        "web_search",
+}
+
 
 def get_tool_status() -> dict:
     """Diagnostic: which tools are available right now and why.

@@ -1,74 +1,159 @@
 'use client';
 
-import { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { useRef, useEffect } from 'react';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
+import { useJarvisStore } from '@/store/jarvisStore';
 
-// Brain 3D using the user's GLB model (1.6MB) which has materials
-// already built in. The user said 'el cerebro esta mal' so we
-// load the original high-quality model and apply a fixed anatomical
-// pose. We force every material to the JARVIS pink/magenta color
-// so the brain matches the UI theme regardless of what colors
-// the GLB shipped with.
+// JARVIS Brain 3D - replica EXACTA del brain-3d.html que el
+// usuario suministro como referencia. Material: HIELO AZUL-BLANCO
+// (0xd0e8e8) con sheen rosa, NO rosa plano. El usuario reporto
+// 'esta peor' y 'demasiado rosado' porque mi fix anterior pinto
+// todo de rosa. La referencia es translucida tipo hielo con glow
+// sutil. flatShading=true para look low-poly facetado.
+//
+// Animacion: sutil respiracion. rotation.x = -PI/2 (acostado),
+// rotation.z = PI/3.5 (vista lateral anatomica).
 
-const PINK = '#e91e63';
-const PINK_BRIGHT = '#ff80ab';
+const ICE = 0xd0e8e8;
+const EMISSIVE = 0x2a1030;
+const SHEEN = 0xff69b4;
+const GLOW = 0xff69b4;
+const BOTTOM_LIGHT_COLOR = 0xff1493;
+const FILL_LIGHT_COLOR = 0x40e0d0;
 
 function BrainModel() {
   const groupRef = useRef<THREE.Group>(null);
-  const gltf = useGLTF('/models/brain.glb');
+  const meshRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
+  const matRef = useRef<THREE.MeshPhysicalMaterial>(null);
+  const glowMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const bottomLightRef = useRef<THREE.PointLight>(null);
 
-  // Traverse and recolor every material to the JARVIS pink
-  // palette. The original GLB ships with reddish materials which
-  // is what the user reported ('esta peor', 'no me gusto').
-  gltf.scene.traverse((child: THREE.Object3D) => {
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      mats.forEach((m) => {
-        if (!m) return;
-        if ((m as THREE.MeshStandardMaterial).color) {
-          (m as THREE.MeshStandardMaterial).color = new THREE.Color(PINK);
-        }
-        if ((m as THREE.MeshStandardMaterial).emissive) {
-          (m as THREE.MeshStandardMaterial).emissive = new THREE.Color(PINK_BRIGHT);
-          (m as THREE.MeshStandardMaterial).emissiveIntensity = 0.25;
-        }
-        if ((m as THREE.MeshStandardMaterial).roughness !== undefined) {
-          (m as THREE.MeshStandardMaterial).roughness = 0.4;
-        }
-        if ((m as THREE.MeshStandardMaterial).metalness !== undefined) {
-          (m as THREE.MeshStandardMaterial).metalness = 0.0;
-        }
-      });
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-    }
-  });
+  const geometry = useLoader(STLLoader, '/models/brain.stl');
+
+  const { activityState } = useJarvisStore();
+  const stateRef = useRef(activityState);
+  useEffect(() => { stateRef.current = activityState; }, [activityState]);
+
+  useEffect(() => {
+    geometry.computeBoundingBox();
+    const bb = geometry.boundingBox;
+    if (!bb) return;
+    const center = new THREE.Vector3();
+    bb.getCenter(center);
+    geometry.translate(-center.x, -center.y, -center.z);
+    const size = new THREE.Vector3();
+    bb.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = maxDim > 0 ? 1.6 / maxDim : 1;
+    if (groupRef.current) groupRef.current.scale.setScalar(scale);
+    geometry.computeVertexNormals();
+  }, [geometry]);
 
   useFrame(({ clock }) => {
-    if (!groupRef.current) return;
     const t = clock.getElapsedTime();
-    // Fixed 3/4 anatomical pose. Subtle breath-like sway, no spin.
-    groupRef.current.rotation.y = -0.3 + Math.sin(t * 0.3) * 0.04;
-    groupRef.current.rotation.x = 0.0 + Math.sin(t * 0.25) * 0.02;
+    const stName = stateRef.current || 'idle';
+
+    // Brain body: subtle breathing (matches the reference exactly)
+    if (groupRef.current) {
+      groupRef.current.rotation.x = (-Math.PI / 2) + Math.sin(t * 0.15) * 0.05;
+      groupRef.current.rotation.z = (Math.PI / 3.5) + Math.cos(t * 0.1) * 0.03;
+      groupRef.current.rotation.y = Math.sin(t * 0.12) * 0.02;
+    }
+
+    // Glow shell pulse
+    if (glowMatRef.current) {
+      glowMatRef.current.opacity = 0.15 + Math.sin(t * 0.8) * 0.05;
+    }
+
+    // Bottom light pulse
+    if (bottomLightRef.current) {
+      bottomLightRef.current.intensity = 0.5 + Math.sin(t * 1.2) * 0.2;
+    }
+
+    // Sheen chromatic shift (subtle pink/magenta cycling)
+    if (matRef.current && matRef.current.sheenColor) {
+      const hue = 0.92 + Math.sin(t * 0.3) * 0.02;
+      matRef.current.sheenColor.setHSL(hue, 0.7, 0.6);
+    }
+
+    // Activity feedback: idle = normal, thinking = transmission blink,
+    // speaking = slight emissive bump, listening = stable.
+    if (matRef.current) {
+      if (stName === 'thinking') {
+        const blink = (Math.sin(t * 4) + 1) / 2;
+        matRef.current.transmission = 0.3 + blink * 0.5;
+        matRef.current.emissiveIntensity = 0.2 + blink * 0.5;
+        matRef.current.opacity = 0.5 + blink * 0.5;
+        matRef.current.transparent = true;
+      } else if (stName === 'speaking') {
+        matRef.current.transmission = 0.6;
+        matRef.current.emissiveIntensity = 0.4;
+        matRef.current.opacity = 1.0;
+        matRef.current.transparent = false;
+      } else {
+        matRef.current.transmission = 0.6;
+        matRef.current.emissiveIntensity = 0.3;
+        matRef.current.opacity = 1.0;
+        matRef.current.transparent = false;
+      }
+    }
   });
 
   return (
     <group ref={groupRef} position={[0, 0, 0]}>
-      <primitive object={gltf.scene} scale={2.2} position={[0, 0, 0]} />
+      <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
+        <meshPhysicalMaterial
+          ref={matRef}
+          color={ICE}
+          emissive={EMISSIVE}
+          emissiveIntensity={0.3}
+          metalness={0}
+          roughness={0.25}
+          transmission={0.6}
+          thickness={1.2}
+          ior={1.45}
+          clearcoat={0.8}
+          clearcoatRoughness={0.1}
+          sheen={0.5}
+          sheenColor={SHEEN}
+          sheenRoughness={0.5}
+          specularIntensity={1.0}
+          specularColor={0xffffff}
+          side={THREE.DoubleSide}
+          flatShading={true}
+        />
+      </mesh>
+      {/* Glow shell - additive pink (matches reference) */}
+      <mesh ref={glowRef} scale={0.95} geometry={geometry}>
+        <meshBasicMaterial
+          ref={glowMatRef}
+          color={GLOW}
+          transparent
+          opacity={0.15}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* Pulsing bottom light */}
+      <pointLight
+        ref={bottomLightRef}
+        position={[0, -2, 0]}
+        intensity={0.5}
+        color={BOTTOM_LIGHT_COLOR}
+      />
     </group>
   );
 }
-
-useGLTF.preload('/models/brain.glb');
 
 export default function BrainBackground() {
   return (
     <div className="fixed inset-0 z-0 pointer-events-none">
       <Canvas
-        camera={{ position: [0, 0.3, 4.5], fov: 35, near: 0.1, far: 50 }}
+        camera={{ position: [0, 0, 3.2], fov: 45, near: 0.1, far: 50 }}
         gl={{
           antialias: true,
           alpha: true,
@@ -77,12 +162,20 @@ export default function BrainBackground() {
         }}
         dpr={[1, 2]}
       >
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[5, 5, 5]} intensity={0.8} color={'#ffffff'} />
-        <directionalLight position={[-3, 3, -2]} intensity={0.5} color={PINK_BRIGHT} />
-        <pointLight position={[0, 2, 3]} intensity={0.5} color={PINK_BRIGHT} />
-        <pointLight position={[0, -2, 1]} intensity={0.3} color={PINK} />
+        <ambientLight intensity={0.5} color={0x404040} />
+        <directionalLight position={[5, 5, 5]} intensity={1.2} color={0xffffff} castShadow />
+        <directionalLight position={[-3, 2, -2]} intensity={0.6} color={FILL_LIGHT_COLOR} />
+        <directionalLight position={[0, -3, 4]} intensity={0.8} color={0x40e0d0} />
+        <pointLight position={[0, 3, 0]} intensity={0.4} color={SHEEN} />
         <BrainModel />
+        <OrbitControls
+          enableDamping
+          dampingFactor={0.05}
+          minDistance={1.5}
+          maxDistance={8}
+          target={[0, 0, 0]}
+          enablePan={false}
+        />
       </Canvas>
     </div>
   );

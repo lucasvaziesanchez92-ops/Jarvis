@@ -175,10 +175,16 @@ def tool_node(state: JarvisState) -> dict:
         logger.warning(f"tool_node: no tool_calls in last message ({type(last).__name__})")
         return {"messages": []}
 
+    from backend.tools.registry import TOOL_ALIASES
     tool_map = {t.name: t for t in ALL_TOOLS}
     result = []
     for tc in last.tool_calls:
-        name = tc["name"]
+        raw_name = tc["name"]
+        # Resolve hallucinated aliases like 'search_drive_file' to
+        # the real tool 'search_drive'. The LLM still hears the
+        # original name in the conversation but the tool runs.
+        canonical = TOOL_ALIASES.get(raw_name, raw_name)
+        name = canonical
         raw_args = tc.get("args", {}) or {}
         logger.info(f"tool_node: executing {name}({json.dumps(raw_args, default=str)[:200]})")
         t = tool_map.get(name)

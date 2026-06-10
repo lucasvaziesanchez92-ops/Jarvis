@@ -85,17 +85,49 @@ def trash_gmail_message(email_id: str) -> str:
 
 
 @tool
-def search_drive(query: str) -> str:
-    """Search files in Google Drive. Args: query keywords. Returns file names, IDs, and types."""
+def search_drive(query: str = "", mime_filter: str = "") -> str:
+    """Search files in Google Drive.
+
+    Args:
+        query: keywords to match in file names (e.g. 'factura', 'informe').
+               Leave empty to list all files.
+        mime_filter: optional MIME-type filter. Common values:
+                     'image/' (any image), 'image/png', 'image/jpeg',
+                     'application/pdf', 'text/', 'application/vnd.google-apps.document'
+                     (Google Docs), 'application/vnd.google-apps.spreadsheet'
+                     (Google Sheets).
+                     Leave empty to match any type.
+
+    Returns: list of matching files with name, size, ID.
+    """
     from backend.services.drive_service import list_files
     try:
-        results = list_files(query=query, max_results=20)
+        # If the user wants only images, build a query that the
+        # Drive service can honour. list_files in the service
+        # accepts a 'mime_type' filter parameter.
+        kw = {"max_results": 20}
+        if query:
+            kw["query"] = query
+        if mime_filter:
+            kw["mime_type"] = mime_filter
+        results = list_files(**kw)
         if not results:
-            return "No se encontraron archivos en Drive."
+            return (
+                f"No se encontraron archivos en Drive"
+                + (f" que coincidan con '{query}'" if query else "")
+                + (f" de tipo '{mime_filter}'" if mime_filter else "")
+                + "."
+            )
         lines = [f"{len(results)} archivos encontrados:"]
         for f in results:
             ftype = "📁" if f.get("mimeType") == "application/vnd.google-apps.folder" else "📄"
-            lines.append(f"- {ftype} {f['name']} ({f.get('size', 'N/A')} bytes) ID:{f['id']}")
+            size = f.get("size", "N/A")
+            try:
+                if isinstance(size, str) and size.isdigit():
+                    size = f"{int(size)/1024:.1f}KB"
+            except Exception:
+                pass
+            lines.append(f"- {ftype} {f['name']} ({size}) ID:{f['id']}")
         return "\n".join(lines)
     except RuntimeError as e:
         return str(e)
