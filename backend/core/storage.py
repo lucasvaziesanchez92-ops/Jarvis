@@ -77,14 +77,18 @@ def _save_local_meta(meta: dict):
 
 def upload_bytes(data: bytes, object_key: str, content_type: Optional[str] = None) -> str:
     if _is_railway_configured():
-        s3 = _get_s3_client()
-        bucket = _get_bucket_name()
-        extra = {}
-        if content_type:
-            extra["ContentType"] = content_type
-        s3.put_object(Bucket=bucket, Key=object_key, Body=data, **extra)
-        endpoint = os.environ.get("ENDPOINT") or os.environ.get("RAILWAY_BUCKET_ENDPOINT")
-        return f"{endpoint}/{bucket}/{object_key}"
+        try:
+            s3 = _get_s3_client()
+            bucket = _get_bucket_name()
+            extra = {}
+            if content_type:
+                extra["ContentType"] = content_type
+            s3.put_object(Bucket=bucket, Key=object_key, Body=data, **extra)
+            endpoint = os.environ.get("ENDPOINT") or os.environ.get("RAILWAY_BUCKET_ENDPOINT")
+            return f"{endpoint}/{bucket}/{object_key}"
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"S3 upload failed, falling back to local: {e}")
 
     # Local fallback
     file_path = _LOCAL_STORAGE_DIR / object_key
@@ -102,10 +106,14 @@ def upload_bytes(data: bytes, object_key: str, content_type: Optional[str] = Non
 
 def download_bytes(object_key: str) -> bytes:
     if _is_railway_configured():
-        s3 = _get_s3_client()
-        bucket = _get_bucket_name()
-        response = s3.get_object(Bucket=bucket, Key=object_key)
-        return response["Body"].read()
+        try:
+            s3 = _get_s3_client()
+            bucket = _get_bucket_name()
+            response = s3.get_object(Bucket=bucket, Key=object_key)
+            return response["Body"].read()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"S3 download failed, falling back to local: {e}")
 
     # Local fallback
     file_path = _LOCAL_STORAGE_DIR / object_key
@@ -116,10 +124,14 @@ def download_bytes(object_key: str) -> bytes:
 
 def delete_file(object_key: str):
     if _is_railway_configured():
-        s3 = _get_s3_client()
-        bucket = _get_bucket_name()
-        s3.delete_object(Bucket=bucket, Key=object_key)
-        return
+        try:
+            s3 = _get_s3_client()
+            bucket = _get_bucket_name()
+            s3.delete_object(Bucket=bucket, Key=object_key)
+            return
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"S3 delete failed, falling back to local: {e}")
 
     # Local fallback
     file_path = _LOCAL_STORAGE_DIR / object_key
@@ -132,10 +144,14 @@ def delete_file(object_key: str):
 
 def list_files(prefix: str = "") -> list[dict]:
     if _is_railway_configured():
-        s3 = _get_s3_client()
-        bucket = _get_bucket_name()
-        response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        return response.get("Contents", [])
+        try:
+            s3 = _get_s3_client()
+            bucket = _get_bucket_name()
+            response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+            return response.get("Contents", [])
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"S3 list failed, falling back to local: {e}")
 
     # Local fallback
     meta = _load_local_meta()
@@ -154,11 +170,15 @@ def list_files(prefix: str = "") -> list[dict]:
 
 def generate_presigned_url(object_key: str, expiration: int = 3600) -> str:
     if _is_railway_configured():
-        s3 = _get_s3_client()
-        bucket = _get_bucket_name()
-        return s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": bucket, "Key": object_key},
-            ExpiresIn=expiration,
-        )
+        try:
+            s3 = _get_s3_client()
+            bucket = _get_bucket_name()
+            return s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": bucket, "Key": object_key},
+                ExpiresIn=expiration,
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"S3 presigned URL failed, falling back to local: {e}")
     return f"/api/files/download/{object_key}"
