@@ -94,6 +94,20 @@ function ensureConnection() {
 
   ws.onclose = () => {
     globalWs = null;
+    
+    // Si se cortó la conexión y había un mensaje streameando, lo cerramos limpio.
+    const store = useJarvisStore.getState();
+    const msgs = store.chatMessages;
+    const last = msgs[msgs.length - 1];
+    if (last && last.isStreaming) {
+      useJarvisStore.setState({ chatMessages: [...msgs.slice(0, -1), { ...last, isStreaming: false }] });
+      store.setLastAssistantText(last.content);
+      store.setActivityState('idle');
+      if (store.voiceEnabled && last.content) {
+        ttsSpeak(last.content);
+      }
+    }
+
     // Only reconnect if there are still active listeners
     if (refCount <= 0) return;
     notifyStatus('disconnected');
