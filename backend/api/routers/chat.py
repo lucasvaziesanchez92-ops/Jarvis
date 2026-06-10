@@ -14,11 +14,12 @@ from backend.agent.personalities import get_persona
 
 router = APIRouter()
 
-# Railway free tier proxy window = 30s. The Ollama cloud large models
-# (qwen2.5:72b, gpt-oss:120b) can take 15-30s on first-token. Cap the
-# graph at 60s; fall back to plain LLM (no tools) on timeout.
-_GRAPH_TIMEOUT = 60
-_PLAIN_TIMEOUT = 30
+# Railway free tier proxy window = 30s. Cap the graph at 22s; fallback
+# to plain LLM (no tools) if the agent times out. Keeping this low
+# because the user sees a fast fallback message instead of staring at
+# "Pensando..." for a minute.
+_GRAPH_TIMEOUT = 22
+_PLAIN_TIMEOUT = 15
 
 
 class WebSocketCallback(BaseCallbackHandler):
@@ -117,6 +118,7 @@ async def ws_chat(websocket: WebSocket):
             config = {
                 "configurable": {"thread_id": session_id},
                 "callbacks": [callback],
+                "recursion_limit": 25,  # enough for ~5 tool iterations
             }
 
             try:
@@ -173,7 +175,7 @@ async def ws_chat(websocket: WebSocket):
                 await send(StreamChunk(type="done"))
 
             except Exception as e:
-                logger.error(f"WS error: {type(e).__name__}: {e}")
+                logger.exception("WS error in chat loop")
                 try:
                     await send(StreamChunk(type="error", content=str(e)[:500]))
                 except Exception:
