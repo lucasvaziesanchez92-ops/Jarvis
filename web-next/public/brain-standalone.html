@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -55,40 +55,40 @@
         controls.maxDistance = 8;
         controls.target.set(0, 0, 0);
 
-        // Material - Ice/Translucent with pink rim glow
+        // Material — Translucent ice-crystal with subtle pink rim
         const brainMaterial = new THREE.MeshPhysicalMaterial({
-            color: 0xffaacc,
-            emissive: 0xff80a0,
-            emissiveIntensity: 0.3,
+            color: 0xd0e8ff,
+            emissive: 0x2244aa,
+            emissiveIntensity: 0.15,
             metalness: 0.0,
-            roughness: 0.25,
-            transmission: 0.6,
+            roughness: 0.1,
+            transmission: 0.75,
             transparent: true,
-            opacity: 0.55,
-            thickness: 1.2,
-            ior: 1.45,
-            clearcoat: 0.8,
-            clearcoatRoughness: 0.1,
-            sheen: 0.5,
+            opacity: 0.6,
+            thickness: 2.0,
+            ior: 1.5,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.05,
+            sheen: 0.8,
             sheenColor: 0xff69b4,
-            sheenRoughness: 0.5,
-            specularIntensity: 1.0,
+            sheenRoughness: 0.3,
+            specularIntensity: 1.2,
             specularColor: 0xffffff,
             envMap: envMap,
-            envMapIntensity: 0.5,
+            envMapIntensity: 1.0,
             side: THREE.DoubleSide,
-            flatShading: true,
+            flatShading: false,
         });
 
-        // Inner glow
+        // Inner glow — soft pink backlight for SSS effect
         const innerMat = new THREE.MeshPhysicalMaterial({
             color: 0xff80d0,
             emissive: 0xff3399,
-            emissiveIntensity: 0.4,
+            emissiveIntensity: 0.5,
             transparent: true,
-            opacity: 0.15,
+            opacity: 0.2,
             side: THREE.BackSide,
-            flatShading: true,
+            flatShading: false,
         });
 
         // Load inline STL
