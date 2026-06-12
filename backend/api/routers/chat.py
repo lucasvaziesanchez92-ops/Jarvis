@@ -129,6 +129,19 @@ async def ws_chat(websocket: WebSocket):
                 except Exception as e:
                     logger.warning(f"build_file_context failed: {e}")
 
+            # Reconstruct history from frontend if backend lost it (e.g. Railway restart)
+            client_history = data.get("history", [])
+            if not _session_history[session_id] and client_history:
+                rebuilt = []
+                for m in client_history:
+                    role = m.get("role")
+                    cont = m.get("content", "")
+                    if role == "user":
+                        rebuilt.append(HumanMessage(content=cont))
+                    elif role == "assistant":
+                        rebuilt.append(AIMessage(content=cont))
+                _session_history[session_id] = rebuilt
+
             # Build the input: prior session history (already in
             # the exact shape the LLM produced, including
             # AIMessage.tool_calls and ToolMessage pairs) plus the

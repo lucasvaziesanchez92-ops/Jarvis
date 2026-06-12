@@ -294,6 +294,10 @@ export function useJarvisChat() {
       session_id: store.chatSessionId,
       persona: store.persona?.name || 'profesional',
       attachments: attachments || [],
+      history: store.chatMessages.map(m => ({
+        role: m.role,
+        content: m.content
+      })),
     }));
   }, [store]);
 
