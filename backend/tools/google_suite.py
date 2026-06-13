@@ -80,7 +80,7 @@ def trash_gmail_message(email_id: str) -> str:
     try:
         result = trash_email(email_id)
         return f"Correo {email_id} movido a papelera."
-    except RuntimeError as e:
+    except Exception as e:
         return str(e)
 
 
@@ -129,7 +129,7 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                 pass
             lines.append(f"- {ftype} {f['name']} ({size}) ID:{f['id']}")
         return "\n".join(lines)
-    except RuntimeError as e:
+    except Exception as e:
         return str(e)
 
 
@@ -147,7 +147,7 @@ def list_drive_files(max_results: int = 20) -> str:
             size_str = f" ({int(f.get('size', 0)) / 1024:.0f}KB)" if f.get("size") else ""
             lines.append(f"- {ftype} {f['name']}{size_str} ID:{f['id']}")
         return "\n".join(lines)
-    except RuntimeError as e:
+    except Exception as e:
         return str(e)
 
 
@@ -227,41 +227,39 @@ def delete_drive_file(file_id: str) -> str:
 
 @tool
 def analyze_drive_image(file_id: str) -> str:
-    """Analyze an image from Google Drive using AI vision (Groq). Args: file_id (Drive file ID of an image — jpg, png, gif, webp). Returns a detailed description of what's in the image: objects, people, text, colors, layout, etc."""
+    """Analyze an image stored in Google Drive using Gemini Vision.
+    Args: file_id: The Google Drive file ID of the image.
+    Returns: A detailed visual description of the image.
+    """
     from backend.services.drive_service import download_file
-    import base64, os
+    import base64
+    import os
+    import requests
     try:
         data, filename, mime = download_file(file_id)
-    except RuntimeError as e:
-        return str(e)
+        if not mime.startswith("image/"):
+            return f"Error: El archivo {filename} no es una imagen (tipo: {mime})."
+            
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        if not api_key:
+            return "Error: GEMINI_API_KEY no configurada."
 
-    if not mime.startswith("image/"):
-        return f"El archivo '{filename}' no es una imagen (tipo: {mime}). Usá read_drive_file para archivos de texto."
-
-    groq_key = os.getenv("GROQ_API_KEY", "")
-    if not groq_key:
-        return f"[Vision no disponible: GROQ_API_KEY no configurada. Imagen: {filename}, {len(data)} bytes.]"
-
-    try:
-        from groq import Groq
-        client = Groq(api_key=groq_key)
         b64 = base64.b64encode(data).decode("ascii")
-        completion = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Describe esta imagen en detalle en español. Qué ves? Objetos, personas, texto, colores, composición, contexto. Sé conciso pero completo."},
-                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": "Describe esta imagen en detalle en español. Qué ves? Objetos, personas, texto, colores, composición, contexto. Sé conciso pero completo."},
+                    {"inline_data": {"mime_type": mime, "data": b64}}
                 ]
-            }],
-            max_tokens=500,
-            temperature=0.3,
-        )
-        return f"[Análisis de {filename}]: {completion.choices[0].message.content}"
+            }]
+        }
+        resp = requests.post(url, json=payload)
+        resp.raise_for_status()
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return f"[Análisis de {filename}]: {text}"
     except Exception as e:
-        return f"[Error al analizar imagen {filename} con Groq Vision: {str(e)[:200]}]"
-
+        return f"[Error al analizar imagen con Gemini: {str(e)[:200]}]"
 
 @tool
 def list_calendar_google(max_results: int = 10) -> str:
@@ -275,7 +273,7 @@ def list_calendar_google(max_results: int = 10) -> str:
         for e in results:
             lines.append(f"- {e['start']} → {e['end']} | {e['summary']}")
         return "\n".join(lines)
-    except RuntimeError as e:
+    except Exception as e:
         return str(e)
 
 
@@ -298,5 +296,5 @@ def create_calendar_event_google(summary: str = "Nueva Cita", start_time: str = 
                 end_time = start_time
         result = create_event(summary, start_time, end_time, description, location)
         return f"Evento creado: {result['summary']} ({result['id']})"
-    except RuntimeError as e:
+    except Exception as e:
         return str(e)

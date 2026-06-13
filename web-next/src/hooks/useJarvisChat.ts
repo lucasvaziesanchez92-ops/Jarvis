@@ -193,11 +193,11 @@ function ensureConnection() {
         if (last && last.isStreaming) {
           useJarvisStore.setState({ chatMessages: [...msgs.slice(0, -1), { ...last, isStreaming: false }] });
           store.setLastAssistantText(last.content);
-          store.setActivityState('idle');
-          // Auto-TTS when voice is enabled (robust module in lib/tts.ts)
-          if (useJarvisStore.getState().voiceEnabled) {
-            ttsSpeak(last.content);
-          }
+        }
+        store.setActivityState('idle');
+        // Auto-TTS when voice is enabled (robust module in lib/tts.ts)
+        if (useJarvisStore.getState().voiceEnabled && last) {
+          ttsSpeak(last.content);
         }
       }
 

@@ -160,33 +160,39 @@ def _extract_text(data: bytes, filename: str) -> str:
 
 
 def _extract_image_with_groq_vision(data: bytes, filename: str) -> str:
-    """Use Groq Vision (llama-3.2-11b-vision-preview) to describe images.
-
-    Returns a detailed description suitable for injection into chat
-    context so the LLM can answer questions about the image.
-    """
+    """Use Gemini REST API to describe images."""
     import base64
     import os
+    import requests
 
-    groq_key = os.getenv("GROQ_API_KEY", "").strip()
-    if not groq_key:
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
         return _extract_image_placeholder(filename)
 
     try:
-        from groq import Groq
-        import groq
-        client = Groq(api_key=groq_key)
+        mime = "image/png"
+        ext = filename.split(".")[-1].lower()
+        if ext in ["jpg", "jpeg"]: mime = "image/jpeg"
+        elif ext == "webp": mime = "image/webp"
+        elif ext == "gif": mime = "image/gif"
+
         b64 = base64.b64encode(data).decode("ascii")
-
-        # Groq discontinued their Vision endpoints. We must fallback immediately.
-        return (
-            f"[⚠️ Aviso del Sistema: Groq ha deshabilitado todos sus modelos de visión gratuita temporalmente. "
-            f"No puedo analizar el contenido visual de la imagen '{filename}'. "
-            f"Por favor, descríbeme con palabras lo que hay en la imagen para poder ayudarte.]"
-        )
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": "Describe esta imagen en detalle en español. Qué ves? Objetos, personas, texto, colores, composición, contexto. Sé conciso pero completo."},
+                    {"inline_data": {"mime_type": mime, "data": b64}}
+                ]
+            }]
+        }
+        resp = requests.post(url, json=payload)
+        resp.raise_for_status()
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return f"[Análisis de {filename}]: {text}"
     except Exception as e:
-        return f"[Error procesando imagen {filename} con Groq: {e}]"
-
+        return f"[Error procesando imagen {filename} con Gemini: {e}]"
 
 def _extract_image_placeholder(filename: str) -> str:
     """Fallback when Groq Vision is not available."""
