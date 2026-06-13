@@ -25,6 +25,7 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 
         const container = document.getElementById('canvas-container');
@@ -107,6 +108,7 @@
 
         loader.load(stlUri, (geometry) => {
             console.log('STL loaded OK');
+            geometry = BufferGeometryUtils.mergeVertices(geometry, 0.001);
             geometry.computeVertexNormals();
             geometry.center();
 
