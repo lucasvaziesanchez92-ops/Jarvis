@@ -131,6 +131,8 @@ def _sanitize_key(key: str) -> str:
     return "/".join(parts)
 
 
+import mimetypes
+
 @router.get("/download/{key:path}")
 async def download_file_endpoint(key: str):
     """Download a file from the bucket by key."""
@@ -139,7 +141,11 @@ async def download_file_endpoint(key: str):
     except Exception:
         raise HTTPException(404, "File not found")
 
-    return StreamingResponse(iter([data]), media_type="application/octet-stream")
+    mime_type, _ = mimetypes.guess_type(key)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    return StreamingResponse(iter([data]), media_type=mime_type)
 
 
 @router.get("/list")
