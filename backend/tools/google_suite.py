@@ -118,7 +118,7 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                 + (f" de tipo '{mime_filter}'" if mime_filter else "")
                 + "."
             )
-        lines = [f"{len(results)} archivos encontrados:"]
+        lines = ["archivos encontrados (MUESTRA SIEMPRE EL ENLACE EN MARKDOWN ASÍ: [Abrir](url)):"]
         for f in results:
             ftype = "📁" if f.get("mimeType") == "application/vnd.google-apps.folder" else "📄"
             size = f.get("size", "N/A")
@@ -127,7 +127,8 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                     size = f"{int(size)/1024:.1f}KB"
             except Exception:
                 pass
-            lines.append(f"- {ftype} {f['name']} ({size}) ID:{f['id']}")
+            url = f.get("webViewLink", "")
+            lines.append(f"- {ftype} {f['name']} ({size}) ID:{f['id']} URL:{url}")
         return "\n".join(lines)
     except Exception as e:
         return str(e)
@@ -141,11 +142,12 @@ def list_drive_files(max_results: int = 20) -> str:
         results = list_files(max_results=max_results)
         if not results:
             return "No hay archivos en Drive."
-        lines = [f"{len(results)} archivos en Drive:"]
+        lines = ["archivos en Drive (MUESTRA SIEMPRE EL ENLACE EN MARKDOWN ASÍ: [Abrir](url)):"]
         for f in results:
             ftype = "📁" if f.get("mimeType") == "application/vnd.google-apps.folder" else "📄"
-            size_str = f" ({int(f.get('size', 0)) / 1024:.0f}KB)" if f.get("size") else ""
-            lines.append(f"- {ftype} {f['name']}{size_str} ID:{f['id']}")
+            size_str = f" ({int(f.get('size', 0)) / 1024:.0f}KB)" if f.get('size') else ""
+            url = f.get("webViewLink", "")
+            lines.append(f"- {ftype} {f['name']}{size_str} ID:{f['id']} URL:{url}")
         return "\n".join(lines)
     except Exception as e:
         return str(e)
@@ -245,7 +247,7 @@ def analyze_drive_image(file_id: str) -> str:
             return "Error: GEMINI_API_KEY no configurada."
 
         b64 = base64.b64encode(data).decode("ascii")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [

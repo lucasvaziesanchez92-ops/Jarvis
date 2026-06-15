@@ -58,27 +58,22 @@
 
         // Material — Translucent ice-crystal with subtle pink rim
         const brainMaterial = new THREE.MeshPhysicalMaterial({
-            color: 0xff88cc,
-            emissive: 0xaa2266,
-            emissiveIntensity: 0.15,
-            metalness: 0.0,
-            roughness: 0.15,
-            transmission: 0.75,
+            color: 0xc26694, // Dusty rose/pink
+            emissive: 0x220011, // Very subtle dark pink emissive
+            emissiveIntensity: 0.2,
+            metalness: 0.1,
+            roughness: 0.25, // Slightly rough to catch light on the facets
+            transmission: 0.65, // Translucent but substantial
             transparent: true,
-            opacity: 0.6,
-            thickness: 2.0,
-            ior: 1.5,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.05,
-            sheen: 0.8,
-            sheenColor: 0xff69b4,
-            sheenRoughness: 0.3,
-            specularIntensity: 1.2,
-            specularColor: 0xffffff,
+            opacity: 0.85,
+            thickness: 1.5,
+            ior: 1.45,
+            clearcoat: 0.3,
+            clearcoatRoughness: 0.2,
             envMap: envMap,
-            envMapIntensity: 1.0,
+            envMapIntensity: 1.2,
             side: THREE.DoubleSide,
-            flatShading: false,
+            flatShading: true, // CRITICAL: This gives the faceted low-poly look from the screenshot
         });
 
         // Inner glow — soft pink backlight for SSS effect

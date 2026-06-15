@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Upload, FileText, Trash2, HelpCircle, AlertCircle, Sparkles, CheckCircle, RefreshCw, File, FileCode, FileImage, FileAudio, FolderOpen, Download, X, Image, Music } from 'lucide-react';
+import { Upload, FileText, Trash2, AlertCircle, Sparkles, CheckCircle, RefreshCw, File, FileCode, FileImage, FileAudio, FolderOpen, Download, X, Image } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { cn } from '@/lib/utils';
 import { API_BASE } from '@/lib/api';
@@ -59,7 +59,9 @@ export default function FilesModePanel() {
   const [railwayStatus, setRailwayStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [previewFile, setPreviewFile] = useState<RailwayFile | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
   const { setScreen, setChatInput } = useJarvisStore();
 
   const checkRailway = async () => {
@@ -162,30 +164,73 @@ export default function FilesModePanel() {
   };
 
   const handlePreviewFile = async (file: RailwayFile) => {
+    // Cancel any in-flight preview request to avoid races
+    if (previewAbortRef.current) previewAbortRef.current.abort();
+    const abort = new AbortController();
+    previewAbortRef.current = abort;
+
     setPreviewFile(file);
-    setPreviewUrl(null); // start loading state
-    
+    setPreviewUrl(null);
+    setPreviewText(null);
+
     const ext = getFileExt(file.key);
-    const directPreviewExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mp3', 'wav', 'txt', 'md', 'json', 'xml', 'html', 'css', 'py', 'js', 'ts'];
-    
-    if (directPreviewExts.includes(ext) || ext === 'pdf') {
+    const filename = file.key.split('/').pop() || file.key;
+
+    // Previews directos (browser nativo): img / video / audio / pdf
+    const directExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'mp4', 'webm', 'mov', 'mp3', 'wav', 'ogg', 'pdf'];
+    if (directExts.includes(ext)) {
       setPreviewUrl(`${API_BASE}/api/v1/files/download/${encodeURIComponent(file.key)}`);
       return;
     }
 
+    // Previews de texto/código: fetch el contenido y mostrar con syntax highlight
+    const textExts = ['txt', 'md', 'markdown', 'json', 'xml', 'html', 'htm', 'css', 'scss',
+                      'py', 'js', 'jsx', 'ts', 'tsx', 'cpp', 'h', 'hpp', 'sql',
+                      'yaml', 'yml', 'log', 'env', 'cfg', 'ini', 'toml', 'csv', 'sh', 'bash'];
+    if (textExts.includes(ext)) {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/files/download/${encodeURIComponent(file.key)}`, {
+          signal: abort.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        if (abort.signal.aborted) return;
+        // Cap en 200KB para no reventar el browser con un dump de 50MB
+        const truncated = text.length > 200_000;
+        setPreviewText(truncated ? text.slice(0, 200_000) + '\n\n... (truncado, archivo >200KB)' : text);
+      } catch (e: any) {
+        if (e.name === 'AbortError') return;
+        setError(`No se pudo leer el archivo: ${e.message}`);
+        setPreviewFile(null);
+      }
+      return;
+    }
+
+    // Office y otros (docx, xlsx, pptx, etc.): Google Docs Viewer via URL firmada
     try {
-      const res = await fetch(`${API_BASE}/api/v1/files/url/${encodeURIComponent(file.key)}`);
+      const res = await fetch(`${API_BASE}/api/v1/files/url/${encodeURIComponent(file.key)}`, {
+        signal: abort.signal,
+      });
+      if (abort.signal.aborted) return;
       if (res.ok) {
         const data = await res.json();
         setPreviewUrl(`https://docs.google.com/gview?url=${encodeURIComponent(data.url)}&embedded=true`);
       } else {
-        alert("No se pudo generar vista previa.");
+        alert('No se pudo generar vista previa para este tipo de archivo.');
         setPreviewFile(null);
       }
-    } catch {
-      alert("Error de conexión al generar vista previa.");
+    } catch (e: any) {
+      if (e.name === 'AbortError') return;
+      alert('Error de conexión al generar vista previa.');
       setPreviewFile(null);
     }
+  };
+
+  const closePreview = () => {
+    if (previewAbortRef.current) previewAbortRef.current.abort();
+    setPreviewFile(null);
+    setPreviewUrl(null);
+    setPreviewText(null);
   };
 
   return (
@@ -356,29 +401,33 @@ export default function FilesModePanel() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-[#121212] border border-white/10 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.02]">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-white/[0.03] rounded-lg border border-white/[0.06]">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 bg-white/[0.03] rounded-lg border border-white/[0.06] shrink-0">
                   {getFileIcon(previewFile.key)}
                 </div>
                 <span className="text-sm font-medium text-white/90 truncate max-w-[300px]">{previewFile.key.split('/').pop() || previewFile.key}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => handleDownloadFile(previewFile)} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white" title="Descargar">
                   <Download className="w-4 h-4" />
                 </button>
-                <button onClick={() => { setPreviewFile(null); setPreviewUrl(null); }} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white" title="Cerrar">
+                <button onClick={closePreview} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white" title="Cerrar">
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
             <div className="flex-1 bg-black/40 relative overflow-hidden flex items-center justify-center">
-              {!previewUrl ? (
-                <div className="flex items-center gap-2 text-white/40"><RefreshCw className="w-4 h-4 animate-spin" /> Cargando vista previa...</div>
-              ) : getFileExt(previewFile.key).match(/^(jpg|jpeg|png|gif|webp)$/i) ? (
+              {previewText !== null ? (
+                <CodePreview text={previewText} filename={previewFile.key} />
+              ) : !previewUrl ? (
+                <div className="flex items-center gap-2 text-white/40">
+                  <RefreshCw className="w-4 h-4 animate-spin" /> Cargando vista previa...
+                </div>
+              ) : getFileExt(previewFile.key).match(/^(jpg|jpeg|png|gif|webp|svg)$/i) ? (
                 <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
               ) : getFileExt(previewFile.key).match(/^(mp4|webm|mov)$/i) ? (
                 <video src={previewUrl} controls className="max-w-full max-h-full" />
-              ) : getFileExt(previewFile.key).match(/^(mp3|wav)$/i) ? (
+              ) : getFileExt(previewFile.key).match(/^(mp3|wav|ogg)$/i) ? (
                 <audio src={previewUrl} controls className="w-full max-w-md" />
               ) : getFileExt(previewFile.key).match(/^(pdf)$/i) ? (
                 <iframe src={previewUrl} className="w-full h-full border-0 bg-white" />
@@ -391,6 +440,77 @@ export default function FilesModePanel() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── CodePreview — lightweight syntax highlighter (no external libs) ── */
+// Detects language by extension, applies minimal regex-based highlighting.
+// Evita deps pesadas (Prism, Shiki) para mantener el bundle chico.
+const LANG_KEYWORDS: Record<string, RegExp> = {
+  js:   /\b(const|let|var|function|return|if|else|for|while|class|import|export|from|as|async|await|new|try|catch|throw|this|null|undefined|true|false)\b/g,
+  jsx:  /\b(const|let|var|function|return|if|else|for|while|class|import|export|from|as|async|await|new|try|catch|throw|null|undefined|true|false)\b/g,
+  ts:   /\b(const|let|var|function|return|if|else|for|while|class|import|export|from|as|async|await|new|try|catch|throw|interface|type|enum|public|private|protected|readonly|null|undefined|true|false)\b/g,
+  tsx:  /\b(const|let|var|function|return|if|else|for|while|class|import|export|from|as|async|await|new|try|catch|throw|interface|type|enum|public|private|protected|readonly|null|undefined|true|false)\b/g,
+  py:   /\b(def|class|import|from|as|return|if|elif|else|for|while|try|except|finally|with|lambda|yield|pass|break|continue|None|True|False|and|or|not|in|is|self)\b/g,
+  css:  /\b(import|url|@media|@keyframes|@font-face|from|to|important)\b/g,
+  json: /\b(true|false|null)\b/g,
+  sql:  /\b(SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|GROUP|ORDER|BY|LIMIT|OFFSET|CREATE|TABLE|INDEX|DROP|ALTER|ADD|PRIMARY|KEY|FOREIGN|REFERENCES|NULL|NOT|AND|OR|IN|LIKE|BETWEEN)\b/gi,
+  yaml: /\b(true|false|null|yes|no|on|off)\b/g,
+};
+
+function highlightCode(text: string, ext: string): string {
+  // 1. Escape HTML
+  let s = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // 2. Strings (single, double, backtick)
+  s = s.replace(/(`[^`\n]*`|"[^"\n]*"|'[^'\n]*')/g, '<span class="text-amber-300">$1</span>');
+
+  // 3. Comments
+  if (['js', 'jsx', 'ts', 'tsx', 'css'].includes(ext)) {
+    s = s.replace(/(\/\/[^\n]*|\/\*[\s\S]*?\*\/)/g, '<span class="text-white/30 italic">$1</span>');
+  } else if (['py', 'sql', 'yaml'].includes(ext)) {
+    s = s.replace(/(#[^\n]*)/g, '<span class="text-white/30 italic">$1</span>');
+  }
+
+  // 4. Numbers
+  s = s.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="text-purple-300">$1</span>');
+
+  // 5. Keywords (per-language)
+  const kw = LANG_KEYWORDS[ext];
+  if (kw) {
+    s = s.replace(kw, '<span class="text-cyan-300 font-semibold">$&</span>');
+  }
+
+  return s;
+}
+
+function CodePreview({ text, filename }: { text: string; filename: string }) {
+  const ext = getFileExt(filename);
+  const isCode = !!LANG_KEYWORDS[ext];
+  const lines = text.split('\n');
+
+  return (
+    <div className="w-full h-full overflow-auto bg-[#0d0d0d] p-4 font-mono text-[12px] leading-relaxed">
+      <div className="flex gap-3">
+        {/* Line numbers gutter */}
+        <div className="select-none text-right text-white/20 shrink-0">
+          {lines.map((_, i) => (
+            <div key={i} className="px-2">{i + 1}</div>
+          ))}
+        </div>
+        {/* Code */}
+        <pre className="flex-1 text-white/85 whitespace-pre-wrap break-all m-0">
+          {isCode ? (
+            <code dangerouslySetInnerHTML={{ __html: highlightCode(text, ext) }} />
+          ) : (
+            <code>{text}</code>
+          )}
+        </pre>
+      </div>
     </div>
   );
 }

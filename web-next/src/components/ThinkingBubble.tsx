@@ -56,7 +56,7 @@ export default function ThinkingBubble() {
     <AnimatePresence>
       {show && (
         <motion.div
-          className="fixed left-1/2 z-40 pointer-events-none"
+          className="fixed left-1/2 z-10 pointer-events-none"
           initial={{ opacity: 0, y: -10, x: '-50%', scale: 0.9 }}
           animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
           exit={{ opacity: 0, y: -8, x: '-50%', scale: 0.95 }}

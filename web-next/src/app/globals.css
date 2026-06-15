@@ -59,8 +59,83 @@ body {
 
 @keyframes statusPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.8); }
+  50% { opacity: 0.5;}
 }
+
+/* Markdown Styling for ReactMarkdown */
+.markdown-body {
+  font-family: inherit;
+}
+.markdown-body p {
+  margin-bottom: 0.75em;
+}
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+.markdown-body ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+.markdown-body ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+.markdown-body li {
+  margin-bottom: 0.25em;
+}
+.markdown-body strong {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+.markdown-body em {
+  font-style: italic;
+}
+.markdown-body a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.markdown-body pre {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 0.75em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: monospace;
+  font-size: 0.85em;
+}
+.markdown-body code {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.15rem 0.3rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: rgba(255, 255, 255, 0.9);
+}
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+}
+.markdown-body blockquote {
+  border-left: 3px solid rgba(34, 211, 238, 0.4);
+  padding-left: 1em;
+  margin-left: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  color: rgba(255, 255, 255, 0.95);
+}
+.markdown-body h1 { font-size: 1.5em; }
+.markdown-body h2 { font-size: 1.3em; }
+.markdown-body h3 { font-size: 1.1em; }
 
 @keyframes recording-ring {
   0%   { transform: scale(1);   opacity: 0.6; }

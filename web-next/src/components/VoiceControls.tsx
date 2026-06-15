@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, Square, Volume2, VolumeX } from 'lucide-react'
+import { Mic, MicOff, Square, Volume2, VolumeX, X } from 'lucide-react'
 import { useJarvisStore } from '@/store/jarvisStore'
 import { speak as ttsSpeak, stop as ttsStop, onTTSEvent } from '@/lib/tts'
 
@@ -20,6 +20,7 @@ export default function VoiceControls() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const isCancelledRef = useRef<boolean>(false)
 
   // Sync activity state with TTS events (so the UI shows
   // 'speaking' even when Web Speech API is the one playing).
@@ -193,10 +194,15 @@ export default function VoiceControls() {
       recorder.onstop = () => {
         stream.getTracks().forEach(t => t.stop())
         streamRef.current = null
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        sendVoice(blob)
+        if (!isCancelledRef.current) {
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+          sendVoice(blob)
+        } else {
+          setActivityState('idle')
+        }
       }
 
+      isCancelledRef.current = false
       recorder.start(100)
       setMicActive(true)
       setActivityState('listening')
@@ -210,6 +216,16 @@ export default function VoiceControls() {
     if (!mediaRecorderRef.current) return
     mediaRecorderRef.current.stop()
     mediaRecorderRef.current = null
+    setMicActive(false)
+  }, [setMicActive])
+
+  const cancelRecording = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    isCancelledRef.current = true
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop()
+      mediaRecorderRef.current = null
+    }
     setMicActive(false)
   }, [setMicActive])
 
@@ -381,7 +397,7 @@ export default function VoiceControls() {
           )}
         </AnimatePresence>
 
-        <div className="relative">
+        <div className="relative flex items-center justify-center gap-6">
           {isActive && (
             <>
               <motion.div
@@ -409,6 +425,19 @@ export default function VoiceControls() {
                 }}
               />
             </>
+          )}
+
+          {micActive && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5, x: -20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.5, x: -20 }}
+              onClick={cancelRecording}
+              className="absolute -left-16 w-12 h-12 rounded-full flex items-center justify-center transition-all bg-red-500/10 hover:bg-red-500/30 border border-red-500/30 text-red-400"
+              title="Cancelar (borrar grabación)"
+            >
+              <X className="w-5 h-5" />
+            </motion.button>
           )}
 
           <button

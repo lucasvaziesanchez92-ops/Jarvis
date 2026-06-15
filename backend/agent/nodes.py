@@ -30,12 +30,18 @@ def _trim_messages(messages: list, persona: str = "profesional"):
     # LLM sees 'tool' after 'user' and rejects with 400.
     keep = max_messages - len(system_msg)
     trimmed_other = other[-keep:]
+    
+    # NEW FIX: Remove any orphaned ToolMessage at the VERY BEGINNING of the kept window.
+    # A ToolMessage MUST follow an AIMessage with tool_calls. If it's the first message, it's orphaned.
+    while trimmed_other and isinstance(trimmed_other[0], ToolMessage):
+        trimmed_other = trimmed_other[1:]
+
     if trimmed_other and isinstance(trimmed_other[-1], ToolMessage):
         # Find the AIMessage with matching tool_call_id in the
         # already-kept or discarded window. Walk backwards through
         # the original 'other' list.
         target_id = trimmed_other[-1].tool_call_id
-        for j in range(len(other) - keep, -1, -1):
+        for j in range(len(other) - len(trimmed_other), -1, -1):
             cand = other[j]
             if isinstance(cand, AIMessage) and getattr(cand, "tool_calls", None):
                 ids = {tc.get("id") for tc in cand.tool_calls}

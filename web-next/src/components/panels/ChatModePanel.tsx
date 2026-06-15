@@ -2,6 +2,8 @@
 
 import React, { KeyboardEvent, useRef, useEffect, useState, ChangeEvent } from 'react';
 import { Send, Bot, User, Plus, MessageSquare, Pencil, Trash2, X, History, Paperclip } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { useJarvisChat } from '@/hooks/useJarvisChat';
 import { cn } from '@/lib/utils';
@@ -86,7 +88,7 @@ export default function ChatModePanel() {
       form.append('folder', 'chat_attachments');
       form.append('generate_url', 'false');
 
-      const res = await fetch(`/api/files/upload`, {
+      const res = await fetch(`${API_BASE}/api/v1/files/upload`, {
         method: 'POST',
         body: form,
       });
@@ -318,10 +320,19 @@ export default function ChatModePanel() {
                   )}
                 </div>
 
-                <div className={msg.role === 'user' ? 'text-white/90' : 'text-white/70 whitespace-pre-wrap'}>
-                  {msg.role === 'assistant' 
-                    ? msg.content.replace(/<thought>[\s\S]*?<\/thought>/g, '')
-                    : msg.content}
+                <div className={msg.role === 'user' ? 'text-white/90' : 'text-white/70 markdown-body text-[13px] leading-relaxed'}>
+                  {msg.role === 'assistant' ? (
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2" />
+                      }}
+                    >
+                      {msg.content.replace(/<thought>[\s\S]*?<\/thought>/g, '')}
+                    </ReactMarkdown>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
 
                 {msg.role === 'assistant' && msg.content.includes('<thought>') && (

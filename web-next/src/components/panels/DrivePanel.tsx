@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, type ChangeEvent, useCallback } from 'react';
-import { Upload, Download, Trash2, Loader2, AlertCircle, FolderOpen, Search, X, Grid3X3, List, FileText, FileImage, FileAudio, Video, FileCode, HardDrive, MoreHorizontal, Plus, ChevronRight } from 'lucide-react';
+import { Upload, Download, Trash2, Loader2, AlertCircle, FolderOpen, Search, X, Grid3X3, List, FileText, FileImage, FileAudio, Video, FileCode, HardDrive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

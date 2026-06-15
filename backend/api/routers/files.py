@@ -5,6 +5,7 @@ Upload, download, list, and manage files in Railway Buckets.
 
 import os
 import uuid
+import mimetypes
 from typing import Optional
 from datetime import datetime
 
@@ -22,6 +23,39 @@ from backend.core.storage import (
 )
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+# MIME type map for files that mimetypes doesn't know by default
+_EXTRA_MIMES = {
+    ".md":   "text/markdown",
+    ".json": "application/json",
+    ".js":   "text/javascript",
+    ".ts":   "text/typescript",
+    ".tsx":  "text/typescript",
+    ".jsx":  "text/javascript",
+    ".py":   "text/x-python",
+    ".yaml": "text/yaml",
+    ".yml":  "text/yaml",
+    ".sql":  "text/x-sql",
+    ".log":  "text/plain",
+    ".env":  "text/plain",
+    ".cpp":  "text/x-c++src",
+    ".h":    "text/x-c++hdr",
+    ".hpp":  "text/x-c++hdr",
+    ".scss": "text/x-scss",
+    ".csv":  "text/csv",
+    ".webm": "video/webm",
+    ".mov":  "video/quicktime",
+    ".wasm": "application/wasm",
+}
+
+
+def _get_mime_for_key(key: str) -> str:
+    """Return best-guess MIME type for a file key. Falls back to octet-stream."""
+    ext = os.path.splitext(key)[1].lower()
+    if ext in _EXTRA_MIMES:
+        return _EXTRA_MIMES[ext]
+    guessed, _ = mimetypes.guess_type(key)
+    return guessed or "application/octet-stream"
 
 ALLOWED_EXTENSIONS = {
     # Texto y Documentos
@@ -134,18 +168,31 @@ def _sanitize_key(key: str) -> str:
 import mimetypes
 
 @router.get("/download/{key:path}")
-async def download_file_endpoint(key: str):
-    """Download a file from the bucket by key."""
+async def download_file_endpoint(key: str, inline: bool = Query(True, description="Si true, sugiere al browser mostrar el archivo en vez de descargar")):
+    """Download a file from the bucket by key.
+
+    Devuelve el archivo con su MIME type correcto (por extensión) y
+    `Content-Disposition: inline` para que el browser lo renderice
+    en <img>, <video>, <audio>, <iframe>, etc. en vez de forzar descarga.
+    """
+    sanitized = _sanitize_key(key)
     try:
-        data = download_bytes(_sanitize_key(key))
+        data = download_bytes(sanitized)
     except Exception:
         raise HTTPException(404, "File not found")
 
-    mime_type, _ = mimetypes.guess_type(key)
-    if not mime_type:
-        mime_type = "application/octet-stream"
+    mime = _get_mime_for_key(sanitized)
+    filename = sanitized.split("/")[-1]
+    disposition = "inline" if inline else f'attachment; filename="{filename}"'
 
-    return StreamingResponse(iter([data]), media_type=mime_type)
+    headers = {
+        "Content-Disposition": disposition,
+        "Content-Length": str(len(data)),
+        # CORS + cache — los previews son archivos del usuario, cachear 1h
+        "Cache-Control": "private, max-age=3600",
+        "Access-Control-Expose-Headers": "Content-Disposition, Content-Length, Content-Type",
+    }
+    return StreamingResponse(iter([data]), media_type=mime, headers=headers)
 
 
 @router.get("/list")
