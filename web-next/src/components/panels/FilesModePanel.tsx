@@ -57,6 +57,8 @@ export default function FilesModePanel() {
   const [error, setError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [railwayStatus, setRailwayStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+  const [previewFile, setPreviewFile] = useState<RailwayFile | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setScreen, setChatInput } = useJarvisStore();
 
@@ -157,6 +159,33 @@ export default function FilesModePanel() {
 
   const handleDownloadFile = async (file: RailwayFile) => {
     window.open(`/api/files/download/${encodeURIComponent(file.key)}`, '_blank');
+  };
+
+  const handlePreviewFile = async (file: RailwayFile) => {
+    setPreviewFile(file);
+    setPreviewUrl(null); // start loading state
+    
+    const ext = getFileExt(file.key);
+    const directPreviewExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mp3', 'wav', 'txt', 'md', 'json', 'xml', 'html', 'css', 'py', 'js', 'ts'];
+    
+    if (directPreviewExts.includes(ext) || ext === 'pdf') {
+      setPreviewUrl(`${API_BASE}/api/v1/files/download/${encodeURIComponent(file.key)}`);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/files/url/${encodeURIComponent(file.key)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPreviewUrl(`https://docs.google.com/gview?url=${encodeURIComponent(data.url)}&embedded=true`);
+      } else {
+        alert("No se pudo generar vista previa.");
+        setPreviewFile(null);
+      }
+    } catch {
+      alert("Error de conexión al generar vista previa.");
+      setPreviewFile(null);
+    }
   };
 
   return (
@@ -295,6 +324,13 @@ export default function FilesModePanel() {
                     <span>Analizar</span>
                   </button>
                   <button
+                    onClick={() => handlePreviewFile(file)}
+                    className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.06] text-white/20 hover:text-cyan-400 active:scale-95 transition-all opacity-0 group-hover:opacity-100"
+                    title="Previsualizar"
+                  >
+                    <Image className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={() => handleDownloadFile(file)}
                     className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.06] text-white/20 hover:text-cyan-400 active:scale-95 transition-all opacity-0 group-hover:opacity-100"
                     title="Descargar"
@@ -314,6 +350,47 @@ export default function FilesModePanel() {
           })
         )}
       </div>
+
+      {/* Preview Modal */}
+      {previewFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-[#121212] border border-white/10 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.02]">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-white/[0.03] rounded-lg border border-white/[0.06]">
+                  {getFileIcon(previewFile.key)}
+                </div>
+                <span className="text-sm font-medium text-white/90 truncate max-w-[300px]">{previewFile.key.split('/').pop() || previewFile.key}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleDownloadFile(previewFile)} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white" title="Descargar">
+                  <Download className="w-4 h-4" />
+                </button>
+                <button onClick={() => { setPreviewFile(null); setPreviewUrl(null); }} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white" title="Cerrar">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-black/40 relative overflow-hidden flex items-center justify-center">
+              {!previewUrl ? (
+                <div className="flex items-center gap-2 text-white/40"><RefreshCw className="w-4 h-4 animate-spin" /> Cargando vista previa...</div>
+              ) : getFileExt(previewFile.key).match(/^(jpg|jpeg|png|gif|webp)$/i) ? (
+                <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
+              ) : getFileExt(previewFile.key).match(/^(mp4|webm|mov)$/i) ? (
+                <video src={previewUrl} controls className="max-w-full max-h-full" />
+              ) : getFileExt(previewFile.key).match(/^(mp3|wav)$/i) ? (
+                <audio src={previewUrl} controls className="w-full max-w-md" />
+              ) : getFileExt(previewFile.key).match(/^(pdf)$/i) ? (
+                <iframe src={previewUrl} className="w-full h-full border-0 bg-white" />
+              ) : previewUrl.includes('docs.google.com') ? (
+                <iframe src={previewUrl} className="w-full h-full border-0 bg-white" />
+              ) : (
+                <iframe src={previewUrl} className="w-full h-full border-0 bg-[#1e1e1e]" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

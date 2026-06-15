@@ -61,6 +61,7 @@ export default function DrivePanel() {
   const [view, setView] = useState<ViewMode>('grid');
   const [hasSearched, setHasSearched] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [previewItem, setPreviewItem] = useState<DriveItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const debRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -207,12 +208,12 @@ export default function DrivePanel() {
             {view === 'grid' ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {folders.map(f => (
-                  <GridCard key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} />
+                  <GridCard key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => setPreviewItem(f)} />
                 ))}
               </div>
             ) : (
               <div className="space-y-0.5">
-                {folders.map(f => <ListRow key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} />)}
+                {folders.map(f => <ListRow key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => setPreviewItem(f)} />)}
               </div>
             )}
           </div>
@@ -225,12 +226,12 @@ export default function DrivePanel() {
             {view === 'grid' ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {files.map(f => (
-                  <GridCard key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} />
+                  <GridCard key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => setPreviewItem(f)} />
                 ))}
               </div>
             ) : (
               <div className="space-y-0.5">
-                {files.map(f => <ListRow key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} />)}
+                {files.map(f => <ListRow key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => setPreviewItem(f)} />)}
               </div>
             )}
           </div>
@@ -256,15 +257,50 @@ export default function DrivePanel() {
           )}
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-[#121212] border border-white/10 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.02]">
+              <div className="flex items-center gap-2">
+                <div className={cn('p-1.5 rounded-lg flex items-center justify-center', getFileMeta(previewItem.mimeType).bg)}>
+                  {React.createElement(getFileMeta(previewItem.mimeType).icon, { className: cn('w-4 h-4', getFileMeta(previewItem.mimeType).color) })}
+                </div>
+                <span className="text-sm font-medium text-white/90">{previewItem.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleDownload(previewItem.id)} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white" title="Descargar">
+                  <Download className="w-4 h-4" />
+                </button>
+                <button onClick={() => setPreviewItem(null)} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white" title="Cerrar">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-black/40 relative overflow-hidden flex items-center justify-center">
+              {previewItem.mimeType.startsWith('image/') ? (
+                <img src={`${API_BASE}/api/v1/drive/download/${previewItem.id}`} alt={previewItem.name} className="max-w-full max-h-full object-contain" />
+              ) : previewItem.mimeType.startsWith('video/') ? (
+                <video src={`${API_BASE}/api/v1/drive/download/${previewItem.id}`} controls className="max-w-full max-h-full" />
+              ) : previewItem.mimeType.startsWith('audio/') ? (
+                <audio src={`${API_BASE}/api/v1/drive/download/${previewItem.id}`} controls className="w-full max-w-md" />
+              ) : (
+                <iframe src={`https://drive.google.com/file/d/${previewItem.id}/preview`} className="w-full h-full border-0" allow="autoplay" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function GridCard({ item, onDelete, onDownload }: { item: DriveItem; onDelete: (id: string, name: string, e?: React.MouseEvent) => void; onDownload: (id: string) => void }) {
+function GridCard({ item, onDelete, onDownload, onOpen }: { item: DriveItem; onDelete: (id: string, name: string, e?: React.MouseEvent) => void; onDownload: (id: string) => void; onOpen: () => void }) {
   const { icon: Icon, color, bg } = getFileMeta(item.mimeType);
   return (
     <div className="group relative bg-white/[0.015] hover:bg-white/[0.04] border border-white/[0.04] hover:border-white/[0.08] rounded-xl p-3 transition-all cursor-pointer"
-      onDoubleClick={() => item.mimeType === FOLDER_MIME ? null : onDownload(item.id)}>
+      onDoubleClick={() => item.mimeType === FOLDER_MIME ? null : onOpen()}>
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity z-10">
         <button onClick={(e) => { e.stopPropagation(); onDownload(item.id); }} className="p-1.5 hover:bg-white/[0.08] rounded-lg">
           <Download className="h-3 w-3 text-white/40" />
@@ -285,11 +321,11 @@ function GridCard({ item, onDelete, onDownload }: { item: DriveItem; onDelete: (
   );
 }
 
-function ListRow({ item, onDelete, onDownload }: { item: DriveItem; onDelete: (id: string, name: string, e?: React.MouseEvent) => void; onDownload: (id: string) => void }) {
+function ListRow({ item, onDelete, onDownload, onOpen }: { item: DriveItem; onDelete: (id: string, name: string, e?: React.MouseEvent) => void; onDownload: (id: string) => void; onOpen: () => void }) {
   const { icon: Icon, color } = getFileMeta(item.mimeType);
   return (
     <div className="group flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.03] rounded-lg transition-colors cursor-pointer"
-      onDoubleClick={() => item.mimeType === FOLDER_MIME ? null : onDownload(item.id)}>
+      onDoubleClick={() => item.mimeType === FOLDER_MIME ? null : onOpen()}>
       <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center shrink-0', getFileMeta(item.mimeType).bg)}>
         <Icon className={cn('h-4 w-4', color)} />
       </div>
