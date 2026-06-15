@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, type ChangeEvent, useCallback } from 'react';
-import { Upload, Download, Trash2, Loader2, AlertCircle, FolderOpen, Search, X, Grid3X3, List, FileText, FileImage, FileAudio, Video, FileCode, HardDrive } from 'lucide-react';
+import { Upload, Download, Trash2, Loader2, AlertCircle, FolderOpen, Search, X, Grid3X3, List, FileText, FileImage, FileAudio, Video, FileCode, HardDrive, Eye, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +62,7 @@ export default function DrivePanel() {
   const [hasSearched, setHasSearched] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [previewItem, setPreviewItem] = useState<DriveItem | null>(null);
+  const [folderHistory, setFolderHistory] = useState<DriveItem[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const debRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -72,24 +73,45 @@ export default function DrivePanel() {
       const res = await fetch(`${API_BASE}/auth/google/status`);
       const data = await res.json();
       setConnected(data.connected ?? false);
-      if (data.connected) fetchItems();
+      if (data.connected) fetchItems('', null);
     } catch { setConnected(false); }
   }
 
   const doSearch = useCallback((q: string) => {
     if (debRef.current) clearTimeout(debRef.current);
-    debRef.current = setTimeout(() => fetchItems(q), 300);
-  }, []);
+    debRef.current = setTimeout(() => fetchItems(q, folderHistory.length > 0 ? folderHistory[folderHistory.length - 1].id : null), 300);
+  }, [folderHistory]);
 
-  async function fetchItems(query: string = '') {
+  async function fetchItems(query: string = '', folderId: string | null = null) {
     setLoading(true); setError(''); setHasSearched(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/drive/list?max_results=200`);
+      const url = new URL(`${API_BASE}/api/v1/drive/list`);
+      url.searchParams.append('max_results', '200');
+      if (folderId) url.searchParams.append('folder_id', folderId);
+      const res = await fetch(url.toString());
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Error'); }
       const data: DriveItem[] = await res.json();
       setItems(query ? data.filter(f => f.name.toLowerCase().includes(query.toLowerCase())) : data);
     } catch (e: any) { setError(e.message); if (e.message?.includes('no está conectado')) setConnected(false); }
     finally { setLoading(false); }
+  }
+
+  function handleOpen(item: DriveItem) {
+    if (item.mimeType === FOLDER_MIME) {
+      setFolderHistory(prev => [...prev, item]);
+      fetchItems(searchQuery, item.id);
+    } else {
+      setPreviewItem(item);
+    }
+  }
+
+  function handleBack() {
+    setFolderHistory(prev => {
+      const newHistory = prev.slice(0, -1);
+      const parentId = newHistory.length > 0 ? newHistory[newHistory.length - 1].id : null;
+      fetchItems(searchQuery, parentId);
+      return newHistory;
+    });
   }
 
   async function handleUpload(fileObj: File) {
@@ -147,17 +169,46 @@ export default function DrivePanel() {
     <div className="flex-1 flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06] shrink-0">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/25" />
-          <Input value={searchQuery} onChange={e => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
-            placeholder="Buscar en Drive..."
-            className="w-full bg-white/[0.04] border-white/[0.06] text-white text-sm h-10 pl-9 pr-9 rounded-xl focus:border-cyan-500/30" />
-          {searchQuery && (
-            <button onClick={() => { setSearchQuery(''); fetchItems(); }} className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg hover:bg-white/[0.06] flex items-center justify-center">
-              <X className="h-3.5 w-3.5 text-white/40" />
-            </button>
-          )}
-        </div>
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
+              <div className="flex items-center gap-2 bg-black/20 rounded-xl px-3 py-1.5 border border-white/[0.05] shadow-inner focus-within:border-cyan-500/30 focus-within:bg-black/40 transition-all">
+                <Search className="w-4 h-4 text-white/40 shrink-0" />
+                <Input
+                  placeholder="Buscar en Drive..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
+                  className="h-8 border-0 bg-transparent px-1 focus-visible:ring-0 text-[13px] placeholder:text-white/30 text-white/90"
+                />
+                {searchQuery && (
+                  <button onClick={() => { setSearchQuery(''); doSearch(''); }} className="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white/80 transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              
+              {/* Breadcrumb Navigation */}
+              {folderHistory.length > 0 && (
+                <div className="flex items-center gap-2 text-[12px] px-1 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                  <button onClick={() => { setFolderHistory([]); fetchItems(searchQuery, null); }} className="text-white/40 hover:text-cyan-400 transition-colors flex items-center gap-1">
+                    <HardDrive className="w-3.5 h-3.5" /> Mi unidad
+                  </button>
+                  {folderHistory.map((folder, idx) => (
+                    <React.Fragment key={folder.id}>
+                      <span className="text-white/20">/</span>
+                      <button 
+                        onClick={() => {
+                          const newHistory = folderHistory.slice(0, idx + 1);
+                          setFolderHistory(newHistory);
+                          fetchItems(searchQuery, folder.id);
+                        }}
+                        className={cn("transition-colors max-w-[120px] truncate", idx === folderHistory.length - 1 ? "text-white/80 font-medium" : "text-white/40 hover:text-cyan-400")}
+                      >
+                        {folder.name}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
         <div className="flex border border-white/[0.08] rounded-lg overflow-hidden shrink-0">
           <button onClick={() => setView('grid')}
             className={cn('h-8 w-8 flex items-center justify-center transition-colors', view === 'grid' ? 'bg-white/[0.08] text-white/80' : 'text-white/25 hover:text-white/50')}>
@@ -208,12 +259,12 @@ export default function DrivePanel() {
             {view === 'grid' ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {folders.map(f => (
-                  <GridCard key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => setPreviewItem(f)} />
+                  <GridCard key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => handleOpen(f)} />
                 ))}
               </div>
             ) : (
               <div className="space-y-0.5">
-                {folders.map(f => <ListRow key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => setPreviewItem(f)} />)}
+                {folders.map(f => <ListRow key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => handleOpen(f)} />)}
               </div>
             )}
           </div>
@@ -226,12 +277,12 @@ export default function DrivePanel() {
             {view === 'grid' ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {files.map(f => (
-                  <GridCard key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => setPreviewItem(f)} />
+                  <GridCard key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => handleOpen(f)} />
                 ))}
               </div>
             ) : (
               <div className="space-y-0.5">
-                {files.map(f => <ListRow key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => setPreviewItem(f)} />)}
+                {files.map(f => <ListRow key={f.id} item={f} onDelete={handleDelete} onDownload={handleDownload} onOpen={() => handleOpen(f)} />)}
               </div>
             )}
           </div>
@@ -240,9 +291,16 @@ export default function DrivePanel() {
 
       {/* Footer */}
       <div className="px-4 py-2.5 border-t border-white/[0.05] flex items-center justify-between shrink-0 bg-white/[0.005]">
-        <Button onClick={() => fetchItems()} size="sm" variant="ghost" className="text-[11px] text-white/30 hover:text-cyan-400/60 h-7 gap-1.5">
-          <Upload className="h-3 w-3 -rotate-90" /> Actualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          {folderHistory.length > 0 && (
+            <Button onClick={handleBack} size="sm" variant="ghost" className="text-[11px] text-white/50 hover:text-white h-7 px-2">
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <Button onClick={() => fetchItems(searchQuery, folderHistory.length > 0 ? folderHistory[folderHistory.length - 1].id : null)} size="sm" variant="ghost" className="text-[11px] text-white/30 hover:text-cyan-400/60 h-7 gap-1.5">
+            <Upload className="h-3 w-3 -rotate-90" /> Actualizar
+          </Button>
+        </div>
         <div className="flex items-center gap-2 text-[10px] text-white/20">
           <span>{items.length} elementos</span>
           {totalSize > 0 && (
@@ -300,8 +358,13 @@ function GridCard({ item, onDelete, onDownload, onOpen }: { item: DriveItem; onD
   const { icon: Icon, color, bg } = getFileMeta(item.mimeType);
   return (
     <div className="group relative bg-white/[0.015] hover:bg-white/[0.04] border border-white/[0.04] hover:border-white/[0.08] rounded-xl p-3 transition-all cursor-pointer"
-      onDoubleClick={() => item.mimeType === FOLDER_MIME ? null : onOpen()}>
+      onDoubleClick={() => onOpen()}>
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity z-10">
+        {item.mimeType !== FOLDER_MIME && (
+          <button onClick={(e) => { e.stopPropagation(); onOpen(); }} className="p-1.5 hover:bg-white/[0.08] rounded-lg" title="Previsualizar">
+            <Eye className="h-3 w-3 text-white/40" />
+          </button>
+        )}
         <button onClick={(e) => { e.stopPropagation(); onDownload(item.id); }} className="p-1.5 hover:bg-white/[0.08] rounded-lg">
           <Download className="h-3 w-3 text-white/40" />
         </button>
@@ -325,7 +388,7 @@ function ListRow({ item, onDelete, onDownload, onOpen }: { item: DriveItem; onDe
   const { icon: Icon, color } = getFileMeta(item.mimeType);
   return (
     <div className="group flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.03] rounded-lg transition-colors cursor-pointer"
-      onDoubleClick={() => item.mimeType === FOLDER_MIME ? null : onOpen()}>
+      onDoubleClick={() => onOpen()}>
       <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center shrink-0', getFileMeta(item.mimeType).bg)}>
         <Icon className={cn('h-4 w-4', color)} />
       </div>
@@ -335,7 +398,12 @@ function ListRow({ item, onDelete, onDownload, onOpen }: { item: DriveItem; onDe
       </div>
       <span className="text-[10px] text-white/20 tabular-nums w-16 text-right hidden sm:block">{formatSize(item.size)}</span>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={() => onDownload(item.id)} className="h-7 w-7 rounded-lg hover:bg-white/[0.06] flex items-center justify-center">
+        {item.mimeType !== FOLDER_MIME && (
+          <button onClick={(e) => { e.stopPropagation(); onOpen(); }} className="h-7 w-7 rounded-lg hover:bg-white/[0.06] flex items-center justify-center" title="Previsualizar">
+            <Eye className="h-3.5 w-3.5 text-white/40" />
+          </button>
+        )}
+        <button onClick={(e) => { e.stopPropagation(); onDownload(item.id); }} className="h-7 w-7 rounded-lg hover:bg-white/[0.06] flex items-center justify-center">
           <Download className="h-3.5 w-3.5 text-white/40" />
         </button>
         <button onClick={(e) => onDelete(item.id, item.name, e)} className="h-7 w-7 rounded-lg hover:bg-red-500/15 flex items-center justify-center">

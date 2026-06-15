@@ -21,9 +21,9 @@ def _handle_drive_error(e: Exception) -> HTTPException:
 
 
 @router.get("/list")
-async def list_files(max_results: int = Query(50, le=200)):
+async def list_files(max_results: int = Query(50, le=200), folder_id: Optional[str] = Query(None)):
     try:
-        return drive_service.list_files(max_results=max_results)
+        return drive_service.list_files(max_results=max_results, folder_id=folder_id)
     except Exception as e:
         raise _handle_drive_error(e)
 
