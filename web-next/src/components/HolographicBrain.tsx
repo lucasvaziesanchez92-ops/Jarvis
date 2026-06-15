@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { useJarvisStore } from '@/store/jarvisStore';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { OrbitControls } from '@react-three/drei';
 
 /* ────────────────────────────────────────────────────────────
    HOLOGRAPHIC BRAIN — Tripo3D Luminescent Brain (rosado)
@@ -87,11 +88,11 @@ function BrainModel({ activityState }: { activityState: string }) {
     return { geometry: g, scale: s };
   }, [rawGeometry]);
 
-  // === MATERIALES — mismo filtro que brain-3d.html, color rosado ===
+  // === MATERIALES — mismo filtro que brain-3d.html ===
   const outerMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: 0xd65e8e,                // rosa fuerte (+45% sobre ice blue)
+        color: 0xd0e8e8,                // ice blue (del original)
         emissive: 0x2a1030,
         emissiveIntensity: 0.3,
         metalness: 0.0,
@@ -294,7 +295,7 @@ export default function HolographicBrain() {
   return (
     <div className="fixed inset-0 z-0" style={{ background: '#000000' }}>
       <Canvas
-        camera={{ position: [0, 0.5, 3.5], fov: 45, near: 0.1, far: 1000 }}
+        camera={{ position: [0, 0.5, 2.8], fov: 45, near: 0.1, far: 1000 }}
         dpr={1.5}
         gl={{
           antialias: true,
@@ -322,6 +323,14 @@ export default function HolographicBrain() {
         <Suspense fallback={<Fallback />}>
           <BrainModel activityState={activityState} />
         </Suspense>
+
+        <OrbitControls 
+          enableDamping 
+          dampingFactor={0.05} 
+          minDistance={1.5} 
+          maxDistance={8} 
+          target={[0, 0, 0]} 
+        />
       </Canvas>
     </div>
   );
