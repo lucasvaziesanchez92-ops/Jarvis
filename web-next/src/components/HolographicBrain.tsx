@@ -45,7 +45,7 @@ function SceneEnvironment() {
       const pmrem = new THREE.PMREMGenerator(gl);
       const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
       scene.environment = envMap;
-      (scene as any).environmentIntensity = 0.5;
+      (scene as any).environmentIntensity = 0.7;  // ↑ subido de 0.5
       cleanup = () => {
         envMap.dispose();
         pmrem.dispose();
@@ -93,21 +93,21 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
     () =>
       new THREE.MeshPhysicalMaterial({
         color: 0xffb3e6,                // rosa-magenta suave
-        emissive: 0x3a2050,
-        emissiveIntensity: 0.4,
+        emissive: 0x4a1a3a,             // dark magenta más brillante
+        emissiveIntensity: 0.7,         // ↑ subido de 0.4
         metalness: 0.0,
-        roughness: 0.25,
-        transmission: 0.7,
+        roughness: 0.2,
+        transmission: 0.55,             // ↓ bajado de 0.7 para que se vea más sólido
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.92,
         thickness: 1.5,
         ior: 1.45,
         clearcoat: 1.0,
         clearcoatRoughness: 0.05,
-        sheen: 0.8,
-        sheenColor: new THREE.Color(0xff69b4),
+        sheen: 1.0,                     // ↑ subido de 0.8
+        sheenColor: new THREE.Color(0xff80ff),
         sheenRoughness: 0.3,
-        specularIntensity: 1.5,
+        specularIntensity: 1.8,         // ↑ subido
         specularColor: 0xffffff,
         side: THREE.DoubleSide,
         flatShading: true,
@@ -118,25 +118,25 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
   const innerMaterial = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        color: 0xec4899,                // glow magenta/pink
+        color: 0xff80ff,                // glow magenta más vivo
         transparent: true,
-        opacity: 0.25,
-        blending: THREE.AdditiveBlending, // destello aditivo
+        opacity: 0.4,                  // ↑ subido de 0.25
+        blending: THREE.AdditiveBlending,
         side: THREE.BackSide,
       }),
     []
   );
 
-  // Glow aditivo para estado "thinking" (igual al brain-3d.html thinkMat)
+  // Glow aditivo permanente (no solo para thinking)
   const glowMaterial = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        color: 0xff69b4,
+        color: 0xff80ff,
         transparent: true,
-        opacity: 0.0,                     // arranca apagado, sube en thinking
-        side: THREE.FrontSide,
+        opacity: 0.3,                  // ↑ visible siempre
         blending: THREE.AdditiveBlending,
         depthWrite: false,
+        side: THREE.BackSide,
       }),
     []
   );
@@ -223,16 +223,16 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
       case 'idle':
       default: {
         // IDLE: glow oscila suave, sheen hue shift
-        outer.opacity = 0.85;
-        outer.transmission = 0.6;
-        outer.emissive.setHex(0x2a1030);
-        outer.emissiveIntensity = 0.3;
-        glow.color.setHex(0xff69b4);
-        glow.opacity = 0.15 + Math.sin(t * 0.8) * 0.05;
+        outer.opacity = 0.92;
+        outer.transmission = 0.55;
+        outer.emissive.setHex(0x4a1a3a);
+        outer.emissiveIntensity = 0.7;
+        glow.color.setHex(0xff80ff);
+        glow.opacity = 0.3 + Math.sin(t * 0.8) * 0.08;  // ↑ más visible
         bot.color.setHex(0xff1493);
-        bot.intensity = 0.5 + Math.sin(t * 1.2) * 0.2;
+        bot.intensity = 0.5 + Math.sin(t * 1.2) * 0.25;
         // Sheen hue shift sutil (del original)
-        outer.sheenColor.setHSL(0.92 + Math.sin(t * 0.3) * 0.02, 0.7, 0.6);
+        outer.sheenColor.setHSL(0.88 + Math.sin(t * 0.3) * 0.02, 0.8, 0.65);
         break;
       }
     }
@@ -248,7 +248,7 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
         distance={10}
         color={0xff1493}
       />
-      <group ref={groupRef} scale={scale * (isMobile ? 0.35 : 0.55)}>
+      <group ref={groupRef} scale={scale * (isMobile ? 0.55 : 0.85)}>
         {/* Outer translucent rose shell */}
         <mesh
           geometry={geometry}

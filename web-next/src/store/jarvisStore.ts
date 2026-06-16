@@ -411,9 +411,18 @@ export const useJarvisStore = create<JarvisStore>()(
     chatSessionId: state.chatSessionId,
     voiceEnabled: state.voiceEnabled,
     brainMode: state.brainMode,
-    brainRenderer: state.brainRenderer,
+    // brainRenderer NO se persiste — siempre arranca en '3d' (HolographicBrain)
+    // Si lo agregás al partialize, los usuarios con '2d' guardado en localStorage
+    // van a seguir viendo el cerebro 2D Canvas apagado en vez del holograma 3D
     chatHistory: state.chatHistory,
   }),
+  // Migración: si hay datos viejos con brainRenderer, lo limpiamos
+  onRehydrateStorage: () => (state) => {
+    if (state && (state as any).brainRenderer) {
+      // Forzar reset a '3d' en rehidratación
+      (state as any).brainRenderer = '3d';
+    }
+  },
 }
 )
 )
