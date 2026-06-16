@@ -39,7 +39,7 @@ async def google_callback(code: str = Query(...), state: str = Query(None), requ
     
     # Whitelist check
     import os
-    allowed_emails_env = os.getenv("ALLOWED_EMAILS", "vaziesanchezlucas@gmail.com")
+    allowed_emails_env = os.getenv("ALLOWED_EMAILS", "vaziesanchezlucas@gmail.com, georgelucasvaziesanchez@uanl.edu.mx")
     allowed_emails = [e.strip().lower() for e in allowed_emails_env.split(",") if e.strip()]
     if email.lower() not in allowed_emails:
         logger.warning(f"Unauthorized Google login attempt from: {email}")

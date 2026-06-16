@@ -57,7 +57,8 @@ Example:
 
     llm = get_llm() # Using the default configured LLM
     try:
-        response = llm.invoke([HumanMessage(content=prompt)])
+        # Disable callbacks so this background extraction doesn't stream tokens to the user's chat UI
+        response = llm.invoke([HumanMessage(content=prompt)], config={"callbacks": []})
         import json
         import re
         

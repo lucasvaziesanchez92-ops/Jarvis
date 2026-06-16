@@ -129,6 +129,21 @@ async def ws_chat(websocket: WebSocket):
                 except Exception as e:
                     logger.warning(f"build_file_context failed: {e}")
 
+            # Try to add user name to context
+            try:
+                from backend.storage.sqlite_store import get_store
+                from backend.storage.models import UserModel
+                store = get_store()
+                session = store.get_session()
+                try:
+                    db_user = session.query(UserModel).filter(UserModel.id == "default_user").first()
+                    if db_user and db_user.name:
+                        full_message = f"[System Context: El usuario se llama {db_user.name}]\n\n{full_message}"
+                finally:
+                    session.close()
+            except Exception as e:
+                logger.warning(f"No se pudo obtener el nombre del usuario: {e}")
+
             # Reconstruct history from frontend if backend lost it (e.g. Railway restart)
             client_history = data.get("history", [])
             if not _session_history[session_id] and client_history:
