@@ -338,7 +338,7 @@ export const useJarvisStore = create<JarvisStore>()(
       const res = await fetch(`${apiBase}/auth/google/status`)
       if (res.ok) {
         const data = await res.json()
-        set({ googleConnected: data.authenticated, googleEmail: data.email || null })
+        set({ googleConnected: data.connected, googleEmail: data.email || null })
       }
     } catch (error) {
       console.error('Failed to check Google auth status', error)
