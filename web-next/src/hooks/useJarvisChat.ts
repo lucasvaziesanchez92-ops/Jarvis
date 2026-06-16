@@ -111,6 +111,7 @@ function ensureConnection() {
     // Only reconnect if there are still active listeners
     if (refCount <= 0) return;
     notifyStatus('disconnected');
+    useJarvisStore.getState().setActivityState('idle');
     scheduleReconnect();
   };
 
@@ -212,8 +213,8 @@ function ensureConnection() {
               content: last.content + `\n[Error: ${data.content}]`,
             }]
           });
-          store.setActivityState('idle');
         }
+        store.setActivityState('idle');
       }
     } catch (e) {
       console.error('[WS] Parse error:', e);
