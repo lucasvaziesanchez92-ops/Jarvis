@@ -8,19 +8,18 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls, Sparkles, Float } from '@react-three/drei';
 
 /* ────────────────────────────────────────────────────────────
-   HOLOGRAPHIC BRAIN — Tripo3D Luminescent Brain (rosado)
-   Integra TODO el filtro del brain-3d.html con animación
-   reactiva al activityState del store.
+   HOLOGRAPHIC BRAIN — Rosa Holográfico Sólido (final)
+   Sincronizado con test standalone brain-magenta-rosado.html.
 
-   Filtro (color 0xd65e8e — +45% rosa sobre el original):
-   - Outer: transmission 0.6, clearcoat 0.8, sheen 0.5 rosa
-   - Inner: teal con emissive magenta
-   - Glow shell: rosa aditivo
-   - 6 luces: ambient + key + 2 fill (rosa/teal) + 2 point (bottom/top)
+   Filtro (color 0xe090b0 — rosa medio un poco oscuro):
+   - Outer: transmission 0.1, clearcoat 0.8, sheen 0.8 rosa,
+     opacity 1.0 (SÓLIDO)
+   - Inner: rosa medio aditivo
+   - Glow shell: rosa medio aditivo
    - RoomEnvironment IBL (necesario para clearcoat)
 
    Animación por estado:
-   - idle:      rotación lenta + sheen hue shift
+   - idle:      rotación lenta + glow estable
    - listening: pulse suave del glow
    - thinking:  PARPADEO (opacity/transmission/emissive oscilan 3Hz)
    - speaking:  pulso más fuerte del glow + bottom light
@@ -88,26 +87,27 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
     return { geometry: g, scale: s };
   }, [rawGeometry]);
 
-  // === MATERIALES — Holográfico Magenta (basado en standalone solid/think) ===
+  // === MATERIALES — Rosa Holográfico (sync con test standalone) ===
+  // Versión final: rosa medio (#e090b0) — un poco más oscuro que el claro
   const outerMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: 0xffb3e6,                // rosa-magenta suave
-        emissive: 0x4a1a3a,             // dark magenta más brillante
-        emissiveIntensity: 0.7,         // ↑ subido de 0.4
+        color: 0xe090b0,                // rosa medio (sync con build-magenta.ps1)
+        emissive: 0xc03060,             // emissive rosa medio
+        emissiveIntensity: 0.65,
         metalness: 0.0,
-        roughness: 0.2,
-        transmission: 0.55,             // ↓ bajado de 0.7 para que se vea más sólido
+        roughness: 0.28,
+        transmission: 0.1,              // muy poco translúcido (sólido)
         transparent: true,
-        opacity: 0.92,
-        thickness: 1.5,
+        opacity: 1.0,                   // 100% opaco (sólido)
+        thickness: 1.8,
         ior: 1.45,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.05,
-        sheen: 1.0,                     // ↑ subido de 0.8
-        sheenColor: new THREE.Color(0xff80ff),
-        sheenRoughness: 0.3,
-        specularIntensity: 1.8,         // ↑ subido
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.1,
+        sheen: 0.8,
+        sheenColor: new THREE.Color(0xff6090),  // rosa medio glow
+        sheenRoughness: 0.4,
+        specularIntensity: 1.3,
         specularColor: 0xffffff,
         side: THREE.DoubleSide,
         flatShading: true,
@@ -118,22 +118,22 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
   const innerMaterial = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        color: 0xff80ff,                // glow magenta más vivo
+        color: 0xff6090,                // rosa medio glow interior
         transparent: true,
-        opacity: 0.4,                  // ↑ subido de 0.25
+        opacity: 0.4,
         blending: THREE.AdditiveBlending,
         side: THREE.BackSide,
       }),
     []
   );
 
-  // Glow aditivo permanente (no solo para thinking)
+  // Glow aditivo permanente
   const glowMaterial = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        color: 0xff80ff,
+        color: 0xff6090,
         transparent: true,
-        opacity: 0.3,                  // ↑ visible siempre
+        opacity: 0.35,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.BackSide,
@@ -171,19 +171,19 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
       case 'thinking': {
         // PARPADEO del brain-3d.html: blink a 3Hz
         const blink = (Math.sin(t * 3) + 1) / 2;
-        outer.opacity = 0.5 + blink * 0.5;
-        outer.transmission = 0.3 + blink * 0.5;
-        outer.emissiveIntensity = 0.3 + blink * 0.5;
-        glow.opacity = 0.1 + blink * 0.4;
+        outer.opacity = 0.7 + blink * 0.3;
+        outer.transmission = 0.05 + blink * 0.15;
+        outer.emissiveIntensity = 0.4 + blink * 0.5;
+        glow.opacity = 0.15 + blink * 0.4;
         bot.intensity = 0.5 + blink * 0.5;
         break;
       }
       case 'speaking': {
         // Pulso del glow + bottom light
         const pulse = (Math.sin(t * 2) + 1) / 2;
-        outer.opacity = 0.85;
-        outer.transmission = 0.6;
-        outer.emissiveIntensity = 0.4;
+        outer.opacity = 1.0;
+        outer.transmission = 0.1;
+        outer.emissiveIntensity = 0.5;
         glow.opacity = 0.2 + pulse * 0.3;
         bot.intensity = 0.5 + pulse * 0.4;
         break;
@@ -191,9 +191,9 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
       case 'listening': {
         // Pulse suave
         const pulse = (Math.sin(t * 1.5) + 1) / 2;
-        outer.opacity = 0.85;
-        outer.transmission = 0.6;
-        outer.emissiveIntensity = 0.3 + pulse * 0.2;
+        outer.opacity = 1.0;
+        outer.transmission = 0.1;
+        outer.emissiveIntensity = 0.4 + pulse * 0.2;
         glow.opacity = 0.15 + pulse * 0.1;
         bot.intensity = 0.4 + pulse * 0.2;
         break;
@@ -203,8 +203,8 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
         const blink = (Math.sin(t * 6) + 1) / 2;
         outer.emissive.setHex(0xff0033);
         outer.emissiveIntensity = 0.3 + blink * 0.7;
-        outer.opacity = 0.7;
-        outer.transmission = 0.5;
+        outer.opacity = 0.85;
+        outer.transmission = 0.1;
         glow.color.setHex(0xff0044);
         glow.opacity = 0.2 + blink * 0.5;
         bot.color.setHex(0xff0044);
@@ -213,20 +213,20 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
       }
       case 'sleep': {
         // Casi estático, brillo bajo
-        outer.opacity = 0.6;
-        outer.transmission = 0.4;
-        outer.emissiveIntensity = 0.15;
-        glow.opacity = 0.05;
-        bot.intensity = 0.2;
+        outer.opacity = 0.85;
+        outer.transmission = 0.08;
+        outer.emissiveIntensity = 0.25;
+        glow.opacity = 0.1;
+        bot.intensity = 0.3;
         break;
       }
       case 'idle':
       default: {
         // IDLE: glow oscila suave, sheen hue shift
-        outer.opacity = 0.92;
-        outer.transmission = 0.55;
-        outer.emissive.setHex(0x4a1a3a);
-        outer.emissiveIntensity = 0.7;
+        outer.opacity = 1.0;
+        outer.transmission = 0.1;
+        outer.emissive.setHex(0xc03060);
+        outer.emissiveIntensity = 0.65;
         glow.color.setHex(0xff80ff);
         glow.opacity = 0.3 + Math.sin(t * 0.8) * 0.08;  // ↑ más visible
         bot.color.setHex(0xff1493);
