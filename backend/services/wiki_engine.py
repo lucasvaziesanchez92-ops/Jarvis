@@ -11,7 +11,7 @@ import frontmatter
 from loguru import logger
 
 # ── Config ──────────────────────────────────────────────────────
-VAULT_PATH = os.getenv("OBSIDIAN_VAULT_PATH", str(Path.home() / "Documents" / "Obsidian" / "JARVIS_Vault"))
+VAULT_PATH = os.getenv("OBSIDIAN_VAULT_PATH", os.path.join("backend", "data", "brain"))
 CHROMA_PATH = os.getenv("CHROMA_DB_PATH", "data/chroma_wiki")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 CHUNK_SIZE = 800
