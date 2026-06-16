@@ -94,11 +94,12 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
       new THREE.MeshPhysicalMaterial({
         color: 0xffb3e6,                // rosa-magenta suave
         emissive: 0xff1493,             // glow interno magenta
-        emissiveIntensity: 0.15,
+        emissiveIntensity: 0.2,
         metalness: 0.1,
-        roughness: 0.25,
-        transmission: 0.95,             // altamente translúcido, volumétrico
+        roughness: 0.3,
+        transmission: 0.6,              // Menos translúcido, más sólido
         transparent: true,
+        opacity: 0.9,                   // Más sólido
         thickness: 2.0,                 // da la sensación de volumen interior
         ior: 1.15,                      // refracción ligera
         clearcoat: 1.0,                 // brillo tipo cristal

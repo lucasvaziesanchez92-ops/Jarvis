@@ -270,10 +270,8 @@ export default function VoiceControls() {
           })
         } else {
           // No audio from backend (e.g. Orpheus TTS not available):
-          // fall back to Web Speech API in the browser. This way
-          // JARVIS always speaks, regardless of which TTS the
-          // backend can produce.
-          if (responseRef.current) {
+          // fall back to Web Speech API in the browser.
+          if (responseRef.current && useJarvisStore.getState().voiceEnabled) {
             const success = ttsSpeak(responseRef.current)
             if (!success) setActivityState('idle')
           } else {
