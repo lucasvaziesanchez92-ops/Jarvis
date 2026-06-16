@@ -55,19 +55,22 @@ Example:
 ]
 """
 
-    llm = get_llm(model_id="llama3-8b-8192") # Using a fast Groq model for extraction if possible
+    llm = get_llm() # Using the default configured LLM
     try:
         response = llm.invoke([HumanMessage(content=prompt)])
         import json
+        import re
         
-        # Parse JSON from markdown block
         content = response.content
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0]
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0]
-            
-        notes = json.loads(content.strip())
+        logger.debug(f"LLM extraction output: {content}")
+        
+        # Try to extract JSON using regex
+        json_match = re.search(r'\[\s*\{.*?\}\s*\]', content, re.DOTALL)
+        if json_match:
+            notes = json.loads(json_match.group(0))
+        else:
+            # Fallback for plain json parsing
+            notes = json.loads(content.strip())
         
         base_dir = "backend/data/brain"
         for note in notes:
@@ -78,6 +81,6 @@ Example:
             logger.info(f"Saved memory to {filepath}")
             
     except Exception as e:
-        logger.error(f"Failed to extract knowledge: {e}")
+        logger.error(f"Failed to extract knowledge: {e}\nRaw content: {response.content if 'response' in locals() else 'None'}")
 
     return {}

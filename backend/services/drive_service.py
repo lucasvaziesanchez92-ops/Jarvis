@@ -155,6 +155,11 @@ def _download_folder_as_zip(service, folder_id: str, folder_name: str) -> tuple[
                     logger.warning(f"Failed to export {c_name}: {e}")
                 continue
                 
+            # Skip other Google Apps files that we don't know how to export
+            if c_mime.startswith("application/vnd.google-apps."):
+                logger.warning(f"Skipping {c_name} because it's a Google App file without binary content ({c_mime})")
+                continue
+                
             c_size = int(child.get("size", 0))
             if c_size > 10 * 1024 * 1024:
                 logger.warning(f"Skipping {c_name} in ZIP because it's too large ({c_size} bytes)")
