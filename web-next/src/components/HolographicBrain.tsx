@@ -88,46 +88,41 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
     return { geometry: g, scale: s };
   }, [rawGeometry]);
 
-  // === MATERIALES — Holográfico Magenta ===
+  // === MATERIALES — Holográfico Magenta (basado en standalone solid/think) ===
   const outerMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
         color: 0xffb3e6,                // rosa-magenta suave
-        emissive: 0xff1493,             // glow interno magenta
-        emissiveIntensity: 0.2,
-        metalness: 0.1,
-        roughness: 0.3,
-        transmission: 0.6,              // Menos translúcido, más sólido
+        emissive: 0x3a2050,
+        emissiveIntensity: 0.4,
+        metalness: 0.0,
+        roughness: 0.25,
+        transmission: 0.7,
         transparent: true,
-        opacity: 0.9,                   // Más sólido
-        thickness: 2.0,                 // da la sensación de volumen interior
-        ior: 1.15,                      // refracción ligera
-        clearcoat: 1.0,                 // brillo tipo cristal
-        clearcoatRoughness: 0.1,
-        sheen: 1.0,                     // simula fresnel en bordes
-        sheenColor: new THREE.Color(0x00ffff), // fresnel cyan sutil
+        opacity: 0.9,
+        thickness: 1.5,
+        ior: 1.45,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05,
+        sheen: 0.8,
+        sheenColor: new THREE.Color(0xff69b4),
         sheenRoughness: 0.3,
-        specularIntensity: 1.0,
+        specularIntensity: 1.5,
         specularColor: 0xffffff,
         side: THREE.DoubleSide,
-        flatShading: false,             // suave, elimina look low-poly
+        flatShading: true,
       }),
     []
   );
 
   const innerMaterial = useMemo(
     () =>
-      new THREE.MeshPhysicalMaterial({
-        color: 0x00ffff,                // núcleo cyan
-        emissive: 0x00ffff,
-        emissiveIntensity: 0.5,
-        metalness: 0.0,
-        roughness: 0.4,
+      new THREE.MeshBasicMaterial({
+        color: 0xec4899,                // glow magenta/pink
         transparent: true,
-        opacity: 0.08,
-        side: THREE.BackSide,
+        opacity: 0.25,
         blending: THREE.AdditiveBlending, // destello aditivo
-        flatShading: false,
+        side: THREE.BackSide,
       }),
     []
   );
