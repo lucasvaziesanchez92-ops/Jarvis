@@ -38,14 +38,20 @@ const BOTTOM_ITEMS: NavItem[] = [
 ];
 
 export function AppSidebar() {
-  const { currentScreen, setScreen, activityState, backendStatus, setBackendStatus } = useJarvisStore();
+  const { 
+    currentScreen, setScreen, activityState, backendStatus, setBackendStatus,
+    googleConnected, googleEmail, checkGoogleAuth,
+    chatHistory, fetchRemoteThreads, loadRemoteThread, chatSessionId
+  } = useJarvisStore();
 
-  // Ping backend cada 10 segundos para actualizar el footer UI
+  // Ping backend cada 10 segundos y checkear Auth/Threads
   useEffect(() => {
+    const apiBase = 'https://backend-production-cabf.up.railway.app';
+    
     const ping = async () => {
       try {
         setBackendStatus('connecting');
-        const res = await fetch('/health', { signal: AbortSignal.timeout(5000) });
+        const res = await fetch(apiBase + '/api/v1/health', { signal: AbortSignal.timeout(5000) });
         if (res.ok) {
           setBackendStatus('connected');
         } else {
@@ -55,10 +61,14 @@ export function AppSidebar() {
         setBackendStatus('disconnected');
       }
     };
+    
     ping();
+    checkGoogleAuth(apiBase);
+    fetchRemoteThreads(apiBase);
+
     const interval = setInterval(ping, 10000);
     return () => clearInterval(interval);
-  }, [setBackendStatus]);
+  }, [setBackendStatus, checkGoogleAuth, fetchRemoteThreads]);
 
   const stateColors: Record<string, string> = {
     idle: 'bg-cyan-400', listening: 'bg-green-400', thinking: 'bg-amber-400',
@@ -115,6 +125,36 @@ export function AppSidebar() {
 
         <div className="px-3 py-2">
           <p className="mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+            Conversaciones
+          </p>
+          {chatHistory.length === 0 ? (
+            <div className="px-2 text-xs text-muted-foreground/50">No hay historial</div>
+          ) : (
+            chatHistory.map((thread) => (
+              <Button
+                key={thread.id}
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setScreen('chat')
+                  loadRemoteThread('https://backend-production-cabf.up.railway.app', thread.id)
+                }}
+                className={cn(
+                  'w-full justify-start gap-3 mb-0.5 h-8 rounded-lg',
+                  chatSessionId === thread.id && 'bg-secondary/10 text-secondary-foreground'
+                )}
+              >
+                <MessageSquare className="h-3 w-3 opacity-50" />
+                <span className="text-xs truncate">{thread.title}</span>
+              </Button>
+            ))
+          )}
+        </div>
+
+        <Separator className="mx-3 my-2 w-auto opacity-50" />
+
+        <div className="px-3 py-2">
+          <p className="mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
             Más
           </p>
           {BOTTOM_ITEMS.map((item) => (
@@ -136,10 +176,30 @@ export function AppSidebar() {
       </ScrollArea>
 
       {/* Footer */}
-      <div className="border-t border-border p-3">
-        <div className="rounded-lg bg-card/50 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed">
-          Ollama Cloud · minimax-m2.7
-          <div className="mt-1 flex items-center gap-1 text-[10px]">
+      <div className="border-t border-border p-3 space-y-2">
+        {/* Google Auth Status */}
+        {googleConnected ? (
+          <div className="rounded-lg bg-green-500/10 px-3 py-2 flex items-center gap-2 border border-green-500/20">
+            <div className="h-2 w-2 rounded-full bg-green-400" />
+            <div className="text-xs text-green-400 font-medium truncate">
+              {googleEmail || "Google Conectado"}
+            </div>
+          </div>
+        ) : (
+          <Button 
+            variant="outline" 
+            className="w-full h-8 text-xs justify-start gap-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground"
+            onClick={() => window.location.href = "https://backend-production-cabf.up.railway.app/auth/google/login"}
+          >
+            <div className="h-2 w-2 rounded-full bg-amber-400" />
+            Vincular cuenta Google
+          </Button>
+        )}
+
+        {/* Backend status */}
+        <div className="rounded-lg bg-card/50 px-3 py-2.5 text-[11px] text-muted-foreground leading-relaxed flex items-center justify-between">
+          <span>Ollama Cloud · minimax-m2.7</span>
+          <div className="flex items-center gap-1 text-[10px]">
             <div className={cn("h-1.5 w-1.5 rounded-full", sm.dot)} />
             <span className={sm.text}>{sm.label}</span>
           </div>

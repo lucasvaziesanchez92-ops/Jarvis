@@ -155,6 +155,9 @@ export interface JarvisStore {
   setGoogleConnected: (connected: boolean, email?: string) => void
   checkGoogleAuth: (apiBase: string) => Promise<void>
 
+  fetchRemoteThreads: (apiBase: string) => Promise<void>
+  loadRemoteThread: (apiBase: string, threadId: string) => Promise<void>
+
   reset: () => void
 }
 
@@ -329,32 +332,74 @@ export const useJarvisStore = create<JarvisStore>()(
 
   setBackendStatus: (backendStatus) => set({ backendStatus }),
 
-  setGoogleConnected: (googleConnected: boolean | null, googleEmail: string | null = null) => set({ googleConnected, googleEmail }),
+  setGoogleConnected: (connected, email) => set({ googleConnected: connected, googleEmail: email }),
   checkGoogleAuth: async (apiBase: string) => {
     try {
       const res = await fetch(`${apiBase}/auth/google/status`)
-      const data = await res.json()
-      set({ googleConnected: data.connected ?? false, googleEmail: data.email || null })
-    } catch {
+      if (res.ok) {
+        const data = await res.json()
+        set({ googleConnected: data.authenticated, googleEmail: data.email || null })
+      }
+    } catch (error) {
+      console.error('Failed to check Google auth status', error)
       set({ googleConnected: false, googleEmail: null })
     }
   },
 
-  reset: () => set({
-    activityState: 'idle',
-    panelMode: 'chat',
-    panelExpanded: true,
-    micActive: false,
-  voiceEnabled: true,
-    visualizerAmplitude: 0,
-    statusText: 'Neural Link Active',
-    thinkingBubbleVisible: false,
-    persona: null,
-    chatMessages: [],
-    chatInput: '',
-    chatSessionId: makeId(),
-    brainMode: 'hologram',
-  }),
+  fetchRemoteThreads: async (apiBase: string) => {
+    try {
+      const res = await fetch(`${apiBase}/api/v1/threads`)
+      if (res.ok) {
+        const data = await res.json()
+        const history = data.map((t: any) => ({
+          id: t.id,
+          title: t.title || 'Nueva conversación',
+          messages: [],
+          createdAt: new Date(t.created_at).getTime(),
+          updatedAt: new Date(t.updated_at).getTime(),
+        }))
+        set({ chatHistory: history })
+      }
+    } catch (e) {
+      console.error('Failed to fetch remote threads', e)
+    }
+  },
+
+  loadRemoteThread: async (apiBase: string, threadId: string) => {
+    try {
+      const res = await fetch(`${apiBase}/api/v1/messages/thread/${threadId}`)
+      if (res.ok) {
+        const data = await res.json()
+        const msgs = data.map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          isStreaming: false,
+          toolCalls: m.metadata?.tool_calls || []
+        }))
+        set({
+          chatSessionId: threadId,
+          chatMessages: msgs,
+          chatInput: '',
+          currentScreen: 'chat',
+          panelMode: 'chat'
+        })
+      }
+    } catch (e) {
+      console.error('Failed to load remote thread messages', e)
+    }
+  },
+
+  reset: () => {
+    set({
+      chatMessages: [],
+      chatInput: '',
+      chatSessionId: makeId(),
+      persona: null,
+      micActive: false,
+      thinkingBubbleVisible: false,
+    })
+  },
 }),
 {
   name: 'jarvis-store',
