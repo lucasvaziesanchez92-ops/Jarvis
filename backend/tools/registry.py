@@ -18,7 +18,7 @@ from backend.tools.todos import create_todo, list_todos, complete_todo, update_t
 from backend.tools.email import search_emails, send_email, list_emails
 
 # Wiki
-from backend.tools.wiki import wiki_query, wiki_save_research, wiki_ingest
+from backend.tools.wiki import wiki_query, wiki_capture
 
 # Utility
 from backend.tools.utility import get_current_time, get_current_date
@@ -122,7 +122,7 @@ CORE_TOOLS = [
     # Todos (full CRUD)
     create_todo, list_todos, complete_todo, update_todo, delete_todo,
     # Wiki
-    wiki_query, wiki_save_research, wiki_ingest,
+    wiki_query, wiki_capture,
     # Time
     get_current_time, get_current_date,
 ]
