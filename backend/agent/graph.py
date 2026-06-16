@@ -253,16 +253,20 @@ def build_autonomous_graph(tools=None):
     (with stale tool_calls) into the next turn's input, and the
     new LLM tool_call didn't match.
     """
+    from backend.agent.knowledge_extractor import extract_knowledge
+    
     builder = StateGraph(JarvisState)
 
     builder.add_node("retrieval", retrieval_node)
     builder.add_node("agent", agent_node)
     builder.add_node("tools", tool_node)
+    builder.add_node("extractor", extract_knowledge)
 
     builder.add_edge(START, "retrieval")
     builder.add_edge("retrieval", "agent")
-    builder.add_conditional_edges("agent", tools_condition)
+    builder.add_conditional_edges("agent", tools_condition, {"tools": "tools", "__end__": "extractor"})
     builder.add_edge("tools", "agent")
+    builder.add_edge("extractor", END)
 
     return builder.compile()
 

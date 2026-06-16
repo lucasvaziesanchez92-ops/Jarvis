@@ -12,6 +12,19 @@ from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 
+class UserModel(Base):
+    __tablename__ = "users"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(String, primary_key=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=True)
+    picture = Column(String, nullable=True)
+    google_id = Column(String, unique=True, index=True, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+
 class NoteModel(Base):
     __tablename__ = "notes"
     __table_args__ = {"extend_existing": True}

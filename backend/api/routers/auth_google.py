@@ -55,6 +55,35 @@ async def google_callback(code: str = Query(...), state: str = Query(None), requ
         access_token=tokens.get("access_token", ""),
         expires_at=tokens.get("expires_at", 0),
     )
+    
+    # Save user to SQLite DB (Phase 1 Cognitive Architecture)
+    try:
+        from backend.storage.sqlite_store import get_store
+        from backend.storage.models import UserModel
+        
+        store = get_store()
+        session = store.get_session()
+        try:
+            db_user = session.query(UserModel).filter(UserModel.email == email).first()
+            if not db_user:
+                # Get more info from Google if available
+                user_info = get_user_info(user_id)
+                name = user_info.get("name") if user_info else None
+                picture = user_info.get("picture") if user_info else None
+                
+                db_user = UserModel(
+                    id=user_id, # force default_user ID for backwards compatibility
+                    email=email,
+                    name=name,
+                    picture=picture
+                )
+                session.add(db_user)
+                session.commit()
+        finally:
+            session.close()
+    except Exception as e:
+        logger.error(f"Failed to create user in DB: {e}")
+
     logger.info(f"Google OAuth connected for {email}")
 
     frontend_url = "https://frontend-production-6465.up.railway.app"
