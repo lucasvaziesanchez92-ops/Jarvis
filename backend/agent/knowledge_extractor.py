@@ -43,14 +43,15 @@ Tools Executed: {', '.join(tools_executed) if tools_executed else 'None'}
 
 Instructions:
 1. Generate one or more Markdown notes if there is useful context, people, projects, tools, or decisions mentioned.
-2. Use backlinks like [[Entity]].
-3. Return your response ONLY as a JSON array of objects, with each object having "filepath" (e.g. "conversations/2026-06-16-Meeting.md" or "people/Juan.md") and "content" (the full markdown string).
+2. Use backlinks like [[Entity]] to connect them.
+3. Return your response ONLY as a JSON array of objects. Do not include any other text.
+4. CRITICAL: For the "content" field, you MUST escape newlines as \\n. Do not output raw newlines inside the JSON string values.
 
 Example:
 [
   {{
     "filepath": "conversations/{datetime.now().strftime("%Y-%m-%d")}_Reagendar.md",
-    "content": "# Reagendar Reunión\nEl usuario pidió usar [[Gmail]] para contactar a [[Juan]].\nResultado: Exito."
+    "content": "# Reagendar Reunión\\nEl usuario pidió usar [[Gmail]] para contactar a [[Juan]].\\nResultado: Exito."
   }}
 ]
 """
@@ -68,17 +69,24 @@ Example:
         # Try to extract JSON using regex
         json_match = re.search(r'\[\s*\{.*?\}\s*\]', content, re.DOTALL)
         if json_match:
-            notes = json.loads(json_match.group(0))
+            try:
+                notes = json.loads(json_match.group(0), strict=False)
+            except json.JSONDecodeError:
+                # If strict=False still fails, try to replace raw newlines before parsing
+                cleaned = json_match.group(0).replace('\n', '\\n').replace('\r', '')
+                notes = json.loads(cleaned, strict=False)
         else:
             # Fallback for plain json parsing
-            notes = json.loads(content.strip())
+            notes = json.loads(content.strip(), strict=False)
         
         base_dir = "backend/data/brain"
         for note in notes:
             filepath = os.path.join(base_dir, note["filepath"])
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            # Ensure the content has real newlines when written
+            final_content = note["content"].replace('\\n', '\n')
             with open(filepath, "w", encoding="utf-8") as f:
-                f.write(note["content"])
+                f.write(final_content)
             logger.info(f"Saved memory to {filepath}")
             
     except Exception as e:
