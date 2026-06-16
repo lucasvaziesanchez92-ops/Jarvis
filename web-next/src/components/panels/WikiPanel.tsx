@@ -2,8 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import ForceGraph2D from 'react-force-graph-2d';
+import dynamic from 'next/dynamic';
 import { Network, FileText, Folder, File, Search, Database, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
+
+// Dynamic import with SSR false to prevent "window is not defined" error in Next.js
+const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { API_BASE } from '@/lib/api';
