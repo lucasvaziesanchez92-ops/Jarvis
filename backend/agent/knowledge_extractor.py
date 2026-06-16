@@ -32,33 +32,53 @@ def extract_knowledge(state: JarvisState) -> dict:
         elif role == "tool":
             transcript += f"\n[Tool Result]: {content[:200]}..."
 
-    prompt = f"""You are JARVIS' Cognitive Memory Subsystem.
+    import glob
+    
+    base_dir = os.getenv("OBSIDIAN_VAULT_PATH", os.path.join("backend", "data", "brain"))
+    
+    # Get existing files for awareness
+    existing_files = []
+    if os.path.exists(base_dir):
+        for root, _, files in os.walk(base_dir):
+            for f in files:
+                if f.endswith(".md"):
+                    rel_path = os.path.relpath(os.path.join(root, f), base_dir).replace("\\", "/")
+                    existing_files.append(rel_path)
+
+    prompt = f"""You are JARVIS' Cognitive Memory Subsystem (Wiki Ingest Engine).
 Your job is to analyze the following interaction and extract operational memory into Obsidian Markdown files.
 Today's date is {datetime.now().strftime("%Y-%m-%d")}.
 
 Interaction Transcript:
 {transcript}
 
-Tools Executed: {', '.join(tools_executed) if tools_executed else 'None'}
+Existing Wiki Files:
+{', '.join(existing_files) if existing_files else 'None'}
 
 Instructions:
-1. Generate one or more Markdown notes if there is useful context, people, projects, tools, or decisions mentioned.
-2. Use backlinks like [[Entity]] to connect them.
-3. Return your response ONLY as a JSON array of objects. Do not include any other text.
-4. CRITICAL: For the "content" field, you MUST escape newlines as \\n. Do not output raw newlines inside the JSON string values.
+1. PULL INFORMATION: Extract context, people, projects, decisions.
+2. SCHEMA: Every note MUST have a YAML frontmatter block at the top with `title`, `tags` (array), `summary` (1-2 sentences), and `provenance` (string).
+3. CONNECTIONS: Use backlinks like [[Entity Name]] to connect related concepts.
+4. MERGE vs CREATE: If the concept belongs to an existing file, specify action "merge" and provide ONLY the new information to append. If it's a new concept, specify action "create" and provide the full file with Frontmatter.
+5. FORMAT: Return ONLY a JSON array.
 
-Example:
+JSON Format:
 [
   {{
-    "filepath": "conversations/{datetime.now().strftime("%Y-%m-%d")}_Reagendar.md",
-    "content": "# Reagendar Reunión\\nEl usuario pidió usar [[Gmail]] para contactar a [[Juan]].\\nResultado: Exito."
+    "filepath": "projects/Proyecto Nexus.md",
+    "action": "create",
+    "content": "---\\ntitle: Proyecto Nexus\\ntags: [proyecto]\\nsummary: Iniciativa para conectar con UANL.\\nprovenance: chat\\n---\\n\\nEste proyecto es liderado por [[Valeria Ramos]]."
+  }},
+  {{
+    "filepath": "people/Carlos Mendoza.md",
+    "action": "merge",
+    "content": "\\n- **{datetime.now().strftime("%Y-%m-%d")}**: Empezó a colaborar con [[Valeria Ramos]] en el [[Proyecto Nexus]]."
   }}
 ]
 """
 
-    llm = get_llm() # Using the default configured LLM
+    llm = get_llm()
     try:
-        # Disable callbacks so this background extraction doesn't stream tokens to the user's chat UI
         response = llm.invoke([HumanMessage(content=prompt)], config={"callbacks": []})
         import json
         import re
@@ -66,30 +86,33 @@ Example:
         content = response.content
         logger.debug(f"LLM extraction output: {content}")
         
-        # Try to extract JSON using regex
         json_match = re.search(r'\[\s*\{.*?\}\s*\]', content, re.DOTALL)
         if json_match:
             try:
                 notes = json.loads(json_match.group(0), strict=False)
             except json.JSONDecodeError:
-                # If strict=False still fails, try to replace raw newlines before parsing
                 cleaned = json_match.group(0).replace('\n', '\\n').replace('\r', '')
                 notes = json.loads(cleaned, strict=False)
         else:
-            # Fallback for plain json parsing
             notes = json.loads(content.strip(), strict=False)
         
-        base_dir = "backend/data/brain"
         for note in notes:
             filepath = os.path.join(base_dir, note["filepath"])
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            # Ensure the content has real newlines when written
+            action = note.get("action", "create")
             final_content = note["content"].replace('\\n', '\n')
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(final_content)
-            logger.info(f"Saved memory to {filepath}")
+            
+            if action == "merge" and os.path.exists(filepath):
+                with open(filepath, "a", encoding="utf-8") as f:
+                    f.write("\n" + final_content)
+                logger.info(f"Merged memory into {filepath}")
+            else:
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(final_content)
+                logger.info(f"Created memory at {filepath}")
             
     except Exception as e:
-        logger.error(f"Failed to extract knowledge: {e}\nRaw content: {response.content if 'response' in locals() else 'None'}")
+        logger.error(f"Failed to extract knowledge: {e}")
 
     return {}
+

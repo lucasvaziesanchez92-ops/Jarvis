@@ -184,11 +184,24 @@ export default function WikiPanel() {
               <ForceGraph2D
                 ref={graphRef}
                 graphData={graphData}
-                nodeLabel="id"
+                nodeLabel={node => `
+                  <div style="background: rgba(0,0,0,0.8); padding: 8px; border-radius: 4px; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); max-width: 200px; white-space: normal;">
+                    <strong style="color: white">${node.id}</strong>
+                    ${node.tags && node.tags.length ? `<br/><span style="color:#00d4ff; font-size: 10px;">${node.tags.join(', ')}</span>` : ''}
+                    ${node.summary && node.summary !== 'N/A' ? `<br/><span style="color:#aaa; font-size: 11px;">${node.summary}</span>` : ''}
+                  </div>
+                `}
                 nodeColor={node => {
-                  if (node.id === selectedFile?.replace('.md', '').split('/').pop()) return '#00ff88';
-                  if (node.group === 'ghost') return '#444';
-                  return '#00d4ff';
+                  if (node.id === selectedFile?.replace('.md', '').split('/').pop()) return '#ffffff';
+                  if (node.group === 'ghost') return '#333333';
+                  if (node.tags) {
+                    const t = node.tags.map((t: string) => t.toLowerCase());
+                    if (t.includes('proyecto')) return '#00d4ff';
+                    if (t.includes('persona')) return '#ff00d4';
+                    if (t.includes('tecnología') || t.includes('tecnologia')) return '#ffaa00';
+                    if (t.includes('concepto')) return '#00ff88';
+                  }
+                  return '#666688';
                 }}
                 linkColor={() => 'rgba(255,255,255,0.1)'}
                 backgroundColor="#050510"

@@ -95,20 +95,34 @@ async def get_graph():
     if not os.path.exists(vault_path):
         return {"nodes": [], "links": []}
 
-    for root, _, filenames in os.walk(vault_path):
-        for name in filenames:
-            if name.endswith(".md"):
-                node_id = name.replace(".md", "")
-                nodes.append({"id": node_id, "group": os.path.basename(root)})
-                node_ids.add(node_id)
-                
+    import frontmatter
     for root, _, filenames in os.walk(vault_path):
         for name in filenames:
             if name.endswith(".md"):
                 node_id = name.replace(".md", "")
                 full_path = os.path.join(root, name)
-                with open(full_path, "r", encoding="utf-8") as f:
-                    content = f.read()
+                
+                try:
+                    with open(full_path, "r", encoding="utf-8") as f:
+                        post = frontmatter.load(f)
+                        content = post.content
+                        tags = post.get("tags", [])
+                        summary = post.get("summary", "")
+                        if isinstance(tags, str): tags = [tags]
+                except Exception:
+                    # Fallback if frontmatter fails
+                    with open(full_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    tags = []
+                    summary = ""
+
+                nodes.append({
+                    "id": node_id, 
+                    "group": os.path.basename(root),
+                    "tags": tags,
+                    "summary": summary
+                })
+                node_ids.add(node_id)
                 
                 # Find all [[Links]]
                 matches = re.findall(r"\[\[(.*?)\]\]", content)
@@ -117,7 +131,7 @@ async def get_graph():
                     target_id = target.split("|")[0].strip()
                     links.append({"source": node_id, "target": target_id})
                     if target_id not in node_ids:
-                        nodes.append({"id": target_id, "group": "ghost"})
+                        nodes.append({"id": target_id, "group": "ghost", "tags": [], "summary": "N/A"})
                         node_ids.add(target_id)
                         
     return {"nodes": nodes, "links": links}

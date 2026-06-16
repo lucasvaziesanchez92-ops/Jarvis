@@ -13,53 +13,29 @@ def wiki_query(query: str) -> str:
         if not results:
             return (
                 "Tu segundo cerebro está vacío o no hay notas relevantes para esa consulta. "
-                "Si tenés archivos .md en data/sources/, indexalos con /api/v1/wiki/reindex."
             )
         lines = []
         for r in results:
             score_pct = round((1 - r.get("score", 1.0)) * 100, 1) if r.get("score") else 0
-            lines.append(f"**{r.get('title', 'Nota')}** ({score_pct}% match)\n{r.get('content', '')[:300]}")
+            lines.append(f"**{r.get('title', 'Nota')}** (Match semántico: {score_pct}%)\n{r.get('content', '')[:500]}")
         return "\n\n".join(lines)
     except Exception as e:
-        return (
-            "El wiki no está indexado todavía. Subí archivos .md con "
-            "wiki_save_research o ejecutá /api/v1/wiki/reindex para empezar."
-        )
+        return f"Error al consultar la wiki: {e}"
 
 
 @tool
-def wiki_save_research(title: str, content: str) -> str:
-    """Guarda investigación en la wiki. Crea un archivo .md y reindexa."""
-    data_dir = Path(os.getenv("DATA_DIR", "data"))
-    sources_dir = data_dir / "sources"
-    sources_dir.mkdir(parents=True, exist_ok=True)
+def wiki_capture(title: str, content: str) -> str:
+    """Guarda un texto crudo o recorte en la carpeta _raw/ para su posterior procesamiento cognitivo."""
+    from backend.services.wiki_engine import get_stats
+    vault_path = get_stats()["vault"]
+    raw_dir = Path(vault_path) / "_raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
 
     safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip().replace(" ", "_")
-    source_path = sources_dir / f"{safe_title}.md"
-    source_path.write_text(f"# {title}\n\n{content}", encoding="utf-8")
+    source_path = raw_dir / f"{safe_title}.md"
+    source_path.write_text(f"---\ntitle: {title}\ntags: [raw]\n---\n\n{content}", encoding="utf-8")
 
-    try:
-        from backend.services.wiki_engine import index_vault
-        index_vault()
-    except Exception:
-        pass
-
-    return f"Conocimiento '{title}' guardado en tu segundo cerebro."
-
-
-@tool
-def wiki_ingest(file_name: str) -> str:
-    """Procesa un archivo .md existente y lo integra en la wiki."""
-    data_dir = Path(os.getenv("DATA_DIR", "data"))
-    source_path = data_dir / "sources" / file_name
-    if not source_path.exists():
-        return f"Error: No se encontró {file_name} en data/sources/."
-    try:
-        from backend.services.wiki_engine import index_vault
-        index_vault()
-    except Exception:
-        pass
-    return f"Archivo {file_name} integrado en tu wiki."
+    return f"Conocimiento crudo '{title}' capturado en la carpeta _raw de tu segundo cerebro. El extractor lo procesará después."
 
 
 @tool
