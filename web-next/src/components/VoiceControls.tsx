@@ -274,7 +274,10 @@ export default function VoiceControls() {
           // JARVIS always speaks, regardless of which TTS the
           // backend can produce.
           if (responseRef.current) {
-            ttsSpeak(responseRef.current)
+            const success = ttsSpeak(responseRef.current)
+            if (!success) setActivityState('idle')
+          } else {
+            setActivityState('idle')
           }
           setScreen('chat')
         }

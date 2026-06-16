@@ -5,7 +5,7 @@ import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { useJarvisStore } from '@/store/jarvisStore';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Sparkles, Float } from '@react-three/drei';
 
 /* ────────────────────────────────────────────────────────────
    HOLOGRAPHIC BRAIN — Tripo3D Luminescent Brain (rosado)
@@ -63,7 +63,7 @@ function SceneEnvironment() {
 }
 
 /* ── Brain model with reactive animation ───────────────── */
-function BrainModel({ activityState }: { activityState: string }) {
+function BrainModel({ activityState, isMobile }: { activityState: string, isMobile: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
   const outerMatRef = useRef<THREE.MeshPhysicalMaterial>(null);
   const innerMatRef = useRef<THREE.MeshPhysicalMaterial>(null);
@@ -88,28 +88,28 @@ function BrainModel({ activityState }: { activityState: string }) {
     return { geometry: g, scale: s };
   }, [rawGeometry]);
 
-  // === MATERIALES — mismo filtro que brain-3d.html ===
+  // === MATERIALES — Holográfico Magenta ===
   const outerMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: 0xd0e8e8,                // ice blue (del original)
-        emissive: 0x2a1030,
-        emissiveIntensity: 0.3,
-        metalness: 0.0,
+        color: 0xffb3e6,                // rosa-magenta suave
+        emissive: 0xff1493,             // glow interno magenta
+        emissiveIntensity: 0.15,
+        metalness: 0.1,
         roughness: 0.25,
-        transmission: 0.6,              // 60% translúcido
+        transmission: 0.95,             // altamente translúcido, volumétrico
         transparent: true,
-        thickness: 1.2,
-        ior: 1.45,
-        clearcoat: 0.8,
+        thickness: 2.0,                 // da la sensación de volumen interior
+        ior: 1.15,                      // refracción ligera
+        clearcoat: 1.0,                 // brillo tipo cristal
         clearcoatRoughness: 0.1,
-        sheen: 0.5,
-        sheenColor: new THREE.Color(0xff69b4),
-        sheenRoughness: 0.5,
+        sheen: 1.0,                     // simula fresnel en bordes
+        sheenColor: new THREE.Color(0x00ffff), // fresnel cyan sutil
+        sheenRoughness: 0.3,
         specularIntensity: 1.0,
         specularColor: 0xffffff,
         side: THREE.DoubleSide,
-        flatShading: true,
+        flatShading: false,             // suave, elimina look low-poly
       }),
     []
   );
@@ -117,15 +117,16 @@ function BrainModel({ activityState }: { activityState: string }) {
   const innerMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: 0x40e0d0,                // teal (del original)
-        emissive: 0xff1493,
-        emissiveIntensity: 0.4,
+        color: 0x00ffff,                // núcleo cyan
+        emissive: 0x00ffff,
+        emissiveIntensity: 0.5,
         metalness: 0.0,
         roughness: 0.4,
         transparent: true,
-        opacity: 0.15,
+        opacity: 0.08,
         side: THREE.BackSide,
-        flatShading: true,
+        blending: THREE.AdditiveBlending, // destello aditivo
+        flatShading: false,
       }),
     []
   );
@@ -242,16 +243,16 @@ function BrainModel({ activityState }: { activityState: string }) {
   });
 
   return (
-    <>
+    <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.5}>
       {/* Bottom light dentro del BrainModel para tener la ref accesible */}
       <pointLight
         ref={bottomLightRef}
         position={[0, -2, 0]}
-        intensity={0.5}
+        intensity={0.3}
         distance={10}
         color={0xff1493}
       />
-      <group ref={groupRef} scale={scale}>
+      <group ref={groupRef} scale={scale * (isMobile ? 0.35 : 0.55)}>
         {/* Outer translucent rose shell */}
         <mesh
           geometry={geometry}
@@ -262,18 +263,22 @@ function BrainModel({ activityState }: { activityState: string }) {
         <mesh
           geometry={geometry}
           material={innerMaterial}
-          scale={0.97}
+          scale={0.96}
           ref={(m) => { if (m) (innerMatRef as any).current = (m as THREE.Mesh).material; }}
         />
         {/* Outer glow shell (para thinking) */}
         <mesh
           geometry={geometry}
           material={glowMaterial}
-          scale={1.02}
+          scale={1.03}
           ref={(m) => { if (m) (glowMatRef as any).current = (m as THREE.Mesh).material; }}
         />
+        {/* Partículas cyan flotando dentro y alrededor */}
+        <Sparkles count={isMobile ? 60 : 150} scale={2.5} size={isMobile ? 1.5 : 2.5} color="#00ffff" opacity={0.6} speed={0.5} noise={1} />
+        {/* Partículas magenta sutiles */}
+        <Sparkles count={isMobile ? 40 : 100} scale={2.2} size={isMobile ? 2 : 3} color="#ff1493" opacity={0.4} speed={0.3} noise={2} />
       </group>
-    </>
+    </Float>
   );
 }
 
@@ -321,7 +326,7 @@ export default function HolographicBrain() {
         <pointLight position={[0, 3, 0]} intensity={0.4} distance={8} color={0xff69b4} />
 
         <Suspense fallback={<Fallback />}>
-          <BrainModel activityState={activityState} />
+          <BrainModel activityState={activityState} isMobile={isMobile} />
         </Suspense>
 
         <OrbitControls 

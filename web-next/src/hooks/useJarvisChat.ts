@@ -212,8 +212,8 @@ function ensureConnection() {
               content: last.content + `\n[Error: ${data.content}]`,
             }]
           });
+          store.setActivityState('idle');
         }
-        store.setActivityState('error');
       }
     } catch (e) {
       console.error('[WS] Parse error:', e);

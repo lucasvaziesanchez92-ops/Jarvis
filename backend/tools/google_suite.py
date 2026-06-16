@@ -89,7 +89,8 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
     """Search files in Google Drive.
 
     Args:
-        query: keywords to match in file names (e.g. 'factura', 'informe').
+        query: keywords to match in file names or contents (e.g. 'factura', 'informe').
+               IMPORTANT: If the user asks you to analyze a file but doesn't give you the exact name, DO NOT ask them for the name. Instead, use 1 or 2 descriptive keywords related to their prompt to search for the file here first.
                Leave empty to list all files.
         mime_filter: optional MIME-type filter. Common values:
                      'image/' (any image), 'image/png', 'image/jpeg',

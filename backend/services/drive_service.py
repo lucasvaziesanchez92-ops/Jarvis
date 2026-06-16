@@ -1,5 +1,6 @@
 """Google Drive service — upload, list, download, read, delete files with auto-refresh."""
 import io
+import zipfile
 from typing import Optional
 
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
@@ -87,16 +88,20 @@ def upload_file(filename: str, data: bytes, mime_type: str = "application/octet-
 
 
 def download_file(file_id: str, user_id: str = DEFAULT_USER) -> tuple[bytes, str, str]:
-    """Download a file from Drive. Returns (bytes, filename, mimeType). Exports Google Docs natively."""
+    """Download a file from Drive. Returns (bytes, filename, mimeType). Exports Google Docs natively. Zips folders."""
     service = _get_drive_service(user_id)
     meta = service.files().get(fileId=file_id, fields="name,mimeType,size").execute()
     mime = meta.get("mimeType", "")
+    filename = meta.get("name", file_id)
+
+    if mime == "application/vnd.google-apps.folder":
+        return _download_folder_as_zip(service, file_id, filename)
 
     if mime in EXPORT_FORMATS:
         export_mime = EXPORT_FORMATS[mime]
         logger.info(f"Exporting Google Workspace file {file_id} as {export_mime}")
         data = service.files().export(fileId=file_id, mimeType=export_mime).execute()
-        return data, meta.get("name", file_id), export_mime
+        return data, filename, export_mime
 
     size = int(meta.get("size", 0))
     if size > MAX_FILE_BYTES:
@@ -108,7 +113,66 @@ def download_file(file_id: str, user_id: str = DEFAULT_USER) -> tuple[bytes, str
     done = False
     while not done:
         _, done = downloader.next_chunk()
-    return buf.getvalue(), meta.get("name", file_id), mime
+    return buf.getvalue(), filename, mime
+
+def _download_folder_as_zip(service, folder_id: str, folder_name: str) -> tuple[bytes, str, str]:
+    """Downloads the immediate children of a folder and zips them. Limits to 50 files and max size."""
+    logger.info(f"Downloading folder {folder_name} as ZIP")
+    results = service.files().list(
+        q=f"'{folder_id}' in parents and trashed = false",
+        pageSize=50,
+        fields="files(id,name,mimeType,size)"
+    ).execute()
+    children = results.get("files", [])
+    
+    zip_buffer = io.BytesIO()
+    total_size = 0
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for child in children:
+            if child.get("mimeType") == "application/vnd.google-apps.folder":
+                continue # Skip subfolders for simplicity/safety
+            
+            c_id = child["id"]
+            c_name = child["name"]
+            c_mime = child.get("mimeType", "")
+            
+            # Export if needed
+            if c_mime in EXPORT_FORMATS:
+                export_mime = EXPORT_FORMATS[c_mime]
+                try:
+                    c_data = service.files().export(fileId=c_id, mimeType=export_mime).execute()
+                    if c_mime == "application/vnd.google-apps.document": c_name += ".txt"
+                    elif c_mime == "application/vnd.google-apps.spreadsheet": c_name += ".csv"
+                    elif c_mime == "application/vnd.google-apps.presentation": c_name += ".txt"
+                    zf.writestr(c_name, c_data)
+                    total_size += len(c_data)
+                except Exception as e:
+                    logger.warning(f"Failed to export {c_name}: {e}")
+                continue
+                
+            c_size = int(child.get("size", 0))
+            if c_size > 10 * 1024 * 1024:
+                logger.warning(f"Skipping {c_name} in ZIP because it's too large ({c_size} bytes)")
+                continue
+                
+            if total_size + c_size > MAX_FILE_BYTES:
+                logger.warning(f"ZIP size limit reached, skipping remaining files.")
+                break
+                
+            try:
+                request = service.files().get_media(fileId=c_id)
+                buf = io.BytesIO()
+                downloader = MediaIoBaseDownload(buf, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                data = buf.getvalue()
+                zf.writestr(c_name, data)
+                total_size += len(data)
+            except Exception as e:
+                logger.warning(f"Failed to download {c_name} for ZIP: {e}")
+                
+    return zip_buffer.getvalue(), f"{folder_name}.zip", "application/zip"
 
 
 def read_file_content(file_id: str, user_id: str = DEFAULT_USER) -> str:
