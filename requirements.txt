@@ -96,3 +96,4 @@ pytest-cov>=4.1.0
 anyio>=4.6.0
 responses>=0.25.0
 locust>=2.20.0
+gTTS>=2.5.0
