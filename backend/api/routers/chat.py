@@ -238,6 +238,10 @@ async def ws_chat(websocket: WebSocket):
                 if state.get("messages"):
                     _session_history[session_id] = _prune_history(list(state["messages"]), _MAX_HISTORY)
 
+                # Fire knowledge extractor in background so it doesn't block UI or timeout
+                from backend.agent.knowledge_extractor import extract_knowledge
+                loop.run_in_executor(None, extract_knowledge, state)
+
             except Exception as e:
                 logger.exception("WS error in chat loop")
                 record_error("ws_chat_loop", e, {
