@@ -74,14 +74,23 @@ def _extract_tags(fm: frontmatter.Post) -> list[str]:
 
 # ── Indexing ─────────────────────────────────────────────────────
 def index_vault(vault_path: str = VAULT_PATH) -> dict:
-    """Index all markdown files in the vault into ChromaDB."""
-    vault = Path(vault_path)
-    if not vault.exists():
-        return {"error": f"Vault not found: {vault_path}", "pages": 0}
+    """Index all markdown files from the database into ChromaDB."""
+    from backend.storage import get_store
+    from backend.storage.models import NoteModel
 
-    md_files = list(vault.rglob("*.md"))
-    if not md_files:
-        return {"pages": 0, "message": "No markdown files found"}
+    store = get_store()
+    session = store.get_session()
+    
+    try:
+        notes = session.query(NoteModel).filter(NoteModel.deleted_at.is_(None)).all()
+    except Exception as e:
+        logger.error(f"Error querying database for index_vault: {e}")
+        return {"error": str(e), "pages": 0}
+    finally:
+        session.close()
+
+    if not notes:
+        return {"pages": 0, "message": "No markdown notes found in database"}
 
     collection = _get_collection()
 
@@ -95,17 +104,18 @@ def index_vault(vault_path: str = VAULT_PATH) -> dict:
     ids, documents, metadatas = [], [], []
     indexed_chunks = 0
 
-    for fpath in md_files:
+    for note in notes:
         try:
-            raw = fpath.read_text(encoding="utf-8", errors="replace")
+            raw = note.content
+            # Still parse frontmatter if it exists in the content
             post = frontmatter.loads(raw)
-            content = post.content
-            title = post.get("title", fpath.stem)
+            content = post.content if post.content else raw
+            title = note.title
             tags = _extract_tags(post)
             links = _extract_links(content)
-            created = post.get("created", datetime.fromtimestamp(fpath.stat().st_mtime, tz=timezone.utc).isoformat())
+            created = note.created_at.isoformat() if note.created_at else datetime.now(timezone.utc).isoformat()
         except Exception as e:
-            logger.warning(f"Error parsing {fpath}: {e}")
+            logger.warning(f"Error parsing note {note.id}: {e}")
             continue
 
         chunks = _split_text(content)
@@ -113,12 +123,12 @@ def index_vault(vault_path: str = VAULT_PATH) -> dict:
             chunks = [content] if content else ["(empty)"]
 
         for i, chunk in enumerate(chunks):
-            chunk_id = hashlib.md5(f"{fpath}_{i}".encode()).hexdigest()
+            chunk_id = hashlib.md5(f"{note.id}_{i}".encode()).hexdigest()
             ids.append(chunk_id)
             documents.append(chunk)
             metadatas.append({
-                "filepath": str(fpath),
-                "filename": str(fpath.name),
+                "filepath": str(note.title) + ".md",
+                "filename": str(note.title) + ".md",
                 "title": str(title),
                 "tags": ", ".join(str(t) for t in tags),
                 "links": ", ".join(str(l) for l in links),
@@ -137,9 +147,9 @@ def index_vault(vault_path: str = VAULT_PATH) -> dict:
             metadatas=metadatas[j:end],
         )
 
-    logger.info(f"Wiki indexed: {len(md_files)} files, {indexed_chunks} chunks")
+    logger.info(f"Wiki indexed: {len(notes)} files, {indexed_chunks} chunks")
     return {
-        "pages": len(md_files),
+        "pages": len(notes),
         "chunks": indexed_chunks,
         "vault": vault_path,
         "last_indexed": datetime.now(timezone.utc).isoformat(),

@@ -96,20 +96,44 @@ JSON Format:
         else:
             notes = json.loads(content.strip(), strict=False)
         
-        for note in notes:
-            filepath = os.path.join(base_dir, note["filepath"])
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            action = note.get("action", "create")
-            final_content = note["content"].replace('\\n', '\n')
-            
-            if action == "merge" and os.path.exists(filepath):
-                with open(filepath, "a", encoding="utf-8") as f:
-                    f.write("\n" + final_content)
-                logger.info(f"Merged memory into {filepath}")
-            else:
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(final_content)
-                logger.info(f"Created memory at {filepath}")
+        from backend.storage import get_store
+        from backend.storage.models import NoteModel
+        import uuid
+        
+        store = get_store()
+        session = store.get_session()
+        
+        try:
+            for note in notes:
+                # Use filepath as title, dropping the .md extension
+                title = os.path.splitext(note["filepath"])[0]
+                action = note.get("action", "create")
+                final_content = note["content"].replace('\\n', '\n')
+                
+                existing = session.query(NoteModel).filter_by(title=title, deleted_at=None).first()
+                
+                if action == "merge" and existing:
+                    existing.content += "\n" + final_content
+                    logger.info(f"Merged memory into DB note: {title}")
+                else:
+                    if existing:
+                        existing.content = final_content
+                        logger.info(f"Overwrote memory in DB note: {title}")
+                    else:
+                        new_note = NoteModel(
+                            id=str(uuid.uuid4()),
+                            title=title,
+                            content=final_content
+                        )
+                        session.add(new_note)
+                        logger.info(f"Created memory in DB note: {title}")
+            session.commit()
+        except Exception as db_err:
+            session.rollback()
+            logger.error(f"DB error saving knowledge: {db_err}")
+            raise
+        finally:
+            session.close()
             
     except Exception as e:
         logger.error(f"Failed to extract knowledge: {e}")

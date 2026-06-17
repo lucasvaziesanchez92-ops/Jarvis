@@ -22,8 +22,9 @@ def get_store():
     global _sqlite_store, _neon_store
 
     storage_type = getattr(settings, 'storage_type', 'sqlite') or 'sqlite'
+    database_url = getattr(settings, 'database_url', None)
 
-    if storage_type == 'neon':
+    if storage_type == 'neon' or database_url:
         from backend.storage.neon_store import PostgresStore
         if _neon_store is None:
             database_url = getattr(settings, 'database_url', None)

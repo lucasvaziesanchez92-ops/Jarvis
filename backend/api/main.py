@@ -99,6 +99,22 @@ async def lifespan(app: FastAPI):
     # The graph is built on first WS/agent request via get_jarvis_graph().
     logger.info("Graph build deferred to first request (memory: lazy)")
 
+    # Reindex ChromaDB from Database on startup
+    try:
+        from backend.services.wiki_engine import index_vault
+        import threading
+        
+        def run_index():
+            try:
+                res = index_vault()
+                logger.info(f"Wiki index reconstructed: {res.get('pages', 0)} notes")
+            except Exception as e:
+                logger.error(f"Background indexing failed: {e}")
+                
+        threading.Thread(target=run_index, daemon=True).start()
+    except Exception as e:
+        logger.error(f"Failed to start wiki index thread: {e}")
+
     # NO pre-warm de TTS: causa descargas múltiples (60MB) cuando Railway
     # spawns varios workers. Lazy-load on first voice request.
 
