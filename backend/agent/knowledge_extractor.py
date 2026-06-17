@@ -56,10 +56,10 @@ Existing Wiki Files:
 {', '.join(existing_files) if existing_files else 'None'}
 
 Instructions:
-1. PULL INFORMATION: Extract context, people, projects, decisions.
+1. PULL INFORMATION EXHAUSTIVELY: Extract all context, people, projects, decisions, technical details, and nuances. DO NOT SUMMARIZE TOO MUCH. The user prefers CLARITY and DETAIL over brevity. Include exact quotes or critical parameters if present.
 2. SCHEMA: Every note MUST have a YAML frontmatter block at the top with `title`, `tags` (array), `summary` (1-2 sentences), and `provenance` (string).
 3. CONNECTIONS: Use backlinks like [[Entity Name]] to connect related concepts.
-4. MERGE vs CREATE: If the concept belongs to an existing file, specify action "merge" and provide ONLY the new information to append. If it's a new concept, specify action "create" and provide the full file with Frontmatter.
+4. MERGE vs CREATE: If the concept belongs to an existing file, specify action "merge" and provide ONLY the new information to append. If it's a new concept, specify action "create" and write a highly structured, readable, and fully detailed markdown document.
 5. FORMAT: Return ONLY a JSON array.
 
 JSON Format:
