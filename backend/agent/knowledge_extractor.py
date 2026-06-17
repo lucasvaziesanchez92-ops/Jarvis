@@ -45,43 +45,44 @@ def extract_knowledge(state: JarvisState) -> dict:
                     rel_path = os.path.relpath(os.path.join(root, f), base_dir).replace("\\", "/")
                     existing_files.append(rel_path)
 
-    prompt = f"""You are JARVIS' Cognitive Memory Subsystem (Wiki Ingest Engine).
-Your job is to analyze the following interaction and extract operational memory into Obsidian Markdown files.
+    prompt = f"""You are JARVIS' Cognitive Memory Subsystem (Hybrid Graph RAG Extractor).
+Your job is to analyze the following interaction and extract operational memory into BOTH Markdown files AND structured Graph Nodes/Edges.
 Today's date is {datetime.now().strftime("%Y-%m-%d")}.
 
 Interaction Transcript:
 {transcript}
 
-Existing Wiki Files:
-{', '.join(existing_files) if existing_files else 'None'}
-
 Instructions:
-1. PULL INFORMATION EXHAUSTIVELY: Extract all context, people, projects, decisions, technical details, and nuances. DO NOT SUMMARIZE TOO MUCH. The user prefers CLARITY and DETAIL over brevity. Include exact quotes or critical parameters if present.
-2. SCHEMA: Every note MUST have a YAML frontmatter block at the top with `title`, `tags` (array), `summary` (1-2 sentences), and `provenance` (string).
-3. CONNECTIONS: Use backlinks like [[Entity Name]] to connect related concepts.
-4. MERGE vs CREATE: If the concept belongs to an existing file, specify action "merge" and provide ONLY the new information to append. If it's a new concept, specify action "create" and write a highly structured, readable, and fully detailed markdown document.
-5. FORMAT: Return ONLY a JSON array.
+1. PULL INFORMATION EXHAUSTIVELY: Extract all context, people, projects, decisions, and technical details.
+2. NOTES (Markdown): Create rich markdown notes for deep context. Every note MUST have a YAML frontmatter.
+3. GRAPH (Structured): Extract explicit Entities (nodes) and Relationships (edges) from the conversation. 
+   - Node Types: Persona, Proyecto, Tarea, Tecnologia, Idea, Concepto.
+   - Edges: ES_FUNDADOR_DE, TRABAJA_EN, USA, DEPENDE_DE, etc.
+4. FORMAT: Return ONLY a valid JSON object matching the exact format below. Do NOT wrap in markdown code blocks.
 
 JSON Format:
-[
-  {{
-    "filepath": "projects/Proyecto Nexus.md",
-    "action": "create",
-    "content": "---\\ntitle: Proyecto Nexus\\ntags: [proyecto]\\nsummary: Iniciativa para conectar con UANL.\\nprovenance: chat\\n---\\n\\nEste proyecto es liderado por [[Valeria Ramos]]."
-  }},
-  {{
-    "filepath": "people/Carlos Mendoza.md",
-    "action": "merge",
-    "content": "\\n- **{datetime.now().strftime("%Y-%m-%d")}**: Empezó a colaborar con [[Valeria Ramos]] en el [[Proyecto Nexus]]."
+{{
+  "notes": [
+    {{
+      "filepath": "projects/Project Quantum.md",
+      "action": "create",
+      "content": "---\\ntitle: Project Quantum\\ntags: [proyecto]\\nsummary: Plataforma IA.\\nprovenance: chat\\n---\\n\\nEste proyecto es liderado por [[Lucas]]."
+    }}
+  ],
+  "graph": {{
+    "nodes": [
+      {{"id": "Project Quantum", "type": "Proyecto", "description": "Plataforma IA bursátil"}},
+      {{"id": "Lucas", "type": "Persona", "description": "Usuario y fundador"}}
+    ],
+    "edges": [
+      {{"source": "Lucas", "target": "Project Quantum", "relation": "ES_FUNDADOR_DE"}}
+    ]
   }}
-]
+}}
 """
 
     llm = get_llm()
     try:
-        import asyncio
-        from requests.exceptions import Timeout
-        
         try:
             response = llm.invoke([HumanMessage(content=prompt)], config={"callbacks": []})
         except Exception as e:
@@ -94,52 +95,44 @@ JSON Format:
         content = response.content
         logger.debug(f"LLM extraction output: {content}")
         
-        notes = []
-        json_match = re.search(r'\[\s*\{.*?\}\s*\]', content, re.DOTALL)
+        parsed_data = {"notes": [], "graph": {"nodes": [], "edges": []}}
+        
+        # Try to find the JSON object
+        json_match = re.search(r'\{\s*"notes".*\}\s*\}', content, re.DOTALL)
         if json_match:
             try:
-                notes = json.loads(json_match.group(0), strict=False)
+                parsed_data = json.loads(json_match.group(0), strict=False)
             except json.JSONDecodeError:
                 cleaned = json_match.group(0).replace('\n', '\\n').replace('\r', '')
                 try:
-                    notes = json.loads(cleaned, strict=False)
-                except:
-                    logger.error("Failed to parse cleaned JSON array.")
+                    parsed_data = json.loads(cleaned, strict=False)
+                except Exception as e:
+                    logger.error(f"Failed to parse cleaned JSON object: {e}")
         else:
-            try:
-                # Try to find just a single object
-                obj_match = re.search(r'\{\s*".*?\s*\}', content, re.DOTALL)
-                if obj_match:
-                    notes = [json.loads(obj_match.group(0), strict=False)]
-                else:
-                    logger.error("No JSON found in extraction.")
-            except:
-                pass
-                
-        if not isinstance(notes, list):
-            notes = [notes] if isinstance(notes, dict) else []
+            logger.error("No valid JSON found in extraction.")
+
+        notes = parsed_data.get("notes", [])
+        graph = parsed_data.get("graph", {"nodes": [], "edges": []})
+        graph_nodes = graph.get("nodes", [])
+        graph_edges = graph.get("edges", [])
             
         from backend.storage import get_store
-        from backend.storage.models import NoteModel
+        from backend.storage.models import NoteModel, GraphNodeModel, GraphEdgeModel
         import uuid
         
         store = get_store()
         session = store.get_session()
         
         try:
+            # 1. Save Markdown Notes
             for note in notes:
-                if not isinstance(note, dict):
+                if not isinstance(note, dict) or "filepath" not in note or "content" not in note:
                     continue
-                if "filepath" not in note or "content" not in note:
-                    continue
-                    
-                # Use filepath as title, dropping the .md extension
                 title = os.path.splitext(note["filepath"])[0]
                 action = note.get("action", "create")
                 final_content = note["content"].replace('\\n', '\n')
                 
                 existing = session.query(NoteModel).filter_by(title=title, deleted_at=None).first()
-                
                 if action == "merge" and existing:
                     existing.content += "\n" + final_content
                     logger.info(f"Merged memory into DB note: {title}")
@@ -148,17 +141,49 @@ JSON Format:
                         existing.content = final_content
                         logger.info(f"Overwrote memory in DB note: {title}")
                     else:
-                        new_note = NoteModel(
-                            id=str(uuid.uuid4()),
-                            title=title,
-                            content=final_content
-                        )
+                        new_note = NoteModel(id=str(uuid.uuid4()), title=title, content=final_content)
                         session.add(new_note)
                         logger.info(f"Created memory in DB note: {title}")
+
+            # 2. Save Graph Nodes
+            for node in graph_nodes:
+                node_id = node.get("id")
+                if not node_id: continue
+                existing_node = session.query(GraphNodeModel).filter_by(id=node_id).first()
+                if existing_node:
+                    existing_node.description = node.get("description", existing_node.description)
+                    existing_node.type = node.get("type", existing_node.type)
+                else:
+                    new_graph_node = GraphNodeModel(
+                        id=node_id,
+                        label=node_id,
+                        type=node.get("type", "Concept"),
+                        description=node.get("description", "")
+                    )
+                    session.add(new_graph_node)
+
+            # 3. Save Graph Edges
+            for edge in graph_edges:
+                source = edge.get("source")
+                target = edge.get("target")
+                relation = edge.get("relation")
+                if not source or not target or not relation: continue
+                
+                # Check if edge already exists to prevent duplicates
+                existing_edge = session.query(GraphEdgeModel).filter_by(source_id=source, target_id=target, relation=relation).first()
+                if not existing_edge:
+                    new_edge = GraphEdgeModel(
+                        id=str(uuid.uuid4()),
+                        source_id=source,
+                        target_id=target,
+                        relation=relation
+                    )
+                    session.add(new_edge)
+
             session.commit()
         except Exception as db_err:
             session.rollback()
-            logger.error(f"DB error saving knowledge: {db_err}")
+            logger.error(f"DB error saving hybrid knowledge: {db_err}")
             raise
         finally:
             session.close()

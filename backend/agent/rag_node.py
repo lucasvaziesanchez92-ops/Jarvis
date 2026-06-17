@@ -60,6 +60,17 @@ def retrieval_node(state: JarvisState) -> dict:
         parts.append(_build_context_string(short, "SEGUNDO CEREBRO"))
 
     try:
+        from backend.services.graph_engine import search_graph
+        graph_context = search_graph(last_msg)
+        if graph_context:
+            parts.append(graph_context)
+    except Exception as e:
+        import traceback
+        import logging
+        logging.getLogger(__name__).error(f"Error fetching graph context: {e}")
+        pass
+
+    try:
         from backend.services.todos_service import list_todos
         active_todos = list_todos(show_completed=False)
         if active_todos:

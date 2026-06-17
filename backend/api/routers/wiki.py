@@ -110,7 +110,7 @@ async def get_file(path: str = Query(..., description="Relative path to the file
 @router.get("/graph")
 async def get_graph():
     from backend.storage import get_store
-    from backend.storage.models import NoteModel
+    from backend.storage.models import NoteModel, GraphNodeModel, GraphEdgeModel
     import frontmatter
 
     store = get_store()
@@ -120,11 +120,10 @@ async def get_graph():
     node_ids = set()
     
     try:
+        # 1. Fetch Markdown Notes (Traditional Wiki Nodes)
         notes = session.query(NoteModel).filter(NoteModel.deleted_at.is_(None)).all()
-        
         for note in notes:
             node_id = note.title
-            
             try:
                 post = frontmatter.loads(note.content)
                 content = post.content if post.content else note.content
@@ -147,12 +146,40 @@ async def get_graph():
             matches = re.findall(r"\[\[(.*?)\]\]", content)
             for target in matches:
                 target_id = target.split("|")[0].strip()
-                links.append({"source": node_id, "target": target_id})
-                if target_id not in node_ids:
-                    nodes.append({"id": target_id, "group": "ghost", "tags": [], "summary": "N/A"})
-                    node_ids.add(target_id)
+                links.append({"source": node_id, "target": target_id, "label": "referencia"})
+
+        # 2. Fetch Structured Graph Nodes
+        graph_nodes = session.query(GraphNodeModel).all()
+        for gn in graph_nodes:
+            if gn.id not in node_ids:
+                nodes.append({
+                    "id": gn.id,
+                    "group": gn.type.lower() if gn.type else "concept",
+                    "tags": [gn.type] if gn.type else [],
+                    "summary": gn.description or ""
+                })
+                node_ids.add(gn.id)
+
+        # 3. Fetch Structured Graph Edges
+        graph_edges = session.query(GraphEdgeModel).all()
+        for ge in graph_edges:
+            links.append({
+                "source": ge.source_id,
+                "target": ge.target_id,
+                "label": ge.relation
+            })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        pass
     finally:
         session.close()
-                        
-    return {"nodes": nodes, "links": links}
 
+    # Filtramos links que apuntan a nodos que no existen
+    valid_links = []
+    for link in links:
+        if link["source"] in node_ids and link["target"] in node_ids:
+            valid_links.append(link)
+
+    return {"nodes": nodes, "links": valid_links}

@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.sql import text
 
-from backend.storage.models import Base, NoteModel, TodoModel, ThreadModel, MessageModel
+from backend.storage.models import Base, NoteModel, TodoModel, ThreadModel, MessageModel, GraphNodeModel, GraphEdgeModel
 
 
 class PostgresStore:

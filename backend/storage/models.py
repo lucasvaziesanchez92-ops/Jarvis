@@ -77,4 +77,33 @@ class MessageModel(Base):
 
     __table_args__ = (
         Index('ix_messages_thread_created', 'thread_id', 'created_at'),
+        {"extend_existing": True}
+    )
+
+
+class GraphNodeModel(Base):
+    __tablename__ = "graph_nodes"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(String, primary_key=True)
+    label = Column(String, nullable=False, index=True)
+    type = Column(String, default="Concept", index=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class GraphEdgeModel(Base):
+    __tablename__ = "graph_edges"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(String, primary_key=True)
+    source_id = Column(String, index=True)
+    target_id = Column(String, index=True)
+    relation = Column(String, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        Index('ix_graph_edges_source_target', 'source_id', 'target_id'),
+        {"extend_existing": True}
     )

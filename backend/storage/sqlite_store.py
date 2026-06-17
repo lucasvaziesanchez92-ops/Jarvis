@@ -9,7 +9,7 @@ from sqlalchemy.pool import QueuePool
 from sqlalchemy.sql import text
 
 from backend.config import settings
-from backend.storage.models import Base, NoteModel, TodoModel, ThreadModel, MessageModel
+from backend.storage.models import Base, NoteModel, TodoModel, ThreadModel, MessageModel, GraphNodeModel, GraphEdgeModel
 
 
 # -- SQLAlchemy engine with WAL mode --------------------------------
