@@ -9,12 +9,13 @@ except ImportError:
 _TRIVIAL = {"hola", "chau", "gracias", "dale", "ok", "si", "no", "bien", "bueno", "buenas", "gracias!", "perfecto"}
 _TRIGGERS = ("qué", "quien", "cómo", "cuándo", "dónde", "por qué", "cuál", "?"
              "explica", "describe", "investiga", "busca", "recorda", "recuerdo",
-             "sabes", "conoces", "tenés", "tienes", "wiki", "nota", "proyecto")
+             "sabes", "conoces", "tenés", "tienes", "wiki", "nota", "proyecto",
+             "nombre", "llamo")
 
 
 def _should_retrieve(query: str) -> bool:
     q = query.lower().strip().rstrip("?!.")
-    if len(q) < 10 or q in _TRIVIAL:
+    if len(q) < 5 or q in _TRIVIAL: # Reduced from 10 to 5 for short queries like "mi nombre"
         return False
     return any(t in q for t in _TRIGGERS)
 
