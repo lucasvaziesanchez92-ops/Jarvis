@@ -214,8 +214,6 @@ async def google_not_configured_handler(request: Request, exc: GoogleNotConfigur
 async def health():
     """Basic health check."""
     import os
-os.environ['HF_HOME'] = os.path.join(os.getcwd(), 'data', 'hf_cache')
-os.environ['XDG_CACHE_HOME'] = os.path.join(os.getcwd(), 'data', 'xdg_cache')
     import psutil
     proc = psutil.Process(os.getpid())
     mem = proc.memory_info()
