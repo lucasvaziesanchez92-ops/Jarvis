@@ -7,10 +7,10 @@ except ImportError:
     semantic_search = None
 
 _TRIVIAL = {"hola", "chau", "gracias", "dale", "ok", "si", "no", "bien", "bueno", "buenas", "gracias!", "perfecto"}
-_TRIGGERS = ("qué", "quien", "cómo", "cuándo", "dónde", "por qué", "cuál", "?"
+_TRIGGERS = ("qué", "quien", "quién", "cómo", "cuándo", "dónde", "por qué", "cuál", "?"
              "explica", "describe", "investiga", "busca", "recorda", "recuerdo",
              "sabes", "conoces", "tenés", "tienes", "wiki", "nota", "proyecto",
-             "nombre", "llamo")
+             "nombre", "llamo", "llamas", "acuerdas", "recuerdas")
 
 
 def _should_retrieve(query: str) -> bool:
