@@ -241,9 +241,10 @@ async def readiness_check():
     # Check database
     try:
         from backend.storage import get_store
+        from sqlalchemy import text
         store = get_store()
         session = store.get_session()
-        session.execute("SELECT 1")
+        session.execute(text("SELECT 1"))
         session.close()
         checks["database"] = "healthy"
     except Exception as e:
