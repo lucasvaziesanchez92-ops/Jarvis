@@ -195,10 +195,10 @@ def _extract_image_with_groq_vision(data: bytes, filename: str) -> str:
         return f"[Error procesando imagen {filename} con Gemini: {e}]"
 
 def _extract_image_placeholder(filename: str) -> str:
-    """Fallback when Groq Vision is not available."""
+    """Fallback when Gemini Vision is not available."""
     return (
         f"[🖼️ Archivo de imagen: {filename}. "
-        f"Análisis visual no disponible (GROQ_API_KEY no configurada). "
+        f"Análisis visual no disponible (La variable GEMINI_API_KEY no está configurada en el servidor). "
         f"Si necesitás analizar esta imagen, describime qué contiene y te ayudo.]"
     )
 
