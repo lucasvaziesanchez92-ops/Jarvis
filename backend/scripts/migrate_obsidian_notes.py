@@ -9,7 +9,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from backend.storage.sqlite_store import get_store, NoteModel
+from backend.storage import get_store
+from backend.storage.models import NoteModel
 
 
 def extract_frontmatter(content: str) -> tuple[dict, str]:

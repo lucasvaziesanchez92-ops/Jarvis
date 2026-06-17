@@ -6,7 +6,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from datetime import datetime, timedelta
-from backend.storage.sqlite_store import get_store, NoteModel, TodoModel, ThreadModel, MessageModel
+from backend.storage import get_store
+from backend.storage.models import NoteModel, TodoModel, ThreadModel, MessageModel
 
 
 def seed_data():

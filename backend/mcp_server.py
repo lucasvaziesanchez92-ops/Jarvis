@@ -166,7 +166,7 @@ def unified_search(query: str, types: str = "all", limit: int = 20) -> dict:
     types: comma-separated list ('notes,todos,calendar,emails') or 'all'
     Returns {query, results: [{type, id, title, content, metadata}, ...], total}
     """
-    from backend.storage.sqlite_store import get_store
+    from backend.storage import get_store
     from sqlalchemy import or_
 
     store = get_store()
@@ -176,7 +176,7 @@ def unified_search(query: str, types: str = "all", limit: int = 20) -> dict:
 
     try:
         if "notes" in type_list:
-            from backend.storage.sqlite_store import NoteModel
+            from backend.storage.models import NoteModel
             notes = session.query(NoteModel).filter(
                 or_(NoteModel.title.ilike(f"%{query}%"), NoteModel.content.ilike(f"%{query}%"))
             ).limit(limit).all()
@@ -184,13 +184,13 @@ def unified_search(query: str, types: str = "all", limit: int = 20) -> dict:
                 results.append({"type": "note", "id": n.id, "title": n.title, "content": n.content[:200], "metadata": {"tags": n.tags}})
 
         if "todos" in type_list:
-            from backend.storage.sqlite_store import TodoModel
+            from backend.storage.models import TodoModel
             todos = session.query(TodoModel).filter(TodoModel.text.ilike(f"%{query}%")).limit(limit).all()
             for t in todos:
                 results.append({"type": "todo", "id": t.id, "title": t.text, "content": f"Priority: {t.priority}, Completed: {t.completed}", "metadata": {}})
 
         if "emails" in type_list:
-            from backend.storage.sqlite_store import ThreadModel
+            from backend.storage.models import ThreadModel
             threads = session.query(ThreadModel).filter(ThreadModel.title.ilike(f"%{query}%")).limit(limit).all()
             for th in threads:
                 results.append({"type": "thread", "id": th.id, "title": th.title or "Untitled", "content": th.meta[:200] if th.meta else "", "metadata": {"status": th.status}})
@@ -330,7 +330,7 @@ def get_system_health() -> dict:
     """Get overall system health: database, LLM provider, and circuit breakers status."""
     checks = {}
     try:
-        from backend.storage.sqlite_store import get_store
+        from backend.storage import get_store
         store = get_store()
         session = store.get_session()
         session.execute("SELECT 1")

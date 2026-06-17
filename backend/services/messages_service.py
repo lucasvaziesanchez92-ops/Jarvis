@@ -5,7 +5,8 @@ from typing import List, Optional, Any
 from sqlalchemy.orm import Session
 
 from backend.models.message import Message
-from backend.storage.sqlite_store import get_store, MessageModel
+from backend.storage import get_store
+from backend.storage.models import MessageModel
 
 
 def create_message(

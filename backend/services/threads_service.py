@@ -6,7 +6,8 @@ from typing import Literal, List, Optional
 from sqlalchemy.orm import Session
 
 from backend.models.thread import Thread
-from backend.storage.sqlite_store import get_store, ThreadModel
+from backend.storage import get_store
+from backend.storage.models import ThreadModel
 
 
 def create_thread(title: str | None = None, metadata: dict | None = None) -> dict:

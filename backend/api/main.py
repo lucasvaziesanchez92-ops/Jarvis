@@ -238,7 +238,7 @@ async def readiness_check():
 
     # Check database
     try:
-        from backend.storage.sqlite_store import get_store
+        from backend.storage import get_store
         store = get_store()
         session = store.get_session()
         session.execute("SELECT 1")

@@ -131,7 +131,7 @@ async def ws_chat(websocket: WebSocket):
 
             # Try to add user name to context
             try:
-                from backend.storage.sqlite_store import get_store
+                from backend.storage import get_store
                 from backend.storage.models import UserModel
                 store = get_store()
                 session = store.get_session()

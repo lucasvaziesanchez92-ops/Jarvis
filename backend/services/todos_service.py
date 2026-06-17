@@ -5,7 +5,8 @@ from typing import Literal, List
 from sqlalchemy.orm import Session
 
 from backend.models.todo import Todo
-from backend.storage.sqlite_store import get_store, TodoModel
+from backend.storage import get_store
+from backend.storage.models import TodoModel
 
 
 def create_todo(text: str, priority: Literal["low", "medium", "high"] = "medium", due_date: str | None = None) -> dict:

@@ -58,7 +58,7 @@ async def google_callback(code: str = Query(...), state: str = Query(None), requ
     
     # Save user to SQLite DB (Phase 1 Cognitive Architecture)
     try:
-        from backend.storage.sqlite_store import get_store
+        from backend.storage import get_store
         from backend.storage.models import UserModel
         
         store = get_store()

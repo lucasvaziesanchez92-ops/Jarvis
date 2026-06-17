@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from backend.storage.sqlite_store import get_store
+from backend.storage import get_store
 from sqlalchemy import or_
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -64,7 +64,7 @@ async def unified_search(
     try:
         # Search Notes
         if "notes" in type_list:
-            from backend.storage.sqlite_store import NoteModel
+            from backend.storage.models import NoteModel
             notes = session.query(NoteModel).filter(
                 or_(
                     NoteModel.title.ilike(f"%{q}%"),
@@ -84,7 +84,7 @@ async def unified_search(
 
         # Search Todos
         if "todos" in type_list:
-            from backend.storage.sqlite_store import TodoModel
+            from backend.storage.models import TodoModel
             todos = session.query(TodoModel).filter(
                 TodoModel.text.ilike(f"%{q}%")
             ).limit(limit).all()
@@ -104,7 +104,7 @@ async def unified_search(
 
         # Search Threads (as proxy for messages)
         if "emails" in type_list:
-            from backend.storage.sqlite_store import ThreadModel, MessageModel
+            from backend.storage.models import ThreadModel, MessageModel
             threads = session.query(ThreadModel).filter(
                 ThreadModel.title.ilike(f"%{q}%")
             ).limit(limit).all()
