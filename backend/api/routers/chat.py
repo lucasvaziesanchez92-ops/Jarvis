@@ -68,6 +68,10 @@ class WebSocketCallback(BaseCallbackHandler):
             text = ""
         self._emit(type="tool_end", content=text[:200], tool_output=text[:500])
 
+    def on_tool_error(self, error: Exception, **kw):
+        err_msg = str(error)
+        self._emit(type="tool_end", content=f"Error: {err_msg[:200]}", tool_output=f"Error: {err_msg[:500]}")
+
 
 async def _keepalive(send_fn, connected_ref):
     while connected_ref[0]:
@@ -224,9 +228,9 @@ async def ws_chat(websocket: WebSocket):
                 final = ai_msgs[-1] if ai_msgs else None
 
                 if final and final.content:
-                    await send(StreamChunk(type="token", content=str(final.content)))
+                    await send(StreamChunk(type="stream", content=str(final.content)))
                 else:
-                    await send(StreamChunk(type="token", content="Listo."))
+                    await send(StreamChunk(type="stream", content="Listo."))
                 await send(StreamChunk(type="done"))
 
                 # Persist this turn's full message list into the
@@ -259,3 +263,20 @@ async def ws_chat(websocket: WebSocket):
         logger.error("WS fatal: {}", str(e))
     finally:
         connected[0] = False
+
+
+@router.get("/history/{session_id}")
+async def get_chat_history(session_id: str):
+    messages = _session_history.get(session_id, [])
+    # Convert LangChain messages to a simple dict format for the frontend if needed,
+    # or just return their text content.
+    # We will return just the text for AIMessages and HumanMessages
+    result = []
+    for m in messages:
+        if m.type in ("human", "ai"):
+            result.append({
+                "role": "user" if m.type == "human" else "assistant",
+                "content": m.content,
+                "tool_calls": getattr(m, "tool_calls", [])
+            })
+    return {"session_id": session_id, "messages": result}

@@ -447,7 +447,7 @@ export default function ChatModePanel() {
                 />
                 <button
                   onClick={sendMessage}
-                  disabled={(!input.trim() && attachments.length === 0) || uploading}
+                  disabled={(!input.trim() && attachments.length === 0) || uploading || status !== 'connected'}
                   className="flex items-center justify-center w-12 h-12 rounded-xl btn-cyan shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Enviar mensaje"
                 >
