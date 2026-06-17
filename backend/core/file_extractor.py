@@ -218,25 +218,22 @@ def build_file_context(file_keys: list[str], filenames: Optional[list[str]] = No
     if not file_keys:
         return ""
 
-    parts = ["=" * 60, "📎 CONTENIDO DE ARCHIVOS ADJUNTOS", "=" * 60]
+    parts = ["\n---\n**📎 CONTENIDO DE ARCHIVOS ADJUNTOS**\n---"]
 
     for i, key in enumerate(file_keys):
         filename = filenames[i] if filenames and i < len(filenames) else key.split("/")[-1]
-        parts.append(f"\n📄 Archivo #{i + 1}: {filename}\n{'─' * 40}")
+        parts.append(f"\n📄 **Archivo #{i + 1}**: {filename}")
         try:
             content = extract_text_from_file(key, filename)
             parts.append(content)
         except Exception as e:
             parts.append(f"[Error al procesar {filename}: {e}]")
 
-    parts.append("\n" + "=" * 60)
-    parts.append(
-        "📨 MENSAJE DEL USUARIO\n"
+    parts.append("\n---\n**📨 MENSAJE DEL USUARIO**\n"
         "(IMPORTANTE: Los archivos y su contenido ya fueron extraídos y analizados "
         "automáticamente en el bloque anterior. Responde basándote directamente en "
         "ese texto. NO llames a herramientas de Drive como analyze_drive_image o "
         "read_drive_file para estos archivos adjuntos, ya tienes toda su información.)"
-    )
-    parts.append("=" * 60)
+        "\n---")
 
     return "\n".join(parts)
