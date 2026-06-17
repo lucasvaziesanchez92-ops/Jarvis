@@ -1,5 +1,7 @@
 """Wiki Engine — ChromaDB indexing + RAG retrieval for Obsidian vault."""
 import os
+os.environ['HF_HOME'] = os.path.join(os.getcwd(), 'data', 'hf_cache')
+os.environ['XDG_CACHE_HOME'] = os.path.join(os.getcwd(), 'data', 'xdg_cache')
 import hashlib
 import re
 from datetime import datetime, timezone
