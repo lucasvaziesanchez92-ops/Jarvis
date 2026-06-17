@@ -263,7 +263,7 @@ async def ws_chat(websocket: WebSocket):
         connected[0] = False
 
 
-@router.get("/history/{session_id}")
+@router.get("/chat/history/{session_id}")
 async def get_chat_history(session_id: str):
     messages = _session_history.get(session_id, [])
     # Convert LangChain messages to a simple dict format for the frontend if needed,
