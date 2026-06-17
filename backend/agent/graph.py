@@ -260,10 +260,13 @@ def build_autonomous_graph(tools=None):
     builder.add_node("retrieval", retrieval_node)
     builder.add_node("agent", agent_node)
     builder.add_node("tools", tool_node)
+    builder.add_node("extractor", extract_knowledge)
+    
     builder.add_edge(START, "retrieval")
     builder.add_edge("retrieval", "agent")
-    builder.add_conditional_edges("agent", tools_condition, {"tools": "tools", "__end__": END})
+    builder.add_conditional_edges("agent", tools_condition, {"tools": "tools", "__end__": "extractor"})
     builder.add_edge("tools", "agent")
+    builder.add_edge("extractor", END)
 
     return builder.compile()
 

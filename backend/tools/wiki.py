@@ -25,17 +25,36 @@ def wiki_query(query: str) -> str:
 
 @tool
 def wiki_capture(title: str, content: str) -> str:
-    """Guarda un texto crudo o recorte en la carpeta _raw/ para su posterior procesamiento cognitivo."""
-    from backend.services.wiki_engine import get_stats
-    vault_path = get_stats()["vault"]
-    raw_dir = Path(vault_path) / "_raw"
-    raw_dir.mkdir(parents=True, exist_ok=True)
+    """Guarda información explícitamente en la Wiki para recordarlo permanentemente."""
+    from backend.storage import get_store
+    from backend.storage.models import NoteModel
+    import uuid
+    import datetime
 
-    safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip().replace(" ", "_")
-    source_path = raw_dir / f"{safe_title}.md"
-    source_path.write_text(f"---\ntitle: {title}\ntags: [raw]\n---\n\n{content}", encoding="utf-8")
-
-    return f"Conocimiento crudo '{title}' capturado en la carpeta _raw de tu segundo cerebro. El extractor lo procesará después."
+    store = get_store()
+    session = store.get_session()
+    
+    try:
+        title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
+        final_content = f"---\ntitle: {title}\ntags: [raw]\n---\n\n{content}"
+        
+        existing = session.query(NoteModel).filter_by(title=title, deleted_at=None).first()
+        if existing:
+            existing.content += "\n\n" + content
+        else:
+            new_note = NoteModel(
+                id=str(uuid.uuid4()),
+                title=title,
+                content=final_content
+            )
+            session.add(new_note)
+        session.commit()
+        return f"Registro '{title}' guardado permanentemente en la Wiki base de datos."
+    except Exception as e:
+        session.rollback()
+        return f"Error guardando en la Wiki: {e}"
+    finally:
+        session.close()
 
 
 @tool
