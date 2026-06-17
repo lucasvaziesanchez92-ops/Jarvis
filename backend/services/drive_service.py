@@ -45,6 +45,8 @@ def list_files(query: str = "", max_results: int = 50, folder_id: Optional[str] 
     q = "trashed = false"
     if folder_id:
         q += f" and '{folder_id}' in parents"
+    elif not query:
+        q += " and 'root' in parents"
     if query:
         # Escape single quotes in user input
         safe = query.replace("'", "\\'")

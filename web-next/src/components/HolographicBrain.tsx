@@ -77,6 +77,7 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
     const g = rawGeometry.clone();
     g.center();
     g.computeVertexNormals();
+    g.scale(0.6, 0.6, 0.6);
     const pos = g.attributes.position as THREE.BufferAttribute;
     const box = new THREE.Box3().setFromBufferAttribute(pos);
     const size = box.getSize(new THREE.Vector3());
