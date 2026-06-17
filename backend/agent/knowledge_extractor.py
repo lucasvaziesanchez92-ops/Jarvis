@@ -79,23 +79,46 @@ JSON Format:
 
     llm = get_llm()
     try:
-        response = llm.invoke([HumanMessage(content=prompt)], config={"callbacks": []})
+        import asyncio
+        from requests.exceptions import Timeout
+        
+        try:
+            response = llm.invoke([HumanMessage(content=prompt)], config={"callbacks": []})
+        except Exception as e:
+            logger.error(f"LLM extraction timeout/error: {e}")
+            return {}
+            
         import json
         import re
         
         content = response.content
         logger.debug(f"LLM extraction output: {content}")
         
+        notes = []
         json_match = re.search(r'\[\s*\{.*?\}\s*\]', content, re.DOTALL)
         if json_match:
             try:
                 notes = json.loads(json_match.group(0), strict=False)
             except json.JSONDecodeError:
                 cleaned = json_match.group(0).replace('\n', '\\n').replace('\r', '')
-                notes = json.loads(cleaned, strict=False)
+                try:
+                    notes = json.loads(cleaned, strict=False)
+                except:
+                    logger.error("Failed to parse cleaned JSON array.")
         else:
-            notes = json.loads(content.strip(), strict=False)
-        
+            try:
+                # Try to find just a single object
+                obj_match = re.search(r'\{\s*".*?\s*\}', content, re.DOTALL)
+                if obj_match:
+                    notes = [json.loads(obj_match.group(0), strict=False)]
+                else:
+                    logger.error("No JSON found in extraction.")
+            except:
+                pass
+                
+        if not isinstance(notes, list):
+            notes = [notes] if isinstance(notes, dict) else []
+            
         from backend.storage import get_store
         from backend.storage.models import NoteModel
         import uuid
@@ -105,6 +128,11 @@ JSON Format:
         
         try:
             for note in notes:
+                if not isinstance(note, dict):
+                    continue
+                if "filepath" not in note or "content" not in note:
+                    continue
+                    
                 # Use filepath as title, dropping the .md extension
                 title = os.path.splitext(note["filepath"])[0]
                 action = note.get("action", "create")
