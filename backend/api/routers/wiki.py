@@ -64,13 +64,26 @@ async def get_files():
     session = store.get_session()
     files = []
     try:
-        notes = session.query(NoteModel).filter(NoteModel.deleted_at.is_(None)).all()
+        try:
+            notes = session.query(NoteModel).filter(NoteModel.deleted_at.is_(None)).all()
+        except Exception:
+            session.rollback()
+            notes = session.query(NoteModel).all()
+            
         for note in notes:
-            files.append({
-                "name": note.title + ".md",
-                "path": note.title + ".md",
-                "directory": "brain"
-            })
+            # Solo incluir notas que parecen archivos wiki (que tienen un directorio en el título)
+            if "/" in note.title:
+                files.append({
+                    "name": note.title.split("/")[-1] + ".md",
+                    "path": note.title + ".md",
+                    "directory": note.title.split("/")[0]
+                })
+            else:
+                files.append({
+                    "name": note.title + ".md",
+                    "path": note.title + ".md",
+                    "directory": "brain"
+                })
     finally:
         session.close()
     return {"files": files}

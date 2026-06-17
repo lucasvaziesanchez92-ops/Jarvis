@@ -50,17 +50,18 @@ def list_notes(tag: str | None = None) -> List[dict]:
     session: Session = store.get_session()
     try:
         query = session.query(NoteModel)
+        # Exclude notes that belong to the Wiki (titles with slashes like projects/TechNova)
+        notes_models = [nm for nm in query.all() if "/" not in nm.title]
+        
         if tag:
             # Filter notes that contain the tag in their tags list
-            notes_models = query.all()
             filtered_notes = []
             for nm in notes_models:
                 tags_list = json.loads(nm.tags)
                 if tag in tags_list:
                     filtered_notes.append(nm)
             notes_models = filtered_notes
-        else:
-            notes_models = query.all()
+            
         notes = []
         for nm in notes_models:
             note = Note(
