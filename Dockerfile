@@ -21,15 +21,9 @@ COPY backend/ ./backend/
 COPY main.py knowledge_engine.py librarian.py sync_service.py alembic.ini ./
 COPY web-next/public/models/brain.stl ./data/
 
-# ---- Non-root user --------------------------------------------------------
-RUN addgroup --system app && adduser --system --group app
-
 # ---- Directories ----------------------------------------------------------
 RUN mkdir -p /app/data/logs /app/data/voices /app/data/chroma_wiki \
-             /app/data/chroma_db /app/data/sources /app/data/checkpoints \
-    && chown -R app:app /app
-
-USER app
+             /app/data/chroma_db /app/data/sources /app/data/checkpoints
 
 EXPOSE 8000
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import dynamic from 'next/dynamic';
-import { Network, FileText, Folder, File, Search, Database, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
+import { Network, FileText, Folder, File, Search, Database, RefreshCw, Loader2, AlertCircle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 // Dynamic import with SSR false to prevent "window is not defined" error in Next.js
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
@@ -19,6 +19,7 @@ export default function WikiPanel() {
   const [fileContent, setFileContent] = useState<string>('');
   const [viewMode, setViewMode] = useState<'text' | 'graph'>('text');
   const [search, setSearch] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   
   const [stats, setStats] = useState<{ chunks: number; vault: string } | null>(null);
   const [reindexing, setReindexing] = useState(false);
@@ -106,6 +107,14 @@ export default function WikiPanel() {
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
         <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="px-2 py-1.5 rounded text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+            title={sidebarOpen ? "Ocultar panel lateral" : "Mostrar panel lateral"}
+          >
+            {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+          </button>
+          <div className="w-px h-4 bg-white/10 mx-1"></div>
           <button 
             onClick={() => setViewMode('text')}
             className={`px-3 py-1.5 rounded flex items-center gap-2 text-xs font-medium transition-colors ${viewMode === 'text' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/60 hover:text-white'}`}
@@ -137,7 +146,7 @@ export default function WikiPanel() {
       <div className="flex-1 flex overflow-hidden">
         
         {/* Sidebar */}
-        <div className="w-64 border-r border-white/5 flex flex-col bg-black/20">
+        <div className={`border-r border-white/5 flex flex-col bg-black/20 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-0 border-r-0 overflow-hidden opacity-0'}`}>
           <div className="p-3 border-b border-white/5 relative">
             <Search className="w-4 h-4 absolute left-6 top-6 text-white/40" />
             <input 
@@ -179,7 +188,34 @@ export default function WikiPanel() {
           {viewMode === 'text' ? (
             <div className="h-full overflow-y-auto p-8 lg:p-12 prose prose-invert prose-emerald max-w-4xl mx-auto">
               {selectedFile ? (
-                <ReactMarkdown>{fileContent || '*Cargando...*'}</ReactMarkdown>
+                <ReactMarkdown
+                  components={{
+                    a: ({ node, href, children, ...props }) => {
+                      if (href?.startsWith('wikilink:')) {
+                        const target = href.replace('wikilink:', '');
+                        return (
+                          <button
+                            onClick={() => {
+                              const targetFile = files.find(f => f.name === `${target}.md` || f.path === `${target}.md`);
+                              if (targetFile) {
+                                setSelectedFile(targetFile.path);
+                                setViewMode('text');
+                              } else {
+                                alert(`La nota "${target}" aún no existe en tu wiki.`);
+                              }
+                            }}
+                            className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 font-medium bg-cyan-400/10 px-1 rounded transition-colors"
+                          >
+                            {children}
+                          </button>
+                        );
+                      }
+                      return <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline" {...props}>{children}</a>;
+                    }
+                  }}
+                >
+                  {(fileContent || '*Cargando...*').replace(/\[\[(.*?)\]\]/g, '[$1](wikilink:$1)')}
+                </ReactMarkdown>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-white/30 space-y-4">
                   <FileText className="w-16 h-16 opacity-20" />

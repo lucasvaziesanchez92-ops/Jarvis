@@ -126,35 +126,42 @@ function ensureConnection() {
 
       if (data.type === 'token' && data.content) {
         useJarvisStore.setState(s => {
-          const last = s.chatMessages[s.chatMessages.length - 1];
+          const msgs = s.chatMessages;
+          const last = msgs[msgs.length - 1];
           if (last && last.role === 'assistant' && last.isStreaming) {
-            const updated = { ...last, content: data.content };
-            return { chatMessages: [...s.chatMessages.slice(0, -1), updated] };
+            // If it's already streaming, ignore the token
+            return s;
           }
+          // Create a new status message
           const newStatus: ChatMessage = { id: makeId(), role: 'assistant', content: `▸ ${data.content}`, isStreaming: true };
-          return { chatMessages: [...s.chatMessages, newStatus] };
+          return { chatMessages: [...msgs, newStatus] };
         });
-        const store = useJarvisStore.getState();
-        store.setActivityState('thinking');
+        useJarvisStore.getState().setActivityState('thinking');
       }
 
       if (data.type === 'stream' && data.content) {
         useJarvisStore.setState(s => {
-          const last = s.chatMessages[s.chatMessages.length - 1];
-          let baseMsgs = s.chatMessages;
-          if (last && last.content?.startsWith('▸ ') && last.isStreaming) {
-            baseMsgs = s.chatMessages.slice(0, -1);
+          const msgs = s.chatMessages;
+          const last = msgs[msgs.length - 1];
+          
+          if (!last || last.role !== 'assistant' || !last.isStreaming) {
+            // Create new message if no streaming assistant message exists
+            const newMsg: ChatMessage = { id: makeId(), role: 'assistant', content: data.content, isStreaming: true };
+            return { chatMessages: [...msgs, newMsg] };
           }
-          const realLast = baseMsgs[baseMsgs.length - 1];
-          if (realLast && realLast.isStreaming && realLast.role === 'assistant') {
-            const updated = { ...realLast, content: realLast.content + data.content };
-            return { chatMessages: [...baseMsgs.slice(0, -1), updated] };
+          
+          // If the last message is a status message (▸ Pensando...), replace it entirely
+          if (last.content.startsWith('▸ ')) {
+            const updated = { ...last, content: data.content };
+            return { chatMessages: [...msgs.slice(0, -1), updated] };
           }
-          const newMsg: ChatMessage = { id: makeId(), role: 'assistant', content: data.content, isStreaming: true };
-          return { chatMessages: [...baseMsgs, newMsg] };
+          
+          // Otherwise, append to existing message
+          const updated = { ...last, content: last.content + data.content };
+          return { chatMessages: [...msgs.slice(0, -1), updated] };
         });
-        const store = useJarvisStore.getState();
-        store.setLastAssistantText(store.chatMessages[store.chatMessages.length - 1]?.content || '');
+        const currentStore = useJarvisStore.getState();
+        currentStore.setLastAssistantText(currentStore.chatMessages[currentStore.chatMessages.length - 1]?.content || '');
       }
 
       if (data.type === 'tool_start') {

@@ -63,6 +63,7 @@ groq==1.0.0
 python-dotenv==1.0.1
 psutil==6.1.0
 tiktoken==0.8.0
+beautifulsoup4==4.12.3
 
 # --- File Text Extraction ---------------------------------------------------
 pypdf==5.1.0
