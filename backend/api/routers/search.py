@@ -145,9 +145,8 @@ async def semantic_search_endpoint(
     Searches notes and wiki using natural language queries.
     """
     try:
-        from backend.service.vector_service import semantic_search
-        source_filter = source if source in ("notes", "wiki") else None
-        raw_results = semantic_search(q, top_k=top_k, source_filter=source_filter)
+        from backend.services.wiki_engine import search_vault
+        raw_results = search_vault(q, n_results=top_k)
     except ImportError:
         raw_results = []
 
@@ -174,7 +173,7 @@ async def semantic_search_endpoint(
 async def knowledge_stats():
     """Get statistics about the semantic knowledge index."""
     try:
-        from backend.service.vector_service import get_index_stats
-        return get_index_stats()
+        from backend.services.wiki_engine import get_stats
+        return get_stats()
     except ImportError:
         return {"status": "unavailable", "reason": "ChromaDB not installed"}

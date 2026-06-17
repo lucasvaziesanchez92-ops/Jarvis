@@ -163,6 +163,14 @@ JSON Format:
         finally:
             session.close()
             
+        # Re-index the vector DB so the new memory is immediately searchable
+        try:
+            from backend.services.wiki_engine import index_vault
+            index_vault()
+            logger.info("Triggered wiki re-index after knowledge extraction.")
+        except Exception as e:
+            logger.error(f"Failed to re-index wiki: {e}")
+            
     except Exception as e:
         logger.error(f"Failed to extract knowledge: {e}")
 

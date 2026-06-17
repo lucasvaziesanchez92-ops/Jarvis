@@ -325,10 +325,27 @@ export default function ChatModePanel() {
                     <ReactMarkdown 
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2" />
+                        a: ({node, href, children, ...props}) => {
+                          if (href?.startsWith('#wikilink:')) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  alert(`Busca "${decodeURIComponent(href.replace('#wikilink:', ''))}" en el panel de Wiki para ver esta nota.`);
+                                }}
+                                className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 bg-cyan-400/10 px-1 rounded"
+                              >
+                                {children}
+                              </button>
+                            );
+                          }
+                          return <a href={href} {...props} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2" />;
+                        }
                       }}
                     >
-                      {msg.content.replace(/<thought>[\s\S]*?<\/thought>/g, '')}
+                      {msg.content.replace(/<thought>[\s\S]*?<\/thought>/g, '').replace(/\[\[(.*?)\]\]/g, (match, p1) => `[${p1}](#wikilink:${encodeURIComponent(p1)})`)}
                     </ReactMarkdown>
                   ) : (
                     msg.content

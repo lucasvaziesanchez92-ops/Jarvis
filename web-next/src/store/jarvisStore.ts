@@ -409,6 +409,7 @@ export const useJarvisStore = create<JarvisStore>()(
     panelExpanded: state.panelExpanded,
     persona: state.persona,
     chatSessionId: state.chatSessionId,
+    chatMessages: state.chatMessages,
     voiceEnabled: state.voiceEnabled,
     brainMode: state.brainMode,
     // brainRenderer NO se persiste — siempre arranca en '3d' (HolographicBrain)

@@ -35,12 +35,10 @@ def _prune_history(messages: list, max_msgs: int) -> list:
             return messages[i:]
     return messages[-max_msgs:]
 
-# Railway free tier proxy window = 30s. Cap the graph at 22s; fallback
-# to plain LLM (no tools) if the agent times out. Keeping this low
-# because the user sees a fast fallback message instead of staring at
-# "Pensando..." for a minute.
-_GRAPH_TIMEOUT = 55
-_PLAIN_TIMEOUT = 30
+# Railway WebSocket can stay open indefinitely if there's keepalive.
+# We increase the graph timeout so JARVIS can execute complex plans.
+_GRAPH_TIMEOUT = 300
+_PLAIN_TIMEOUT = 60
 
 
 class WebSocketCallback(BaseCallbackHandler):

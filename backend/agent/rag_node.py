@@ -2,22 +2,17 @@
 from backend.agent.state import JarvisState
 
 try:
-    from backend.service.vector_service import semantic_search
+    from backend.services.wiki_engine import search_vault as semantic_search
 except ImportError:
     semantic_search = None
 
 _TRIVIAL = {"hola", "chau", "gracias", "dale", "ok", "si", "no", "bien", "bueno", "buenas", "gracias!", "perfecto"}
-_TRIGGERS = ("qué", "quien", "quién", "cómo", "cuándo", "dónde", "por qué", "cuál", "?"
-             "explica", "describe", "investiga", "busca", "recorda", "recuerdo",
-             "sabes", "conoces", "tenés", "tienes", "wiki", "nota", "proyecto",
-             "nombre", "llamo", "llamas", "acuerdas", "recuerdas")
-
 
 def _should_retrieve(query: str) -> bool:
     q = query.lower().strip().rstrip("?!.")
-    if len(q) < 5 or q in _TRIVIAL: # Reduced from 10 to 5 for short queries like "mi nombre"
+    if len(q) < 5 or q in _TRIVIAL:
         return False
-    return any(t in q for t in _TRIGGERS)
+    return True
 
 
 def _build_context_string(results: list[dict], source_label: str) -> str:
@@ -44,7 +39,7 @@ def retrieval_node(state: JarvisState) -> dict:
         return {"retrieved_context": []}
 
     try:
-        results = semantic_search(last_msg, top_k=3, source_filter=None)
+        results = semantic_search(last_msg, n_results=3)
     except Exception:
         return {"retrieved_context": []}
 
@@ -63,6 +58,29 @@ def retrieval_node(state: JarvisState) -> dict:
     if by_source.get("wiki"):
         short = by_source["wiki"][:2]
         parts.append(_build_context_string(short, "SEGUNDO CEREBRO"))
+
+    try:
+        from backend.services.todos_service import list_todos
+        active_todos = list_todos(show_completed=False)
+        if active_todos:
+            lines = ["\n## TAREAS PENDIENTES\n"]
+            for t in active_todos[:5]:
+                due = f" (Vence: {t.get('due_date')})" if t.get('due_date') else ""
+                lines.append(f"- [{t.get('priority', 'medium')}] {t.get('text')}{due}")
+            parts.append("\n".join(lines))
+    except Exception:
+        pass
+
+    try:
+        from backend.services.calendar_service import list_events
+        upcoming = list_events(max_results=3)
+        if upcoming:
+            lines = ["\n## PRÓXIMOS EVENTOS (CALENDARIO)\n"]
+            for e in upcoming:
+                lines.append(f"- {e.get('start')} -> {e.get('end')} | {e.get('summary')}")
+            parts.append("\n".join(lines))
+    except Exception:
+        pass
 
     full = "\n---\n".join(parts) if parts else ""
     return {"retrieved_context": [full] if full else []}
