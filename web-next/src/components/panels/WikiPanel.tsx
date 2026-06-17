@@ -192,10 +192,12 @@ export default function WikiPanel() {
                   components={{
                     a: ({ node, href, children, ...props }) => {
                       if (href?.startsWith('wikilink:')) {
-                        const target = href.replace('wikilink:', '');
+                        const target = decodeURIComponent(href.replace('wikilink:', ''));
                         return (
                           <button
-                            onClick={() => {
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
                               const targetFile = files.find(f => f.name === `${target}.md` || f.path === `${target}.md`);
                               if (targetFile) {
                                 setSelectedFile(targetFile.path);
@@ -214,7 +216,7 @@ export default function WikiPanel() {
                     }
                   }}
                 >
-                  {(fileContent || '*Cargando...*').replace(/\[\[(.*?)\]\]/g, '[$1](wikilink:$1)')}
+                  {(fileContent || '*Cargando...*').replace(/\[\[(.*?)\]\]/g, (match, p1) => `[${p1}](wikilink:${encodeURIComponent(p1)})`)}
                 </ReactMarkdown>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-white/30 space-y-4">
