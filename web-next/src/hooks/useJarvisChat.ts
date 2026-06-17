@@ -262,9 +262,8 @@ export function useJarvisChat() {
     return () => {
       refCount--;
       listeners = listeners.filter(l => l !== listener);
-      if (refCount <= 0) {
-        teardownConnection();
-      }
+      // We explicitly DO NOT call teardownConnection() here so the 
+      // WebSocket stays alive in the background when switching tabs (e.g. to Wiki)
     };
   }, [settings.apiUrl]);
 
