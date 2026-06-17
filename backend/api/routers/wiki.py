@@ -72,16 +72,17 @@ async def get_files():
             
         for note in notes:
             # Solo incluir notas que parecen archivos wiki (que tienen un directorio en el título)
-            if "/" in note.title:
+            if note.title and "/" in note.title:
                 files.append({
                     "name": note.title.split("/")[-1] + ".md",
                     "path": note.title + ".md",
                     "directory": note.title.split("/")[0]
                 })
             else:
+                title_val = note.title if note.title else "Untitled"
                 files.append({
-                    "name": note.title + ".md",
-                    "path": note.title + ".md",
+                    "name": title_val + ".md",
+                    "path": title_val + ".md",
                     "directory": "brain"
                 })
     finally:

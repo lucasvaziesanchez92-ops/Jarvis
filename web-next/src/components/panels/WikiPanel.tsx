@@ -26,9 +26,17 @@ export default function WikiPanel() {
   const graphRef = useRef<any>(null);
 
   useEffect(() => {
-    fetchStats();
-    fetchFiles();
-    fetchGraph();
+    async function initWiki() {
+      try {
+        await fetch(`${API_BASE}/api/v1/wiki/lazy_load`);
+      } catch (e) {
+        console.error("Failed to lazy load wiki:", e);
+      }
+      fetchStats();
+      fetchFiles();
+      fetchGraph();
+    }
+    initWiki();
   }, []);
 
   async function fetchStats() {

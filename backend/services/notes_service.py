@@ -51,7 +51,7 @@ def list_notes(tag: str | None = None) -> List[dict]:
     try:
         query = session.query(NoteModel)
         # Exclude notes that belong to the Wiki (titles with slashes like projects/TechNova)
-        notes_models = [nm for nm in query.all() if "/" not in nm.title]
+        notes_models = [nm for nm in query.all() if nm.title and "/" not in nm.title]
         
         if tag:
             # Filter notes that contain the tag in their tags list
