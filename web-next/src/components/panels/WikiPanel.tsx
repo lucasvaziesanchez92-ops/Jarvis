@@ -191,13 +191,23 @@ export default function WikiPanel() {
                 <ReactMarkdown
                   components={{
                     a: ({ node, href, children, ...props }) => {
-                      if (href?.startsWith('wikilink:')) {
-                        const target = decodeURIComponent(href.replace('wikilink:', ''));
+                      if (!href) return <span className="text-gray-500">{children}</span>;
+                      
+                      const isInternal = href.startsWith('#wikilink:') || (!href.startsWith('http') && !href.startsWith('mailto:'));
+                      
+                      if (isInternal) {
+                        let target = decodeURIComponent(href);
+                        if (target.startsWith('#wikilink:')) {
+                          target = target.replace('#wikilink:', '');
+                        }
+                        target = target.replace('.md', '');
+                        
                         return (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
+                              e.stopPropagation();
                               const targetFile = files.find(f => f.name === `${target}.md` || f.path === `${target}.md`);
                               if (targetFile) {
                                 setSelectedFile(targetFile.path);
@@ -212,11 +222,12 @@ export default function WikiPanel() {
                           </button>
                         );
                       }
+                      
                       return <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline" {...props}>{children}</a>;
                     }
                   }}
                 >
-                  {(fileContent || '*Cargando...*').replace(/\[\[(.*?)\]\]/g, (match, p1) => `[${p1}](wikilink:${encodeURIComponent(p1)})`)}
+                  {(fileContent || '*Cargando...*').replace(/\[\[(.*?)\]\]/g, (match, p1) => `[${p1}](#wikilink:${encodeURIComponent(p1)})`)}
                 </ReactMarkdown>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-white/30 space-y-4">

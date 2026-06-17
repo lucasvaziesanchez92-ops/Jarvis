@@ -266,13 +266,33 @@ export function useJarvisChat() {
       listener.onBackendStatus('connected');
     }
 
+    // Attempt to sync history when we know the session ID
+    if (store.chatSessionId) {
+      fetch(`${settings.apiUrl}/api/v1/chat/history/${store.chatSessionId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && Array.isArray(data.messages)) {
+            // Merge or set messages here. To avoid duplicate IDs, 
+            // we overwrite if our current length is less than the backend's.
+            if (data.messages.length > store.chatMessages.length) {
+               store.setChatMessages(data.messages.map((m: any) => ({
+                 id: m.id || makeId(),
+                 role: m.role,
+                 content: m.content,
+                 isStreaming: false,
+                 toolCalls: m.tool_calls
+               })));
+            }
+          }
+        })
+        .catch(err => console.error("Error fetching history:", err));
+    }
+
     return () => {
       refCount--;
       listeners = listeners.filter(l => l !== listener);
-      // We explicitly DO NOT call teardownConnection() here so the 
-      // WebSocket stays alive in the background when switching tabs (e.g. to Wiki)
     };
-  }, [settings.apiUrl]);
+  }, [settings.apiUrl, store.chatSessionId]);
 
   const sendMessage = useCallback((text: string, attachments?: Array<{key: string; filename: string}>) => {
     const msg = text.trim();
