@@ -6,7 +6,7 @@ import json
 from langchain_core.tools import tool
 
 try:
-    from duckduckgo_search import DDGS
+    from duckduckgo_search import AsyncDDGS
     HAS_DDGS = True
 except ImportError:
     HAS_DDGS = False
@@ -32,14 +32,17 @@ def _wiki_fallback(query: str) -> str:
     except Exception as e:
         return f"Error crítico durante la búsqueda web: {str(e)}"
 
-def _run_sync_search(query: str) -> str:
+@tool
+async def web_search(query: str) -> str:
+    """Busca en internet usando un buscador real y extrae el contenido de las páginas web más relevantes.
+    Úsala SIEMPRE que el usuario te pida buscar algo en internet, información externa o reciente."""
     try:
         if not HAS_DDGS:
-            return _wiki_fallback(query)
+            return await asyncio.get_event_loop().run_in_executor(None, _wiki_fallback, query)
             
-        results = DDGS().text(query, max_results=3)
+        results = await AsyncDDGS().text(query, max_results=3)
         if not results:
-            return _wiki_fallback(query)
+            return await asyncio.get_event_loop().run_in_executor(None, _wiki_fallback, query)
             
         final_report = []
         for i, res in enumerate(results):
@@ -49,12 +52,6 @@ def _run_sync_search(query: str) -> str:
             final_report.append(f"### Fuente {i+1}: {title} ({href})\n\n{body}")
             
         return "\n\n---\n\n".join(final_report)
-    except Exception as e:
+    except Exception:
         # DDGS blocked or errored -> use Wiki fallback
-        return _wiki_fallback(query)
-
-@tool
-async def web_search(query: str) -> str:
-    """Busca en internet usando un buscador real y extrae el contenido de las páginas web más relevantes.
-    Úsala SIEMPRE que el usuario te pida buscar algo en internet, información externa o reciente."""
-    return await asyncio.get_event_loop().run_in_executor(None, _run_sync_search, query)
+        return await asyncio.get_event_loop().run_in_executor(None, _wiki_fallback, query)
