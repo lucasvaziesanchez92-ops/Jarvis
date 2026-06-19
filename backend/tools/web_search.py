@@ -1,61 +1,52 @@
-"""Web Agent PRO — Búsqueda y extracción real (Zero-Cost)."""
+"""Web Agent PRO — Búsqueda y extracción real usando duckduckgo-search y Wikipedia."""
 import asyncio
 import urllib.request
 import urllib.parse
-from bs4 import BeautifulSoup
+import json
+from duckduckgo_search import DDGS
 from langchain_core.tools import tool
 
-def _run_sync_search(query: str) -> str:
-    def clean_html(html_content: bytes) -> str:
-        soup = BeautifulSoup(html_content, "html.parser")
-        for s in soup(["script", "style", "nav", "footer", "header", "aside"]):
-            s.decompose()
-        text = soup.get_text(separator="\n")
-        lines = [line.strip() for line in text.splitlines() if len(line.strip()) > 30]
-        return "\n".join(lines[:50])
-
+def _wiki_fallback(query: str) -> str:
     try:
-        url = "https://lite.duckduckgo.com/lite/"
-        data = urllib.parse.urlencode({"q": query}).encode("utf-8")
-        req = urllib.request.Request(
-            url, 
-            data=data, 
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
-            html = response.read()
-            
-        soup = BeautifulSoup(html, "html.parser")
-        results = soup.select("a.result-url")
+        url = "https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=" + urllib.parse.quote(query) + "&utf8=&format=json"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/2.0 (Bot)'})
+        with urllib.request.urlopen(req, timeout=10) as res:
+            data = json.loads(res.read())
         
-        urls = []
-        for r in results:
-            href = r.get("href")
-            if href and href.startswith("http"):
-                urls.append(href)
-            if len(urls) >= 3:
-                break
-                
-        if not urls:
-            return f"No se encontraron resultados externos para '{query}'."
+        results = data.get('query', {}).get('search', [])
+        if not results:
+            return f"No se encontraron resultados externos para '{query}' en la web ni en Wikipedia."
             
         final_report = []
-        for i, u in enumerate(urls):
-            try:
-                req_page = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-                with urllib.request.urlopen(req_page, timeout=10) as res:
-                    page_html = res.read()
-                content = clean_html(page_html)
-                final_report.append(f"### Fuente {i+1}: {u}\n\n{content}")
-            except Exception as e:
-                final_report.append(f"### Fuente {i+1}: {u}\n\nError al acceder: {str(e)}")
-                
+        for i, r in enumerate(results[:3]):
+            title = r.get("title", "Sin título")
+            snippet = r.get("snippet", "").replace("<span class=\"searchmatch\">", "**").replace("</span>", "**")
+            final_report.append(f"### Fuente {i+1} (Wikipedia): {title}\n\n{snippet}...")
+            
         return "\n\n---\n\n".join(final_report)
     except Exception as e:
-        return f"Error crítico durante la navegación: {str(e)}"
+        return f"Error crítico durante la búsqueda web: {str(e)}"
+
+def _run_sync_search(query: str) -> str:
+    try:
+        results = DDGS().text(query, max_results=3)
+        if not results:
+            return _wiki_fallback(query)
+            
+        final_report = []
+        for i, res in enumerate(results):
+            title = res.get("title", "Sin Título")
+            href = res.get("href", "")
+            body = res.get("body", "Sin extracto")
+            final_report.append(f"### Fuente {i+1}: {title} ({href})\n\n{body}")
+            
+        return "\n\n---\n\n".join(final_report)
+    except Exception as e:
+        # DDGS blocked or errored -> use Wiki fallback
+        return _wiki_fallback(query)
 
 @tool
 async def web_search(query: str) -> str:
-    """Busca en internet y extrae el contenido de las páginas web más relevantes.
-    Úsala para investigación profunda sin APIs externas."""
+    """Busca en internet usando un buscador real y extrae el contenido de las páginas web más relevantes.
+    Úsala SIEMPRE que el usuario te pida buscar algo en internet, información externa o reciente."""
     return await asyncio.get_event_loop().run_in_executor(None, _run_sync_search, query)
