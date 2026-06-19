@@ -3,8 +3,13 @@ import asyncio
 import urllib.request
 import urllib.parse
 import json
-from duckduckgo_search import DDGS
 from langchain_core.tools import tool
+
+try:
+    from duckduckgo_search import DDGS
+    HAS_DDGS = True
+except ImportError:
+    HAS_DDGS = False
 
 def _wiki_fallback(query: str) -> str:
     try:
@@ -29,6 +34,9 @@ def _wiki_fallback(query: str) -> str:
 
 def _run_sync_search(query: str) -> str:
     try:
+        if not HAS_DDGS:
+            return _wiki_fallback(query)
+            
         results = DDGS().text(query, max_results=3)
         if not results:
             return _wiki_fallback(query)
