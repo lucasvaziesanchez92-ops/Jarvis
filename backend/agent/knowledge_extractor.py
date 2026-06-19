@@ -188,13 +188,12 @@ JSON Format:
         finally:
             session.close()
             
-        # Re-index the vector DB so the new memory is immediately searchable
-        try:
-            from backend.services.wiki_engine import index_vault
-            index_vault()
-            logger.info("Triggered wiki re-index after knowledge extraction.")
-        except Exception as e:
-            logger.error(f"Failed to re-index wiki: {e}")
+        # [MODIFICACION PARA AHORRAR RAM]:
+        # Se ha deshabilitado el re-indexado automático (index_vault()) de vectores ChromaDB 
+        # para evitar crashes de memoria (OOM) en Railway de 512MB. 
+        # La tabla GraphNodes de PostgreSQL seguirá actualizándose y el RAG funcionará bien.
+        # El usuario deberá pulsar "Reindex" en la Wiki manualmente si quiere vectorizar textos.
+        logger.info("Hybrid extraction complete. Vector DB re-index skipped to save RAM.")
             
     except Exception as e:
         logger.error(f"Failed to extract knowledge: {e}")
