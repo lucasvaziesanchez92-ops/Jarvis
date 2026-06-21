@@ -251,7 +251,8 @@ async def ws_chat(websocket: WebSocket):
                     "message_preview": (message or "")[:200],
                 })
                 try:
-                    await send(StreamChunk(type="error", content=str(e)[:500]))
+                    await send(StreamChunk(type="stream", content=f"\n\n❌ **Error interno en el agente:** {str(e)[:500]}"))
+                    await send(StreamChunk(type="done"))
                 except Exception:
                     pass
 

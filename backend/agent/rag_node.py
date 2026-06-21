@@ -38,13 +38,11 @@ def retrieval_node(state: JarvisState) -> dict:
     if not last_msg.strip() or not _should_retrieve(last_msg):
         return {"retrieved_context": []}
 
+    results = []
     try:
         results = semantic_search(last_msg, n_results=3)
     except Exception:
-        return {"retrieved_context": []}
-
-    if not results:
-        return {"retrieved_context": []}
+        pass
 
     by_source: dict = {"notes": [], "wiki": []}
     for r in results:
