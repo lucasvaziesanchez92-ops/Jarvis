@@ -1,15 +1,10 @@
-"""Web Agent PRO — Búsqueda y extracción real usando duckduckgo-search y Wikipedia."""
+"""Web Agent PRO — Búsqueda y extracción real sin deadlocks."""
 import asyncio
 import urllib.request
 import urllib.parse
 import json
+import re
 from langchain_core.tools import tool
-
-try:
-    from duckduckgo_search import AsyncDDGS
-    HAS_DDGS = True
-except ImportError:
-    HAS_DDGS = False
 
 def _wiki_fallback(query: str) -> str:
     try:
@@ -32,26 +27,35 @@ def _wiki_fallback(query: str) -> str:
     except Exception as e:
         return f"Error crítico durante la búsqueda web: {str(e)}"
 
+def _ddg_html_scraper(query: str) -> str:
+    """Scrapes DDG HTML lite directly using urllib to avoid curl_cffi deadlocks."""
+    try:
+        url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(query)
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as res:
+            html = res.read().decode('utf-8', errors='ignore')
+            
+        # Parse result snippets
+        results = []
+        snippets = re.findall(r'<a class="result__snippet[^>]*>(.*?)</a>', html, re.IGNORECASE | re.DOTALL)
+        titles = re.findall(r'<h2 class="result__title">.*?<a[^>]*>(.*?)</a>', html, re.IGNORECASE | re.DOTALL)
+        
+        for i in range(min(3, len(snippets), len(titles))):
+            title = re.sub(r'<[^>]+>', '', titles[i]).strip()
+            body = re.sub(r'<[^>]+>', '', snippets[i]).strip()
+            results.append(f"### Fuente {i+1}: {title}\n\n{body}")
+            
+        if results:
+            return "\n\n---\n\n".join(results)
+        return _wiki_fallback(query)
+    except Exception:
+        return _wiki_fallback(query)
+
 @tool
 async def web_search(query: str) -> str:
     """Busca en internet usando un buscador real y extrae el contenido de las páginas web más relevantes.
     Úsala SIEMPRE que el usuario te pida buscar algo en internet, información externa o reciente."""
-    try:
-        if not HAS_DDGS:
-            return await asyncio.get_event_loop().run_in_executor(None, _wiki_fallback, query)
-            
-        results = await AsyncDDGS().text(query, max_results=3)
-        if not results:
-            return await asyncio.get_event_loop().run_in_executor(None, _wiki_fallback, query)
-            
-        final_report = []
-        for i, res in enumerate(results):
-            title = res.get("title", "Sin Título")
-            href = res.get("href", "")
-            body = res.get("body", "Sin extracto")
-            final_report.append(f"### Fuente {i+1}: {title} ({href})\n\n{body}")
-            
-        return "\n\n---\n\n".join(final_report)
-    except Exception:
-        # DDGS blocked or errored -> use Wiki fallback
-        return await asyncio.get_event_loop().run_in_executor(None, _wiki_fallback, query)
+    return await asyncio.get_event_loop().run_in_executor(None, _ddg_html_scraper, query)
