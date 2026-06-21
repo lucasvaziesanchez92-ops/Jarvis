@@ -38,16 +38,27 @@ def _ddg_html_scraper(query: str) -> str:
         with urllib.request.urlopen(req, timeout=10) as res:
             html = res.read().decode('utf-8', errors='ignore')
             
-        # Parse result snippets
+        # Parse result snippets individually to filter out Ads
         results = []
-        snippets = re.findall(r'<a class="result__snippet[^>]*>(.*?)</a>', html, re.IGNORECASE | re.DOTALL)
-        titles = re.findall(r'<h2 class="result__title">.*?<a[^>]*>(.*?)</a>', html, re.IGNORECASE | re.DOTALL)
+        # Split HTML by result blocks
+        blocks = re.split(r'class="result ', html)[1:]
         
-        for i in range(min(3, len(snippets), len(titles))):
-            title = re.sub(r'<[^>]+>', '', titles[i]).strip()
-            body = re.sub(r'<[^>]+>', '', snippets[i]).strip()
-            results.append(f"### Fuente {i+1}: {title}\n\n{body}")
+        for block in blocks:
+            # Ignore ads
+            if "badge--ad" in block or "result--ad" in block:
+                continue
+                
+            title_match = re.search(r'<h2 class="result__title">.*?<a[^>]*>(.*?)</a>', block, re.IGNORECASE | re.DOTALL)
+            snippet_match = re.search(r'<a class="result__snippet[^>]*>(.*?)</a>', block, re.IGNORECASE | re.DOTALL)
             
+            if title_match and snippet_match:
+                title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
+                body = re.sub(r'<[^>]+>', '', snippet_match.group(1)).strip()
+                results.append(f"### Fuente {len(results)+1}: {title}\n\n{body}")
+                
+            if len(results) >= 3:
+                break
+                
         if results:
             return "\n\n---\n\n".join(results)
         return _wiki_fallback(query)
