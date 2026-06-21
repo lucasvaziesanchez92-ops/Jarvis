@@ -206,7 +206,7 @@ async def ws_chat(websocket: WebSocket):
 
                         async def _plain():
                             return await asyncio.wait_for(
-                                llm.ainvoke([sys_msg, user_msg]),
+                                llm.ainvoke([sys_msg, user_msg], config={"callbacks": [cb]}),
                                 timeout=_PLAIN_TIMEOUT,
                             )
 
@@ -214,21 +214,16 @@ async def ws_chat(websocket: WebSocket):
                         state = {"messages": history + [HumanMessage(content=full_message), ai_resp]}
                     except Exception as e2:
                         logger.error(f"plain LLM fallback failed: {type(e2).__name__}: {e2}")
-                        await send(StreamChunk(type="token", content=(
-                            f"Error técnico con el modelo: {type(e2).__name__}: {str(e2)[:200]}"
+                        await send(StreamChunk(type="stream", content=(
+                            f"\nError técnico con el modelo: {type(e2).__name__}: {str(e2)[:200]}"
                         )))
                         await send(StreamChunk(type="done"))
                         continue
                 finally:
                     ping.cancel()
 
-                ai_msgs = [m for m in state.get("messages", []) if isinstance(m, AIMessage)]
-                final = ai_msgs[-1] if ai_msgs else None
-
-                if final and final.content:
-                    await send(StreamChunk(type="stream", content=str(final.content)))
-                else:
-                    await send(StreamChunk(type="stream", content="Listo."))
+                # La respuesta ya se streameó mediante los callbacks.
+                # Ya no reenviamos final.content completo al final para evitar duplicados.
                 await send(StreamChunk(type="done"))
 
                 # Persist this turn's full message list into the
