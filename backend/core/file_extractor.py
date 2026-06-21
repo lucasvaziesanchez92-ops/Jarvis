@@ -187,10 +187,20 @@ def _extract_image_with_groq_vision(data: bytes, filename: str) -> str:
                 ]
             }]
         }
-        resp = requests.post(url, json=payload)
-        resp.raise_for_status()
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return f"[Análisis de {filename}]: {text}"
+        
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            resp = requests.post(url, json=payload)
+            if resp.status_code in (429, 500, 502, 503, 504):
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+            resp.raise_for_status()
+            text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return f"[Análisis de {filename}]: {text}"
+            
+        return f"[Error procesando imagen {filename} con Gemini: Superado límite de reintentos]"
     except Exception as e:
         return f"[Error procesando imagen {filename} con Gemini: {e}]"
 
