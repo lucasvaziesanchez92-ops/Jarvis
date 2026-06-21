@@ -55,7 +55,7 @@ def _ddg_html_scraper(query: str) -> str:
         return _wiki_fallback(query)
 
 @tool
-async def web_search(query: str) -> str:
+def web_search(query: str) -> str:
     """Busca en internet usando un buscador real y extrae el contenido de las páginas web más relevantes.
     Úsala SIEMPRE que el usuario te pida buscar algo en internet, información externa o reciente."""
-    return await asyncio.get_event_loop().run_in_executor(None, _ddg_html_scraper, query)
+    return _ddg_html_scraper(query)
