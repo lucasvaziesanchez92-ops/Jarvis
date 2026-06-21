@@ -177,8 +177,7 @@ def _extract_image_with_groq_vision(data: bytes, filename: str) -> str:
         elif ext == "gif": mime = "image/gif"
 
         b64 = base64.b64encode(data).decode("ascii")
-        
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [
@@ -196,6 +195,8 @@ def _extract_image_with_groq_vision(data: bytes, filename: str) -> str:
                 if attempt < max_retries - 1:
                     time.sleep(2 ** attempt)
                     continue
+            if resp.status_code != 200:
+                raise Exception(f"HTTP {resp.status_code}: {resp.text}")
             resp.raise_for_status()
             text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
             return f"[Análisis de {filename}]: {text}"
