@@ -206,7 +206,7 @@ async def ws_chat(websocket: WebSocket):
 
                         async def _plain():
                             return await asyncio.wait_for(
-                                llm.ainvoke([sys_msg, user_msg], config={"callbacks": [cb]}),
+                                llm.ainvoke([sys_msg, user_msg], config={"callbacks": [callback]}),
                                 timeout=_PLAIN_TIMEOUT,
                             )
 
