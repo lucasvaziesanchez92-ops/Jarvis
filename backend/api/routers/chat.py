@@ -37,8 +37,8 @@ def _prune_history(messages: list, max_msgs: int) -> list:
 
 # Railway WebSocket can stay open indefinitely if there's keepalive.
 # We increase the graph timeout so JARVIS can execute complex plans.
-_GRAPH_TIMEOUT = 300
-_PLAIN_TIMEOUT = 60
+_GRAPH_TIMEOUT = 90
+_PLAIN_TIMEOUT = 15
 
 
 class WebSocketCallback(BaseCallbackHandler):
