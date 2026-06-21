@@ -248,7 +248,7 @@ def analyze_drive_image(file_id: str) -> str:
             return "Error: GEMINI_API_KEY no configurada."
 
         b64 = base64.b64encode(data).decode("ascii")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [
@@ -257,10 +257,22 @@ def analyze_drive_image(file_id: str) -> str:
                 ]
             }]
         }
-        resp = requests.post(url, json=payload)
-        resp.raise_for_status()
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return f"[Análisis de {filename}]: {text}"
+        
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            resp = requests.post(url, json=payload)
+            if resp.status_code in (429, 500, 502, 503, 504):
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+            if resp.status_code != 200:
+                raise Exception(f"HTTP {resp.status_code}: {resp.text}")
+            resp.raise_for_status()
+            text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return f"[Análisis de {filename}]: {text}"
+            
+        return f"[Error procesando imagen {filename} con Gemini: Superado límite de reintentos]"
     except Exception as e:
         return f"[Error al analizar imagen con Gemini: {str(e)[:200]}]"
 

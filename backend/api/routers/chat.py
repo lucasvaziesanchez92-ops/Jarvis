@@ -37,7 +37,7 @@ def _prune_history(messages: list, max_msgs: int) -> list:
 
 # Railway WebSocket can stay open indefinitely if there's keepalive.
 # We increase the graph timeout so JARVIS can execute complex plans.
-_GRAPH_TIMEOUT = 90
+_GRAPH_TIMEOUT = 300
 _PLAIN_TIMEOUT = 15
 
 
@@ -176,7 +176,7 @@ async def ws_chat(websocket: WebSocket):
             config = {
                 "configurable": {"thread_id": session_id},
                 "callbacks": [callback],
-                "recursion_limit": 25,  # enough for ~5 tool iterations
+                "recursion_limit": 50,  # enough for ~15 tool iterations
             }
 
             try:
