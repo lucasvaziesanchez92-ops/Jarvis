@@ -119,7 +119,7 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                 + (f" de tipo '{mime_filter}'" if mime_filter else "")
                 + "."
             )
-        lines = ["archivos encontrados (MUESTRA SIEMPRE EL ENLACE EN MARKDOWN ASÍ: [Abrir](url)):"]
+        lines = ["INSTRUCCIÓN OBLIGATORIA: Debes mostrar estos archivos a los usuarios COMO ENLACES CLICKABLES en Markdown, usando este formato exacto: [Nombre del Archivo](URL)"]
         for f in results:
             ftype = "📁" if f.get("mimeType") == "application/vnd.google-apps.folder" else "📄"
             size = f.get("size", "N/A")
@@ -129,7 +129,7 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
             except Exception:
                 pass
             url = f.get("webViewLink", "")
-            lines.append(f"- {ftype} {f['name']} ({size}) ID:{f['id']} URL:{url}")
+            lines.append(f"- {ftype} [{f['name']}]({url}) ({size})")
         return "\n".join(lines)
     except Exception as e:
         return str(e)
@@ -143,12 +143,12 @@ def list_drive_files(max_results: int = 20) -> str:
         results = list_files(max_results=max_results)
         if not results:
             return "No hay archivos en Drive."
-        lines = ["archivos en Drive (MUESTRA SIEMPRE EL ENLACE EN MARKDOWN ASÍ: [Abrir](url)):"]
+        lines = ["INSTRUCCIÓN OBLIGATORIA: Debes mostrar estos archivos a los usuarios COMO ENLACES CLICKABLES en Markdown, usando este formato exacto: [Nombre del Archivo](URL)"]
         for f in results:
             ftype = "📁" if f.get("mimeType") == "application/vnd.google-apps.folder" else "📄"
             size_str = f" ({int(f.get('size', 0)) / 1024:.0f}KB)" if f.get('size') else ""
             url = f.get("webViewLink", "")
-            lines.append(f"- {ftype} {f['name']}{size_str} ID:{f['id']} URL:{url}")
+            lines.append(f"- {ftype} [{f['name']}]({url}){size_str}")
         return "\n".join(lines)
     except Exception as e:
         return str(e)
@@ -261,7 +261,7 @@ def analyze_drive_image(file_id: str) -> str:
         import time
         max_retries = 3
         for attempt in range(max_retries):
-            resp = requests.post(url, json=payload)
+            resp = requests.post(url, json=payload, timeout=15)
             if resp.status_code in (429, 500, 502, 503, 504):
                 if attempt < max_retries - 1:
                     time.sleep(2 ** attempt)

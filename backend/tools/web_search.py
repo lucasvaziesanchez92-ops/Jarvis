@@ -49,18 +49,35 @@ def _ddg_html_scraper(query: str) -> str:
                 continue
                 
             title_match = re.search(r'<h2 class="result__title">.*?<a[^>]*>(.*?)</a>', block, re.IGNORECASE | re.DOTALL)
+            href_match = re.search(r'<h2 class="result__title">.*?<a[^>]*href="([^"]+)"', block, re.IGNORECASE | re.DOTALL)
             snippet_match = re.search(r'<a class="result__snippet[^>]*>(.*?)</a>', block, re.IGNORECASE | re.DOTALL)
             
             if title_match and snippet_match:
                 title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
                 body = re.sub(r'<[^>]+>', '', snippet_match.group(1)).strip()
-                results.append(f"### Fuente {len(results)+1}: {title}\n\n{body}")
+                url = href_match.group(1) if href_match else ""
+                if url.startswith("//duckduckgo.com/l/?uddg="):
+                    url = urllib.parse.unquote(url.split("uddg=")[1].split("&")[0])
+                elif url.startswith("//"):
+                    url = "https:" + url
+                    
+                results.append(f"### Fuente {len(results)+1}: [{title}]({url})\n{body}")
                 
             if len(results) >= 3:
                 break
                 
         if results:
-            return "\n\n---\n\n".join(results)
+            # Get URL of the first source to generate preview
+            first_url_match = re.search(r'\[.*?\]\((.*?)\)', results[0])
+            first_url = first_url_match.group(1) if first_url_match else ""
+            
+            # Add strict instruction for the LLM to output the preview markdown
+            prefix = ""
+            if first_url:
+                encoded_url = urllib.parse.quote(first_url)
+                prefix = f"INSTRUCCIÓN OBLIGATORIA: Muestra la siguiente imagen de vista previa en tu respuesta: ![Vista previa del sitio](https://api.microlink.io/?url={encoded_url}&screenshot=true&meta=false&embed=screenshot.url)\n\n"
+            
+            return prefix + "\n\n---\n\n".join(results)
         return _wiki_fallback(query)
     except Exception:
         return _wiki_fallback(query)
