@@ -11,7 +11,7 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY web-next/package.json web-next/package-lock.json* ./
+COPY web-next/package.json web-next/package-lock.json* web-next/copy-models.js ./
 RUN npm ci --only=production
 
 # ── Builder stage ─────────────────────────────────────────────
