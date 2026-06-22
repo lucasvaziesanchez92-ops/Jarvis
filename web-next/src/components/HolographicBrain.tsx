@@ -107,16 +107,16 @@ function BrainModel({ activityState, isMobile, activePersonality }: { activitySt
         roughness: 0.28,
         transmission: 0.1,              // muy poco translúcido (sólido)
         transparent: true,
-        opacity: 1.0,                   // 100% opaco (sólido)
+        opacity: 1.0,
         thickness: 1.8,
         ior: 1.45,
-        clearcoat: 0.8,
-        clearcoatRoughness: 0.1,
-        sheen: 0.8,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.2,
+        sheen: 0.5,
         sheenColor: glowColor,
         sheenRoughness: 0.4,
-        specularIntensity: 1.3,
-        specularColor: 0xffffff,
+        specularIntensity: 0.4,
+        specularColor: baseColor,
         side: THREE.DoubleSide,
         flatShading: true,
       }),
@@ -240,9 +240,9 @@ function BrainModel({ activityState, isMobile, activePersonality }: { activitySt
         // IDLE: glow oscila suave
         outer.opacity = 1.0;
         outer.transmission = 0.1;
-        outer.emissiveIntensity = 0.65;
-        glow.opacity = 0.3 + Math.sin(t * 0.8) * 0.08;
-        bot.intensity = 0.5 + Math.sin(t * 1.2) * 0.25;
+        outer.emissiveIntensity = 0.45;
+        glow.opacity = 0.2 + Math.sin(t * 0.8) * 0.08;
+        bot.intensity = 0.3 + Math.sin(t * 1.2) * 0.25;
         break;
       }
     }

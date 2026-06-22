@@ -78,12 +78,24 @@ function StatusIndicator() {
 
 /* ── Floating Title (Home only) ────────────────────────────── */
 function FloatingTitle() {
+  const { persona } = useJarvisStore()
+  const activePersonality = persona?.name || 'profesional'
+  const theme = PERSONALITY_THEMES[activePersonality] || PERSONALITY_THEMES.profesional
+  
   return (
     <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 pointer-events-none text-center">
-      <h1 className="text-3xl font-black tracking-[0.35em] text-white/80" style={{ textShadow: '0 0 35px rgba(68,204,221,0.25)' }}>
+      <h1 className="text-3xl font-black tracking-[0.35em] text-white/80" style={{ textShadow: `0 0 35px ${theme.hex}40` }}>
         JARVIS
       </h1>
-      <p className="text-[9px] tracking-[0.45em] uppercase text-cyan-400/40 mt-2 font-bold">Quantum Core Active</p>
+      <div 
+        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 bg-black/40 backdrop-blur-md"
+        style={{ boxShadow: `0 0 10px ${theme.hex}20` }}
+      >
+        <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: theme.hex }} />
+        <p className="text-[9px] tracking-[0.3em] uppercase font-bold" style={{ color: theme.hex }}>
+          MODO: {persona?.label || 'PROFESIONAL'}
+        </p>
+      </div>
     </div>
   )
 }
