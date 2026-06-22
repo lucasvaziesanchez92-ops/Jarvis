@@ -75,7 +75,10 @@ def _ddg_html_scraper(query: str) -> str:
             prefix = ""
             if first_url:
                 encoded_url = urllib.parse.quote(first_url)
-                prefix = f"INSTRUCCIÓN OBLIGATORIA: Muestra la siguiente imagen de vista previa en tu respuesta: ![Vista previa del sitio](https://api.microlink.io/?url={encoded_url}&screenshot=true&meta=false&embed=screenshot.url)\n\n"
+                prefix = (
+                    f"INSTRUCCIÓN OBLIGATORIA: Muestra la siguiente imagen de vista previa en tu respuesta: ![Vista previa del sitio](https://api.microlink.io/?url={encoded_url}&screenshot=true&meta=false&embed=screenshot.url)\n\n"
+                    "CRÍTICO: Cuando menciones las fuentes o referencias de esta búsqueda, DEBES formatearlas como enlaces Markdown clicables (ej. [Nombre de la página](URL)). ¡NUNCA escribas la URL cruda!\n\n"
+                )
             
             return prefix + "\n\n---\n\n".join(results)
         return _wiki_fallback(query)
