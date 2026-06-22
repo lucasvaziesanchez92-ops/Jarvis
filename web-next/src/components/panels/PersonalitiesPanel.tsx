@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Check, Briefcase, Heart, Wrench, Building2, Palette, LifeBuoy } from 'lucide-react';
+import { useJarvisStore } from '@/store/jarvisStore';
 
 /* ── PersonalitiesPanel v2 ───────────────────────────────────────────
    6 personalities from RFP + backward compatibility.
@@ -37,9 +38,12 @@ const FALLBACK_PERSONAS: Persona[] = [
 ];
 
 export default function PersonalitiesPanel() {
+  const { persona, setPersona } = useJarvisStore();
   const [personas, setPersonas] = useState<Persona[]>(FALLBACK_PERSONAS);
-  const [active, setActive] = useState<string>('profesional');
   const [loading, setLoading] = useState(true);
+
+  // Sync with global store, default to profesional
+  const active = persona?.name || 'profesional';
 
   useEffect(() => {
     fetch(`${API}/personas`)
@@ -55,6 +59,10 @@ export default function PersonalitiesPanel() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const handleSelect = (p: Persona) => {
+    setPersona(p);
+  };
 
   const activePersona = personas.find(p => p.name === active) || personas[0];
 
@@ -74,7 +82,7 @@ export default function PersonalitiesPanel() {
           return (
             <button
               key={p.name}
-              onClick={() => setActive(p.name)}
+              onClick={() => handleSelect(p)}
               className={`relative p-4 rounded-xl text-left transition-all ${
                 isActive
                   ? 'glass-strong border border-cyan-400/30 bg-cyan-400/[0.06]'
@@ -84,7 +92,7 @@ export default function PersonalitiesPanel() {
               {isActive && <Check className="absolute top-2 right-2 w-3 h-3 text-cyan-400" />}
               
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">{p.icon}</span>
+                <Icon className="w-4 h-4 text-white/60" />
                 <span className={`text-[13px] font-semibold ${isActive ? 'text-cyan-300' : 'text-white/70'}`}>
                   {p.label}
                 </span>
@@ -109,7 +117,10 @@ export default function PersonalitiesPanel() {
       {/* Active persona details */}
       <div className="glass-base rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{activePersona.icon}</span>
+          {(() => {
+            const ActiveIcon = ICON_MAP[activePersona.icon] || Briefcase;
+            return <ActiveIcon className="w-5 h-5 text-white/60" />;
+          })()}
           <div>
             <h4 className="text-[12px] font-semibold text-white/70">{activePersona.label}</h4>
             {activePersona.tone && (
