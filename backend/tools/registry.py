@@ -15,7 +15,7 @@ from backend.tools.notes import create_note, list_notes, get_note, update_note, 
 from backend.tools.todos import create_todo, list_todos, complete_todo, update_todo, delete_todo
 
 # Email
-from backend.tools.email import search_emails, send_email, list_emails
+from backend.tools.email_tools import search_emails, send_email, list_emails
 
 # Wiki
 from backend.tools.wiki import wiki_query, wiki_capture
@@ -60,9 +60,9 @@ except Exception:
     list_calendar_google = None              # type: ignore
     create_calendar_event_google = None      # type: ignore
 
-# Calendar (full CRUD — local tools/calendar.py, with different naming)
+# Calendar (full CRUD — local tools/calendar_tools.py, with different naming)
 try:
-    from backend.tools.calendar import (
+    from backend.tools.calendar_tools import (
         create_calendar_event, list_calendar_events,
         update_calendar_event, delete_calendar_event,
     )
