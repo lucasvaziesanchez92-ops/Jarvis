@@ -88,12 +88,13 @@ except Exception:
 
 # Web search — lazy import (playwright may be missing).
 try:
-    from backend.tools.web_search import web_search, buscar_imagenes_web
+    from backend.tools.web_search import web_search, buscar_imagenes_web, buscar_reversa_gratis
     _WEB_SEARCH_AVAILABLE = True
 except Exception:
     _WEB_SEARCH_AVAILABLE = False
     web_search = None  # type: ignore
     buscar_imagenes_web = None  # type: ignore
+    buscar_reversa_gratis = None  # type: ignore
 
 # Semantic search — DEFERRED (langchain_chroma is heavy ~150MB).
 # Tools are loaded on first use, not at module import.
@@ -133,6 +134,8 @@ if _WEB_SEARCH_AVAILABLE and web_search is not None:
     CORE_TOOLS.append(web_search)
     if buscar_imagenes_web is not None:
         CORE_TOOLS.append(buscar_imagenes_web)
+    if buscar_reversa_gratis is not None:
+        CORE_TOOLS.append(buscar_reversa_gratis)
 
 # Semantic search (if chromadb installed)
 if _SEMANTIC_AVAILABLE:
