@@ -19,16 +19,27 @@ const THINKING_LINES = [
 ]
 
 export default function ThinkingBubble() {
-  const { activityState } = useJarvisStore()
+  const { activityState, lastAssistantText } = useJarvisStore()
   const [show, setShow] = useState(false)
   const [label, setLabel] = useState('')
   const [subtext, setSubtext] = useState('')
 
   useEffect(() => {
+    let text = ''
+    if (lastAssistantText) {
+      const match = lastAssistantText.match(/<thought>([\s\S]*?)<\/thought>/)
+      if (match) text = match[1].trim()
+    }
+
     if (activityState === 'thinking') {
       setShow(true)
       setLabel('Pensando')
-      setSubtext(THINKING_LINES[Math.floor(Math.random() * THINKING_LINES.length)])
+      if (text) {
+        // Show the actual thought truncated to 60 chars
+        setSubtext(text.length > 60 ? text.slice(0, 60) + '...' : text)
+      } else {
+        setSubtext(THINKING_LINES[Math.floor(Math.random() * THINKING_LINES.length)])
+      }
     } else if (activityState === 'listening') {
       setShow(true)
       setLabel('Escuchando')
@@ -40,7 +51,7 @@ export default function ThinkingBubble() {
     } else {
       setShow(false)
     }
-  }, [activityState])
+  }, [activityState, lastAssistantText])
 
   const color = activityState === 'thinking' ? '#ec4899'
     : activityState === 'listening' ? '#00ff88'

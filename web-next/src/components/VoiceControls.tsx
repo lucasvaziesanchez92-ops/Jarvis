@@ -265,9 +265,7 @@ export default function VoiceControls() {
 
         if (data.audio_base64) {
           setActivityState('speaking')
-          playAudio(data.audio_base64, () => {
-            setScreen('chat')
-          })
+          playAudio(data.audio_base64)
         } else {
           // No audio from backend (e.g. Orpheus TTS not available):
           // fall back to Web Speech API in the browser.
@@ -277,7 +275,6 @@ export default function VoiceControls() {
           } else {
             setActivityState('idle')
           }
-          setScreen('chat')
         }
       } else {
         const errText = await res.text().catch(() => '')
@@ -299,24 +296,30 @@ export default function VoiceControls() {
       audioElRef.current.onerror = null
       audioElRef.current.pause()
       audioElRef.current.src = ''
+  const playAudio = useCallback((base64: string, onEnded?: () => void) => {
+    if (audioElRef.current) {
+      audioElRef.current.onended = null
+      audioElRef.current.onerror = null
+      audioElRef.current.pause()
+      audioElRef.current.src = ''
       audioElRef.current.load()
     }
-    const binary = atob(b64)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-    const blob = new Blob([bytes], { type: 'audio/wav' })
-    const url = URL.createObjectURL(blob)
-    const audio = new Audio(url)
-    audioElRef.current = audio
-    audio.onended = () => {
+    try {
+      const src = `data:audio/mp3;base64,${base64}`
+      const audio = new Audio(src)
+      audioElRef.current = audio
+      audio.onended = () => {
+        setActivityState('idle')
+        audioElRef.current = null
+        onEnded?.()
+      }
+      audio.onerror = () => { setActivityState('idle'); audioElRef.current = null }
+      audio.play().catch(() => { setActivityState('idle'); audioElRef.current = null })
+    } catch (e) {
+      console.error(e)
       setActivityState('idle')
-      URL.revokeObjectURL(url)
-      audioElRef.current = null
-      onEnd?.()
     }
-    audio.onerror = () => { setActivityState('idle'); audioElRef.current = null }
-    audio.play().catch(() => { setActivityState('idle'); audioElRef.current = null })
-  }
+  }, [setActivityState])
 
   const handleMicClick = () => {
     if (activityState === 'speaking' || activityState === 'thinking') {
