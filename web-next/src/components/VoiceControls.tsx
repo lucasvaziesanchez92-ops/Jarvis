@@ -232,64 +232,88 @@ export default function VoiceControls() {
   /* ── Send to backend → add transcript + response to chat ──── */
   const sendVoice = async (audioBlob: Blob) => {
     setActivityState('thinking')
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 180000)
+    const { chatSessionId, persona, showThinkingBubble, hideThinkingBubble, setLastUserText, setLastAssistantText } = useJarvisStore.getState()
+    
     try {
-      const { chatSessionId, persona } = useJarvisStore.getState()
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
       formData.append('session_id', chatSessionId)
       formData.append('persona', persona?.name || 'profesional')
 
-      const res = await fetch(`${API}/voice`, {
+      // 1. Iniciar tarea asíncrona
+      const startRes = await fetch(`${API}/voice/start`, {
         method: 'POST',
         body: formData,
-        signal: controller.signal,
       })
-      clearTimeout(timeout)
-      if (res.ok) {
-        const data = await res.json()
+      
+      if (!startRes.ok) {
+        throw new Error('Error al iniciar tarea de voz')
+      }
+      
+      const { job_id } = await startRes.json()
 
-        transcriptRef.current = data.transcript || ''
-        responseRef.current = data.response_text || ''
+      // 2. Polling cada 1.5 segundos
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`${API}/voice/status/${job_id}`)
+          if (!statusRes.ok) return
+          const state = await statusRes.json()
 
-        // Si el transcript está vacío (ej. filtro de alucinaciones de Whisper), ignoramos silenciosamente
-        if (!transcriptRef.current) {
-          setActivityState('idle')
-          return
-        }
-
-        setLastUserText(transcriptRef.current)
-        setLastAssistantText(responseRef.current)
-
-        appendChatMessage({ id: makeId(), role: 'user', content: transcriptRef.current })
-        if (responseRef.current) {
-          appendChatMessage({ id: makeId(), role: 'assistant', content: responseRef.current })
-        }
-
-        if (data.audio_base64) {
-          setActivityState('speaking')
-          playAudio(data.audio_base64)
-        } else {
-          // No audio from backend (e.g. Orpheus TTS not available):
-          // fall back to Web Speech API in the browser.
-          if (responseRef.current && useJarvisStore.getState().voiceEnabled) {
-            const success = ttsSpeak(responseRef.current)
-            if (!success) setActivityState('idle')
-          } else {
-            setActivityState('idle')
+          // Actualizar estado visual (Pensando/Transcribiendo)
+          if (state.status === 'transcribing' || state.status === 'thinking' || state.status === 'queued') {
+             showThinkingBubble(state.thought || 'Procesando...')
+          } else if (state.status === 'speaking') {
+             setActivityState('speaking')
           }
+
+          // Terminado o Error
+          if (state.status === 'done' || state.status === 'error') {
+            clearInterval(pollInterval)
+            hideThinkingBubble()
+
+            transcriptRef.current = state.transcript || ''
+            responseRef.current = state.response_text || ''
+
+            if (!transcriptRef.current && state.status !== 'error') {
+              setActivityState('idle')
+              return
+            }
+
+            setLastUserText(transcriptRef.current)
+            setLastAssistantText(responseRef.current)
+            
+            // Append to chat panel
+            if (transcriptRef.current) {
+               appendChatMessage({ id: makeId(), role: 'user', content: transcriptRef.current })
+            }
+            if (responseRef.current) {
+               appendChatMessage({ id: makeId(), role: 'assistant', content: responseRef.current })
+            }
+
+            // Audio reproduction
+            if (state.audio_base64) {
+              setActivityState('speaking')
+              playAudio(state.audio_base64)
+            } else {
+              // No audio from backend (e.g. Orpheus TTS not available):
+              // fall back to Web Speech API in the browser.
+              if (responseRef.current && useJarvisStore.getState().voiceEnabled) {
+                const success = ttsSpeak(responseRef.current)
+                if (!success) setActivityState('idle')
+              } else {
+                setActivityState('idle')
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Polling error:", e)
+          clearInterval(pollInterval)
+          setActivityState('idle')
         }
-      } else {
-        const errText = await res.text().catch(() => '')
-        console.error('Voice API error:', res.status, errText)
-        setActivityState('idle')
-      }
-    } catch (e: any) {
-      clearTimeout(timeout)
-      if (e?.name !== 'AbortError') {
-        console.error('Voice error:', e)
-      }
+      }, 1500)
+
+    } catch (error) {
+      console.error('Error enviando audio:', error)
       setActivityState('idle')
     }
   }

@@ -151,10 +151,103 @@ async def _synthesize_base64(text: str) -> str:
         logger.warning(f"TTS synthesis falló (voice seguirá sin audio): {e}")
         return ""
 
-# ── Endpoint: POST /api/voice ───────────────────────────────────────────
+# ── Async Jobs Structure ──────────────────────────────────────────────
 
-@router.post("", response_model=VoicePipelineResponse)
-async def voice_pipeline(
+from typing import Dict, Any
+from uuid import uuid4
+
+# Global in-memory dict to track async voice tasks
+# For production/scale, use Redis + Celery. For local/Railway single-instance, dict is fine.
+voice_jobs: Dict[str, Dict[str, Any]] = {}
+
+async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, persona: str):
+    try:
+        # 1. STT
+        voice_jobs[job_id]["status"] = "transcribing"
+        voice_jobs[job_id]["thought"] = "Escuchando..."
+        try:
+            transcript = await _transcribe(audio_bytes)
+            voice_jobs[job_id]["transcript"] = transcript
+            logger.info(f"[{job_id}] Voice STT: {transcript[:80]}")
+        except Exception as e:
+            logger.error(f"[{job_id}] STT failed: {e}")
+            voice_jobs[job_id]["status"] = "error"
+            voice_jobs[job_id]["response_text"] = "No pude entender el audio. ¿Podés repetir?"
+            return
+        
+        if not transcript.strip():
+            voice_jobs[job_id]["status"] = "error"
+            voice_jobs[job_id]["response_text"] = "No escuché nada."
+            return
+
+        # 2. LLM Graph with Tools
+        voice_jobs[job_id]["status"] = "thinking"
+        voice_jobs[job_id]["thought"] = "Pensando..."
+        
+        from langchain_core.messages import HumanMessage
+        from backend.api.dependencies import get_jarvis_graph
+        graph = get_jarvis_graph()
+        config = {"configurable": {"thread_id": session_id or "voice-session"}}
+        
+        try:
+            # We use astream_events to catch tool calls and update the "thought"
+            async for event in graph.astream_events(
+                {
+                    "messages": [HumanMessage(content=transcript)],
+                    "session_id": session_id or "voice-session",
+                    "persona": persona,
+                },
+                config=config,
+                version="v2",
+            ):
+                if event["event"] == "on_tool_start":
+                    tool_name = event["name"]
+                    voice_jobs[job_id]["thought"] = f"Usando herramienta: {tool_name}..."
+            
+            # Fetch final state after stream finishes
+            state = await graph.aget_state(config)
+            ai_msgs = [m for m in state.values.get("messages", []) if hasattr(m, "type") and m.type == "ai"]
+            if not ai_msgs:
+                raise ValueError("No AI messages generated")
+            final_msg = ai_msgs[-1].content
+            voice_jobs[job_id]["response_text"] = final_msg
+            logger.info(f"[{job_id}] Voice LLM: {final_msg[:80]}")
+            
+        except Exception as e:
+            logger.error(f"[{job_id}] Agent failed: {e}")
+            voice_jobs[job_id]["status"] = "error"
+            voice_jobs[job_id]["response_text"] = "Tuve un problema al procesar la solicitud."
+            return
+
+        # 3. TTS
+        voice_jobs[job_id]["status"] = "speaking"
+        voice_jobs[job_id]["thought"] = "Generando voz..."
+        try:
+            audio_b64 = await asyncio.wait_for(
+                _synthesize_base64(final_msg), timeout=15
+            )
+            voice_jobs[job_id]["audio_base64"] = audio_b64
+        except Exception as e:
+            logger.warning(f"[{job_id}] TTS skipped (timeout/error): {e}")
+            voice_jobs[job_id]["audio_base64"] = ""
+
+        # Done
+        voice_jobs[job_id]["status"] = "done"
+
+    except Exception as e:
+        logger.error(f"[{job_id}] Global job error: {e}")
+        voice_jobs[job_id]["status"] = "error"
+        voice_jobs[job_id]["response_text"] = "Error interno procesando tu solicitud."
+
+# ── Endpoints Async Polling ───────────────────────────────────────────
+
+from pydantic import BaseModel
+
+class JobStartResponse(BaseModel):
+    job_id: str
+
+@router.post("/start", response_model=JobStartResponse)
+async def voice_start(
     audio: UploadFile = File(...),
     session_id: str = Form(default=""),
     persona: str = Form(default="profesional"),
@@ -162,50 +255,30 @@ async def voice_pipeline(
     if not audio.filename:
         raise HTTPException(status_code=400, detail="No audio file provided")
 
-    transcript = ""
-    response_text = ""
-    audio_b64 = ""
-
     try:
         content = await audio.read()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"No se pudo leer el audio: {e}")
 
-    # STT
-    try:
-        transcript = await _transcribe(content)
-        logger.info(f"Voice STT: {transcript[:80]}")
-    except Exception as e:
-        logger.error("STT failed: {}", str(e)[:200])
-        return VoicePipelineResponse(transcript="", response_text="No pude entender el audio. ¿Podés repetir?", audio_base64="")
+    job_id = str(uuid4())
+    voice_jobs[job_id] = {
+        "status": "queued",
+        "thought": "Iniciando...",
+        "transcript": "",
+        "response_text": "",
+        "audio_base64": "",
+    }
 
-    # LLM — Agent Graph con herramientas
-    if transcript.strip():
-        try:
-            response_text, _tools_used = await _chat_with_agent(transcript, session_id, persona)
-            logger.info(f"Voice LLM (agent): {response_text[:80]}")
-        except Exception as e:
-            logger.error(f"Agent failed: {e}")
-            response_text = "Entendí lo que dijiste pero tuve un problema para procesarlo."
+    # Start background task to bypass HTTP proxy timeouts
+    asyncio.create_task(_process_voice_job(job_id, content, session_id, persona))
+    
+    return JobStartResponse(job_id=job_id)
 
-    # TTS (optional — voice works without it). TTS runs in background so the response
-    # is returned within Railway's 30s proxy window. Frontend can poll /voice/tts
-    # later or we send audio in a follow-up SSE/WS event.
-    if response_text:
-        try:
-            audio_b64 = await asyncio.wait_for(
-                _synthesize_base64(response_text), timeout=10
-            )
-        except (asyncio.TimeoutError, Exception) as e:
-            logger.warning(f"TTS skipped (timeout/error): {e}")
-            audio_b64 = ""
-
-    return VoicePipelineResponse(
-        transcript=transcript,
-        response_text=response_text,
-        audio_base64=audio_b64,
-        session_id=session_id,
-    )
+@router.get("/status/{job_id}")
+async def voice_status(job_id: str):
+    if job_id not in voice_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return voice_jobs[job_id]
 
 # ── Endpoint: POST /api/voice/tts ───────────────────────────────────────
 
