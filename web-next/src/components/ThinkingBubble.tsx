@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useJarvisStore } from '@/store/jarvisStore'
 import { Brain, Mic, Volume2 } from 'lucide-react'
 
+import { PERSONALITY_THEMES } from '@/constants/colors'
+
 /* ─── Thinking Bubble v3 — Compact status orb ───
    ONLY shows status label + icon. NEVER shows full response text.
    Response text stays in the chat panel where it belongs.
@@ -19,10 +21,13 @@ const THINKING_LINES = [
 ]
 
 export default function ThinkingBubble() {
-  const { activityState, lastAssistantText } = useJarvisStore()
+  const { activityState, lastAssistantText, persona } = useJarvisStore()
+  const activePersonality = persona?.name || 'profesional'
   const [show, setShow] = useState(false)
   const [label, setLabel] = useState('')
   const [subtext, setSubtext] = useState('')
+
+  const theme = PERSONALITY_THEMES[activePersonality] || PERSONALITY_THEMES.profesional
 
   useEffect(() => {
     let text = ''
@@ -53,10 +58,10 @@ export default function ThinkingBubble() {
     }
   }, [activityState, lastAssistantText])
 
-  const color = activityState === 'thinking' ? '#ec4899'
+  const color = activityState === 'thinking' ? theme.hex
     : activityState === 'listening' ? '#00ff88'
-    : activityState === 'speaking' ? '#40e0d0'
-    : '#4488aa'
+    : activityState === 'speaking' ? theme.hex
+    : theme.hex
 
   const Icon = activityState === 'thinking' ? Brain
     : activityState === 'listening' ? Mic
@@ -86,7 +91,7 @@ export default function ThinkingBubble() {
             style={{
               background: 'rgba(12,12,20,0.85)',
               backdropFilter: 'blur(20px) saturate(1.5)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              border: `1px solid ${color}33`,
               boxShadow: `0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)`,
             }}
           >
@@ -101,7 +106,7 @@ export default function ThinkingBubble() {
               }}
             />
 
-            {/* Pulsing icon */}
+            {/* Pulsing icon or audio waves */}
             <div className="relative w-7 h-7 flex items-center justify-center"
               style={{ color }}
             >
@@ -109,7 +114,7 @@ export default function ThinkingBubble() {
                 className="absolute inset-0 rounded-full"
                 style={{ background: color }}
                 animate={{ scale: [1, 1.6, 1], opacity: [0.3, 0, 0.3] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                transition={{ duration: activityState === 'speaking' ? 0.8 : 2, repeat: Infinity, ease: 'easeInOut' }}
               />
               <Icon className="w-4 h-4 relative z-10" strokeWidth={2.5} />
             </div>
@@ -119,21 +124,36 @@ export default function ThinkingBubble() {
               <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/60">
                 {label}
               </span>
-              <span className="text-[11px] text-white/30 mt-0.5">
+              <span className="text-[11px] text-white/30 mt-0.5 max-w-[150px] truncate">
                 {subtext}
               </span>
             </div>
 
             {/* Dots */}
-            <div className="flex gap-[3px] ml-1">
-              {[0,1,2].map(i => (
-                <motion.div key={i} className="w-[3px] h-[3px] rounded-full"
-                  style={{ background: color }}
-                  animate={{ opacity: [0.2, 1, 0.2] }}
-                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
-                />
-              ))}
-            </div>
+            {activityState !== 'speaking' && (
+              <div className="flex gap-[3px] ml-1">
+                {[0,1,2].map(i => (
+                  <motion.div key={i} className="w-[3px] h-[3px] rounded-full"
+                    style={{ background: color }}
+                    animate={{ opacity: [0.2, 1, 0.2] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {/* Audio Waves */}
+            {activityState === 'speaking' && (
+              <div className="flex gap-[2px] ml-1 items-center h-4">
+                {[0,1,2,3].map(i => (
+                  <motion.div key={i} className="w-[3px] rounded-full"
+                    style={{ background: color }}
+                    animate={{ height: ['4px', '14px', '4px', '10px', '4px'] }}
+                    transition={{ duration: 0.6 + (i * 0.1), repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </motion.div>
       )}

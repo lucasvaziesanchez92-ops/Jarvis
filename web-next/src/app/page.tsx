@@ -9,12 +9,14 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { API_BASE } from '@/lib/api'
+import { PERSONALITY_THEMES } from '@/constants/colors'
 
 /* ── Lazy-load panels + brain + bubble + voice ───────────────── */
 const BrainBackground = dynamic(() => import('@/components/BrainBackground'), { ssr: false })
 const BrainVisual     = dynamic(() => import('@/components/BrainVisual'),     { ssr: false })
 const ThinkingBubble  = dynamic(() => import('@/components/ThinkingBubble'),  { ssr: false })
 const VoiceControls   = dynamic(() => import('@/components/VoiceControls'),   { ssr: false })
+const ParticleBackground = dynamic(() => import('@/components/ParticleBackground'), { ssr: false })
 
 const ChatPanel        = dynamic(() => import('@/components/panels/ChatModePanel'),       { ssr: false })
 const TasksPanel       = dynamic(() => import('@/components/panels/TasksModePanel'),      { ssr: false })
@@ -239,23 +241,37 @@ function WelcomeScreen() {
    A fully unified iOS/macOS responsive application.
 ╚══════════════════════════════════════════════════════════════ */
 export default function RootPage() {
-  const { currentScreen, googleConnected, checkGoogleAuth, brainRenderer } = useJarvisStore()
+  const { currentScreen, googleConnected, checkGoogleAuth, brainRenderer, activityState, persona } = useJarvisStore()
   const activeScreen = currentScreen === 'home' ? 'home' : currentScreen
+  const activePersonality = persona?.name || 'profesional'
+  const theme = PERSONALITY_THEMES[activePersonality] || PERSONALITY_THEMES.profesional
 
   useEffect(() => {
     checkGoogleAuth(API_BASE)
-  }, [])
+    const t = setTimeout(() => setShowApp(true), 2000)
+    return () => clearTimeout(t)
+  }, [checkGoogleAuth])
 
-  const showApp = googleConnected === true
+  const [showApp, setShowApp] = useState(false)
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#040408] text-white">
+      {/* Background dynamic glow based on persona */}
+      <div 
+        className="absolute inset-0 pointer-events-none transition-opacity duration-1000 z-0"
+        style={{
+          background: `radial-gradient(circle at center, transparent 30%, ${theme.hex} 100%)`,
+          opacity: activityState === 'thinking' ? 0.25 : activityState === 'speaking' ? 0.2 : 0.08
+        }}
+      />
       {/* Google Auth Gate — blocks EVERYTHING below until connected */}
       {googleConnected !== true && <WelcomeScreen />}
 
       {/* All app UI only renders when Google is connected */}
       {showApp && (
         <>
+          {/* Dynamic Background Particles (Shows on Home and behind panels) */}
+          <ParticleBackground />
           {/* 1. Brain Background based on selected renderer */}
           {brainRenderer === '3d' && <BrainBackground />}
           {brainRenderer === '2d' && (
