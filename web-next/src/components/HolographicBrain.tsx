@@ -3,6 +3,7 @@
 import { useRef, useMemo, useEffect, Suspense } from 'react';
 import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { useJarvisStore } from '@/store/jarvisStore';
+import { PERSONALITY_THEMES } from '@/constants/colors';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls, Sparkles, Float } from '@react-three/drei';
@@ -62,7 +63,7 @@ function SceneEnvironment() {
 }
 
 /* ── Brain model with reactive animation ───────────────── */
-function BrainModel({ activityState, isMobile }: { activityState: string, isMobile: boolean }) {
+function BrainModel({ activityState, isMobile, activePersonality }: { activityState: string, isMobile: boolean, activePersonality: string }) {
   const groupRef = useRef<THREE.Group>(null);
   const outerMatRef = useRef<THREE.MeshPhysicalMaterial>(null);
   const innerMatRef = useRef<THREE.MeshPhysicalMaterial>(null);
@@ -88,13 +89,19 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
     return { geometry: g, scale: s };
   }, [rawGeometry]);
 
-  // === MATERIALES — Rosa Holográfico (sync con test standalone) ===
-  // Versión final: rosa medio (#e090b0) — un poco más oscuro que el claro
+  // === MATERIALES DINÁMICOS POR PERSONALIDAD ===
+  const theme = PERSONALITY_THEMES[activePersonality] || PERSONALITY_THEMES.profesional;
+  const baseColor = new THREE.Color(theme.hex);
+  
+  // Create slightly darker/brighter variants for emissive and sheen
+  const emissiveColor = baseColor.clone().multiplyScalar(0.7);
+  const glowColor = baseColor.clone().multiplyScalar(1.2);
+
   const outerMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: 0xe090b0,                // rosa medio (sync con build-magenta.ps1)
-        emissive: 0xc03060,             // emissive rosa medio
+        color: baseColor,
+        emissive: emissiveColor,
         emissiveIntensity: 0.65,
         metalness: 0.0,
         roughness: 0.28,
@@ -106,40 +113,38 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
         clearcoat: 0.8,
         clearcoatRoughness: 0.1,
         sheen: 0.8,
-        sheenColor: new THREE.Color(0xff6090),  // rosa medio glow
+        sheenColor: glowColor,
         sheenRoughness: 0.4,
         specularIntensity: 1.3,
         specularColor: 0xffffff,
         side: THREE.DoubleSide,
         flatShading: true,
       }),
-    []
+    [baseColor.getHex()]
   );
 
   const innerMaterial = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        color: 0xff6090,                // rosa medio glow interior
+        color: glowColor,
         transparent: true,
         opacity: 0.4,
         blending: THREE.AdditiveBlending,
         side: THREE.BackSide,
       }),
-    []
+    [glowColor.getHex()]
   );
 
-  // Glow aditivo permanente
   const glowMaterial = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        color: 0xff6090,
+        color: glowColor,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.15,
         blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.BackSide,
+        side: THREE.FrontSide,
       }),
-    []
+    [glowColor.getHex()]
   );
 
   // Dispose on unmount
@@ -168,6 +173,15 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
     if (!outer || !inner || !glow || !bot) return;
 
     // === ANIMACIÓN POR ESTADO ===
+    
+    // Always apply the active personality colors (except in error state)
+    if (activityState !== 'error') {
+      outer.emissive.copy(emissiveColor);
+      glow.color.copy(glowColor);
+      bot.color.copy(baseColor);
+      outer.sheenColor.copy(glowColor);
+    }
+
     switch (activityState) {
       case 'thinking': {
         // PARPADEO del brain-3d.html: blink a 3Hz
@@ -223,17 +237,12 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
       }
       case 'idle':
       default: {
-        // IDLE: glow oscila suave, sheen hue shift
+        // IDLE: glow oscila suave
         outer.opacity = 1.0;
         outer.transmission = 0.1;
-        outer.emissive.setHex(0xc03060);
         outer.emissiveIntensity = 0.65;
-        glow.color.setHex(0xff80ff);
-        glow.opacity = 0.3 + Math.sin(t * 0.8) * 0.08;  // ↑ más visible
-        bot.color.setHex(0xff1493);
+        glow.opacity = 0.3 + Math.sin(t * 0.8) * 0.08;
         bot.intensity = 0.5 + Math.sin(t * 1.2) * 0.25;
-        // Sheen hue shift sutil (del original)
-        outer.sheenColor.setHSL(0.88 + Math.sin(t * 0.3) * 0.02, 0.8, 0.65);
         break;
       }
     }
@@ -247,7 +256,7 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
         position={[0, -2, 0]}
         intensity={0.3}
         distance={10}
-        color={0xff1493}
+        color={theme.hex}
       />
       <group ref={groupRef} scale={scale * (isMobile ? 0.55 : 0.85)}>
         {/* Outer translucent rose shell */}
@@ -273,7 +282,7 @@ function BrainModel({ activityState, isMobile }: { activityState: string, isMobi
         {/* Partículas cyan flotando dentro y alrededor */}
         <Sparkles count={isMobile ? 60 : 150} scale={2.5} size={isMobile ? 1.5 : 2.5} color="#00ffff" opacity={0.6} speed={0.5} noise={1} />
         {/* Partículas magenta sutiles */}
-        <Sparkles count={isMobile ? 40 : 100} scale={2.2} size={isMobile ? 2 : 3} color="#ff1493" opacity={0.4} speed={0.3} noise={2} />
+        <Sparkles count={isMobile ? 40 : 100} scale={2.2} size={isMobile ? 2 : 3} color={theme.hex} opacity={0.4} speed={0.3} noise={2} />
       </group>
     </Float>
   );
@@ -284,18 +293,20 @@ function Fallback() {
   return (
     <mesh>
       <icosahedronGeometry args={[0.7, 1]} />
-      <meshBasicMaterial color="#ff69b4" wireframe />
+      <meshBasicMaterial color="#ffffff" wireframe />
     </mesh>
   );
 }
 
 /* ── Componente principal ─────────────────────────────── */
 export default function HolographicBrain() {
-  const { activityState } = useJarvisStore();
+  const { activityState, persona } = useJarvisStore();
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const activePersonality = persona?.name || 'profesional';
+  const theme = PERSONALITY_THEMES[activePersonality] || PERSONALITY_THEMES.profesional;
 
   return (
-    <div className="fixed inset-0 z-0" style={{ background: '#000000' }}>
+    <div className="fixed inset-0 z-0 pointer-events-none">
       <Canvas
         camera={{ position: [0, 0.5, 2.8], fov: 45, near: 0.1, far: 1000 }}
         dpr={1.5}
@@ -310,20 +321,18 @@ export default function HolographicBrain() {
           gl.toneMappingExposure = 1.0;
         }}
       >
-        <color attach="background" args={['#000000']} />
-
         {/* IBL via RoomEnvironment (necesario para clearcoat) */}
         <SceneEnvironment />
 
         {/* === 5 luces fijas del brain-3d.html (la 6ta, la bottom, está dentro de BrainModel) === */}
         <ambientLight intensity={0.5} color={0x404040} />
         <directionalLight position={[5, 5, 5]} intensity={1.2} color={0xffffff} />
-        <directionalLight position={[-3, 2, -2]} intensity={0.6} color={0xff69b4} />
+        <directionalLight position={[-3, 2, -2]} intensity={0.6} color={0xffffff} />
         <directionalLight position={[0, -3, 4]} intensity={0.8} color={0x40e0d0} />
-        <pointLight position={[0, 3, 0]} intensity={0.4} distance={8} color={0xff69b4} />
+        <pointLight position={[0, 3, 0]} intensity={0.4} distance={8} color={0xffffff} />
 
         <Suspense fallback={<Fallback />}>
-          <BrainModel activityState={activityState} isMobile={isMobile} />
+          <BrainModel activityState={activityState} isMobile={isMobile} activePersonality={activePersonality} />
         </Suspense>
 
         <OrbitControls 
