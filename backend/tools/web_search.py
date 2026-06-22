@@ -114,7 +114,11 @@ def buscar_imagenes_web(query: str) -> str:
         if not resultados:
             return f"No se pudieron extraer las URLs de las imágenes para '{query}'."
             
-        return "INSTRUCCIÓN OBLIGATORIA: Muestra estas imágenes en tu respuesta exactamente así en formato Markdown:\n\n" + "\n\n".join(resultados)
+        return (
+            "CRÍTICO: El usuario solicitó imágenes. DEBES copiar y pegar EXACTAMENTE los siguientes bloques de Markdown en tu respuesta final. "
+            "NO resumas estas imágenes, NO alteres los URLs y NO inventes imágenes con URLs vacíos como `![]()`. "
+            "COPIA Y PEGA ESTO LITERALMENTE:\n\n" + "\n\n".join(resultados)
+        )
     except Exception as e:
         return f"Error buscando imágenes: {str(e)}"
 
