@@ -234,7 +234,7 @@ def build_file_context(file_keys: list[str], filenames: Optional[list[str]] = No
     for i, key in enumerate(file_keys):
         filename = filenames[i] if filenames and i < len(filenames) else key.split("/")[-1]
         parts.append(f"\n📄 **Archivo #{i + 1}**: {filename}")
-        parts.append(f"Clave de acceso (attachment_key): {key}")
+        parts.append(f"► Clave de acceso: {key} (IMPORTANTE: Usa '{key}' como 'attachment_key' en la herramienta 'buscar_reversa_gratis' si el usuario pide buscar el origen de esta imagen en internet)")
         try:
             content = extract_text_from_file(key, filename)
             parts.append(content)

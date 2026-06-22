@@ -194,9 +194,31 @@ PERSONALIDADES = {
 PERSONALIDADES["default"] = PERSONALIDADES["profesional"]
 
 
+DRIVE_SUPER_PROMPT = """
+
+[REGLA ESTRICTA DE GOOGLE DRIVE]
+Tienes acceso directo al Google Drive del usuario a través de tus herramientas. Si el usuario te pide buscar información sobre sus documentos, está estrictamente prohibido alucinar o inventar nombres de archivos. Debes invocar obligatoriamente la herramienta search_drive. Cuando analices un archivo, cita textualmente fragmentos del contenido recuperado y genera siempre la respuesta utilizando la sintaxis de enlace Markdown interactivo con su enlace directo para que el usuario pueda hacer clic e ir a su documento.
+"""
+
 def get_persona(name: str) -> PersonaConfig:
-    """Obtener configuracion de personalidad por nombre."""
-    return PERSONALIDADES.get(name, PERSONALIDADES["profesional"])
+    """Obtener configuracion de personalidad por nombre y aplicar reglas globales."""
+    base_persona = PERSONALIDADES.get(name, PERSONALIDADES["profesional"])
+    
+    # Inyectar reglas globales (Drive, Markdown links) sin reescribir todo
+    prompt_con_reglas = base_persona.system_prompt + DRIVE_SUPER_PROMPT
+    
+    # Retornar una copia para no mutar el dict original
+    return PersonaConfig(
+        name=base_persona.name,
+        label=base_persona.label,
+        description=base_persona.description,
+        system_prompt=prompt_con_reglas,
+        allowed_tools=base_persona.allowed_tools,
+        icon=base_persona.icon,
+        tone=base_persona.tone,
+        vocabulary_do=base_persona.vocabulary_do,
+        vocabulary_dont=base_persona.vocabulary_dont,
+    )
 
 
 def get_all_personas() -> list[dict]:
