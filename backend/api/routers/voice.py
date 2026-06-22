@@ -62,7 +62,7 @@ async def _transcribe(audio_bytes: bytes) -> str:
 
 async def _chat_with_agent(transcript: str, session_id: str = "") -> tuple[str, bool]:
     """Usa el agente completo con herramientas. Retorna (respuesta, tools_used).
-    Timeout agresivo (25s) para que el proxy de Railway free tier no corte con 502."""
+    Timeout ampliado a 90s para permitir tareas complejas como buscar en Drive/Gmail."""
     from langchain_core.messages import HumanMessage
     from backend.api.dependencies import get_jarvis_graph
     graph = get_jarvis_graph()
@@ -77,10 +77,10 @@ async def _chat_with_agent(transcript: str, session_id: str = "") -> tuple[str, 
                 },
                 config=config,
             ),
-            timeout=25,
+            timeout=90,  # Aumentado para tareas complejas
         )
     except asyncio.TimeoutError:
-        return "Me tardé demasiado procesando eso. ¿Podés repetirlo más breve?", False
+        return "Me tardé demasiado procesando tu solicitud de red. Por favor, revisa el chat de texto para más detalles o intenta de nuevo.", False
     except Exception as e:
         error_msg = str(e)[:200]
         logger.warning("Agent graph falló en voice, usando fallback directo: {}", error_msg)
