@@ -31,7 +31,7 @@ def record_error(source: str, error: Exception, context: dict | None = None) -> 
         "type": type(error).__name__,
         "message": str(error)[:500],
         "trace": traceback.format_exc()[:1500],
-        "context": (context or {})[:500] if isinstance(context, dict) else str(context)[:500],
+        "context": str(context)[:500] if context else "",
     })
 
 

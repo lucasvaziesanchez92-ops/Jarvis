@@ -6,15 +6,40 @@ from langchain_core.tools import tool
 def search_gmail(query: str) -> str:
     """Search emails in Gmail. Args: query (Gmail search syntax like 'from:user@example.com' or 'subject:meeting')."""
     from backend.services.gmail_service import search_emails
+    from backend.services.lancedb_cache import semantic_cache
+    from loguru import logger
     try:
+        logger.info(f"🔍 [Interceptor] Evaluando caché semántica para Gmail: '{query}'")
+        cache_hits = semantic_cache.buscar_similitud("gmail", query, umbral=0.72)
+        
+        if cache_hits:
+            logger.info(f"⚡ [Cache Hit] Datos recuperados localmente desde LanceDB. Evitando API externa.")
+            lines = [f"⚡ **[Cache Hit]** {len(cache_hits)} correos encontrados en memoria local:"]
+            for hit in cache_hits:
+                # El id lo guardamos en attachment_key o link_directo
+                lines.append(f"- {hit['nombre']} | {hit['contenido'][:100]}... | ID:{hit['attachment_key']}")
+            return "\n".join(lines)
+
+        logger.info(f"🌐 [Cache Miss] Solicitando datos en vivo a la API de Gmail...")
         results = search_emails(query, max_results=10)
         if not results:
             return "No se encontraron correos con esa búsqueda."
-        lines = [f"{len(results)} correos encontrados:"]
+        
+        lines = [f"🌐 **[Búsqueda en Vivo]** {len(results)} correos encontrados:"]
         for e in results:
             lines.append(f"- [{e['date']}] {e['from']} | {e['subject']} | ID:{e['id']}")
+            
+            semantic_cache.guardar_en_cache(
+                categoria="gmail",
+                id_doc=e["id"],
+                titulo=f"{e['from']} - {e['subject']}",
+                contenido="", # Podríamos agregar snippet
+                link="",
+                timestamp=e["date"]
+            )
+            
         return "\n".join(lines)
-    except RuntimeError as e:
+    except Exception as e:
         return str(e)
 
 
@@ -102,10 +127,26 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
     Returns: list of matching files with name, size, ID.
     """
     from backend.services.drive_service import list_files
+    from backend.services.lancedb_cache import semantic_cache
+    from loguru import logger
     try:
-        # If the user wants only images, build a query that the
-        # Drive service can honour. list_files in the service
-        # accepts a 'mime_type' filter parameter.
+        # Interceptor Inteligente para Google Drive
+        if query:
+            logger.info(f"🔍 [Interceptor] Evaluando caché semántica para la consulta: '{query}'")
+            cache_hits = semantic_cache.buscar_similitud("drive", query, umbral=0.72)
+            
+            if cache_hits:
+                logger.info(f"⚡ [Cache Hit] Datos recuperados localmente desde LanceDB. Evitando API externa.")
+                lines = ["⚡ **[Cache Hit - Resultados ultrarrápidos]**\nINSTRUCCIÓN OBLIGATORIA: Debes mostrar estos archivos a los usuarios COMO ENLACES CLICKABLES en Markdown, usando este formato exacto: [Nombre del Archivo](URL)"]
+                for hit in cache_hits:
+                    url = hit.get("link_directo", "")
+                    lines.append(f"- 📄 [{hit['nombre']}]({url})")
+                return "\n".join(lines)
+
+        # Cache Miss - Ir a los servidores de Google reales
+        if query:
+            logger.info(f"🌐 [Cache Miss] Solicitando datos en vivo a la API de Google Drive...")
+        
         kw = {"max_results": 20}
         if query:
             kw["query"] = query
@@ -119,7 +160,8 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                 + (f" de tipo '{mime_filter}'" if mime_filter else "")
                 + "."
             )
-        lines = ["INSTRUCCIÓN OBLIGATORIA: Debes mostrar estos archivos a los usuarios COMO ENLACES CLICKABLES en Markdown, usando este formato exacto: [Nombre del Archivo](URL)"]
+            
+        lines = ["🌐 **[Búsqueda en Vivo]**\nINSTRUCCIÓN OBLIGATORIA: Debes mostrar estos archivos a los usuarios COMO ENLACES CLICKABLES en Markdown, usando este formato exacto: [Nombre del Archivo](URL)"]
         for f in results:
             ftype = "📁" if f.get("mimeType") == "application/vnd.google-apps.folder" else "📄"
             size = f.get("size", "N/A")
@@ -130,6 +172,18 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                 pass
             url = f.get("webViewLink", "")
             lines.append(f"- {ftype} [{f['name']}]({url}) ({size})")
+            
+            # Guardar el resultado en la caché para la próxima consulta
+            if ftype == "📄" and query:  # Solo cachear archivos (no carpetas) si hubo query
+                semantic_cache.guardar_en_cache(
+                    categoria="drive",
+                    id_doc=f["id"],
+                    titulo=f["name"],
+                    contenido="", # El contenido completo requeriría descarga, lo dejamos vacío para title search
+                    link=url,
+                    timestamp=f.get("modifiedTime", "")
+                )
+                
         return "\n".join(lines)
     except Exception as e:
         return str(e)

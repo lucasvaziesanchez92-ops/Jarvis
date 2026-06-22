@@ -117,6 +117,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start wiki index thread: {e}")
 
+    # Iniciar Cache Worker de LanceDB
+    try:
+        from backend.services.cache_worker import cache_worker
+        import asyncio
+        worker_task = asyncio.create_task(cache_worker.start())
+        logger.info("Background Cache Worker started")
+    except Exception as e:
+        logger.error(f"Failed to start Cache Worker: {e}")
+
     # NO pre-warm de TTS: causa descargas múltiples (60MB) cuando Railway
     # spawns varios workers. Lazy-load on first voice request.
 
@@ -124,6 +133,11 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Jarvis API shutting down")
+    try:
+        cache_worker.stop()
+        worker_task.cancel()
+    except Exception:
+        pass
 
 
 # -- Application Factory --------------------------------------

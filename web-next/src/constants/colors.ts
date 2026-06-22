@@ -2,7 +2,7 @@ export const PERSONALITY_THEMES: Record<string, {
   hex: string;
   tailwind: string;
   bgGlow: string;
-  particleType: 'grid' | 'waves' | 'matrix' | 'vectors' | 'chaos' | 'pulses';
+  particleType: 'grid' | 'waves' | 'matrix' | 'vectors' | 'chaos' | 'pulses' | 'scanner';
   particleSpeed: number;
 }> = {
   profesional: {
@@ -46,5 +46,12 @@ export const PERSONALITY_THEMES: Record<string, {
     bgGlow: 'rgba(249, 115, 22, 0.15)',
     particleType: 'pulses',
     particleSpeed: 0.4,
+  },
+  vision_activa: {
+    hex: '#a78bfa',
+    tailwind: 'text-violet-400',
+    bgGlow: 'rgba(167, 139, 250, 0.2)',
+    particleType: 'scanner',
+    particleSpeed: 3.5,
   },
 };

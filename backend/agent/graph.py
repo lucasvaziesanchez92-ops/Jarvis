@@ -38,6 +38,9 @@ def agent_node(state: JarvisState) -> dict:
     from backend.tools.registry import ALL_TOOLS
     from backend.agent.personalities import get_persona
     from backend.core.token_budget import manage_context
+    from backend.services.lancedb_cache import semantic_cache
+    from backend.agent.profiler import analizar_y_guardar_perfil
+    import asyncio
 
     persona = state.get("persona", "profesional")
     iterations = state.get("tool_iterations", 0)
@@ -147,6 +150,31 @@ def agent_node(state: JarvisState) -> dict:
 
     retrieved = "\n".join(state.get("retrieved_context", [])) if state.get("retrieved_context") else ""
 
+    # 1. Recuperar los hechos biográficos desde el almacenamiento local incrustado (<2ms)
+    try:
+        hechos_perfil = semantic_cache.obtener_perfil_completo()
+        if hechos_perfil:
+            bloque_memoria = "[MEMORIA PERMANENTE DEL USUARIO]\n"
+            for hecho in hechos_perfil:
+                bloque_memoria += f"- {hecho}\n"
+            retrieved = bloque_memoria + "\n" + retrieved if retrieved else bloque_memoria
+    except Exception as e:
+        logger.error(f"Error fetching user profile: {e}")
+
+    # 3. EXTRACCIÓN ASÍNCRONA DESACOPLADA (El truco de velocidad)
+    if last_user_msg:
+        try:
+            import threading
+            def run_profiler():
+                try:
+                    asyncio.run(analizar_y_guardar_perfil(last_user_msg))
+                except Exception as ex:
+                    logger.error(f"Profiler thread error: {ex}")
+            
+            threading.Thread(target=run_profiler, daemon=True).start()
+        except Exception as e:
+            logger.error(f"Error starting profiler task: {e}")
+
     if tools_executed and iterations > 0:
         tool_context = f"[CONTEXTO: Ya ejecutaste estas herramientas en este turno: {', '.join(tools_executed)}. No las repitas a menos que sea necesario.]"
         if retrieved:
@@ -171,9 +199,10 @@ def agent_node(state: JarvisState) -> dict:
     return result
 
 
-def tool_node(state: JarvisState) -> dict:
+async def tool_node(state: JarvisState) -> dict:
     from backend.tools.registry import ALL_TOOLS
     from backend.api.routers.diagnostics import record_error
+    import asyncio
 
     messages = state["messages"]
     last = messages[-1]
@@ -185,24 +214,15 @@ def tool_node(state: JarvisState) -> dict:
 
     from backend.tools.registry import TOOL_ALIASES
     tool_map = {t.name: t for t in ALL_TOOLS}
-    result = []
-    for tc in last.tool_calls:
+    
+    async def _run_tool(tc):
         raw_name = tc["name"]
-        # Resolve hallucinated aliases like 'search_drive_file' to
-        # the real tool 'search_drive'. The LLM still hears the
-        # original name in the conversation but the tool runs.
         canonical = TOOL_ALIASES.get(raw_name, raw_name)
         name = canonical
         raw_args = tc.get("args", {}) or {}
         logger.info(f"tool_node: executing {name}({json.dumps(raw_args, default=str)[:200]})")
         t = tool_map.get(name)
         if t:
-            # Validate args against the tool's Pydantic schema BEFORE
-            # invoking. devstral-small-2:24b sometimes omits required
-            # fields (e.g. 'content' on create_note) which previously
-            # surfaced to the user as 'Error: content' — useless.
-            # We return a structured error that the LLM can recover
-            # from in its next turn.
             try:
                 schema = getattr(t, "args_schema", None)
                 missing = []
@@ -214,9 +234,6 @@ def tool_node(state: JarvisState) -> dict:
                             if is_required:
                                 missing.append(fname)
                     if missing:
-                        # Heuristics: pick a sensible default for the
-                        # most common 'content' omission so the LLM
-                        # can keep moving.
                         if missing == ["content"] and name.startswith("create_"):
                             coerced["content"] = "(contenido no especificado)"
                             missing = []
@@ -226,26 +243,39 @@ def tool_node(state: JarvisState) -> dict:
                         f"{missing} que no fueron provistos. Reformula tu llamada "
                         f"incluyendo esos argumentos."
                     )
-                    result.append(ToolMessage(content=msg, tool_call_id=tc["id"], name=name))
-                    continue
-                out = str(t.invoke(coerced))
+                    return ToolMessage(content=msg, tool_call_id=tc["id"], name=name), None
+                
+                # Ejecución asíncrona para mayor concurrencia
+                if hasattr(t, "ainvoke") and callable(t.ainvoke):
+                    out = str(await t.ainvoke(coerced))
+                else:
+                    out = str(await asyncio.to_thread(t.invoke, coerced))
+                    
                 logger.info(f"tool_node: {name} returned {len(out)} chars: {out[:200]}")
-                result.append(ToolMessage(content=out, tool_call_id=tc["id"], name=name))
-                if name not in tools_executed:
-                    tools_executed.append(name)
+                return ToolMessage(content=out, tool_call_id=tc["id"], name=name), name
             except Exception as ex:
                 logger.error("Tool '{}' crashed: {}: {}", name, type(ex).__name__, str(ex), exc_info=True)
                 record_error("tool_node", ex, {"tool": name, "args": raw_args})
-                result.append(ToolMessage(content=f"Error: {type(ex).__name__}: {str(ex)[:200]}", tool_call_id=tc["id"], name=name))
+                return ToolMessage(content=f"Error: {type(ex).__name__}: {str(ex)[:200]}", tool_call_id=tc["id"], name=name), None
         else:
             logger.error(f"tool_node: tool '{name}' not found in registry ({len(tool_map)} tools loaded)")
-            result.append(ToolMessage(
+            return ToolMessage(
                 content=f"Herramienta '{name}' no encontrada. Disponibles: {', '.join(sorted(tool_map.keys()))[:200]}",
                 tool_call_id=tc["id"], name=name,
-            ))
+            ), None
+
+    # Ejecutar todas las herramientas en paralelo masivo
+    tasks = [_run_tool(tc) for tc in last.tool_calls]
+    results = await asyncio.gather(*tasks)
+
+    messages_out = []
+    for msg, executed_name in results:
+        messages_out.append(msg)
+        if executed_name and executed_name not in tools_executed:
+            tools_executed.append(executed_name)
 
     return {
-        "messages": result,
+        "messages": messages_out,
         "tool_iterations": state.get("tool_iterations", 0) + 1,
         "tools_executed": tools_executed,
     }

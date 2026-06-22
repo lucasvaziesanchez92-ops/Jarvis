@@ -14,7 +14,7 @@ import base64
 import asyncio
 from functools import lru_cache
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from loguru import logger
 
 from backend.config import settings
@@ -346,3 +346,185 @@ async def text_to_speech(request: TTSRequest):
     except Exception as e:
         logger.error(f"TTS error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+# ── Endpoint: WebSocket /ws/stream (Real-Time Audio Streaming) ───────
+
+# Variable global que actúa como un búfer circular de tamaño 1 en la RAM
+ultimo_frame_pantalla = None
+
+@router.websocket("/ws/stream")
+async def websocket_voice_stream(websocket: WebSocket):
+    global ultimo_frame_pantalla
+    await websocket.accept()
+    from backend.api.routers.chat import _session_history, _MAX_HISTORY, _prune_history
+    from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+    from backend.api.dependencies import get_jarvis_graph
+    import re
+    import asyncio
+    
+    def limpiar_texto_para_voz(texto_crudo):
+        texto = texto_crudo
+        texto = re.sub(r'<thought>.*?</thought>', '', texto, flags=re.DOTALL)
+        texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)
+        texto = texto.split("Visión general creada por IA")[0]
+        texto = re.sub(r'^\s*[-*•]\s+', ', ', texto, flags=re.MULTILINE)
+        texto = re.sub(r'[*#_]', '', texto)
+        texto = re.sub(r'\n+', '. ', texto)
+        texto = re.sub(r'\.{2,}', '.', texto)
+        texto = re.sub(r'\s+', ' ', texto)
+        texto = texto.replace(" .", ".")
+        return texto.strip()
+
+    stream_task = None
+
+    async def process_audio(audio_bytes, session_id, persona):
+        try:
+            await websocket.send_json({"type": "state", "status": "thinking"})
+            
+            # 1. STT
+            try:
+                transcript = await _transcribe(audio_bytes)
+            except Exception as e:
+                logger.error(f"STT failed: {e}")
+                await websocket.send_json({"type": "error", "payload": "No escuché nada."})
+                return
+            
+            if not transcript.strip():
+                await websocket.send_json({"type": "error", "payload": "No escuché nada."})
+                return
+            
+            # 2. System Prompt
+            voice_prompt = SystemMessage(
+                content="[MODO VOZ ACTIVO]: El usuario te está hablando por micrófono. "
+                        "REGLA 1: Debes MENCIONAR LA INFORMACIÓN CLAVE de los resultados de forma hablada y natural. "
+                        "NUNCA digas 'aquí los tienes' asumiendo que el usuario puede leerlos. "
+                        "REGLA 2: VELOCIDAD CRÍTICA. Usa max_results=3 en herramientas para ser rápido."
+            )
+            
+            history = list(_session_history[session_id])
+            
+            # Inyección Multimodal
+            if ultimo_frame_pantalla:
+                logger.info("👁️ [Visión Omnisciente] Adjuntando contexto de pantalla al LLM multimodal...")
+                
+                user_content = [
+                    {
+                        "type": "text", 
+                        "text": f"{transcript}\n\n[Instrucción técnica]: El usuario está compartiendo su pantalla en tiempo real. Analiza los elementos visuales, código o errores de consola visibles en la imagen adjunta para enriquecer tu respuesta."
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{ultimo_frame_pantalla}"}
+                    }
+                ]
+                human_msg = HumanMessage(content=user_content)
+            else:
+                human_msg = HumanMessage(content=transcript)
+                
+            input_state = {
+                "messages": history + [voice_prompt, human_msg],
+                "session_id": session_id,
+                "persona": persona,
+            }
+            
+            graph = get_jarvis_graph()
+            config = {"configurable": {"thread_id": f"{session_id}-{uuid4()}"}}
+            
+            buffer_frase = ""
+            full_response = ""
+            
+            # Usamos astream_events v2
+            async for event in graph.astream_events(input_state, config=config, version="v2"):
+                # Permitir interrupción en cada iteración
+                await asyncio.sleep(0)
+                kind = event["event"]
+                
+                if kind == "on_tool_start":
+                    tool_name = event.get("name", "tool")
+                    await websocket.send_json({
+                        "type": "thought",
+                        "payload": f"Usando herramienta: {tool_name}..."
+                    })
+                    
+                elif kind == "on_chat_model_stream":
+                    chunk = event["data"].get("chunk")
+                    if chunk and hasattr(chunk, "content"):
+                        chunk_content = chunk.content
+                        if isinstance(chunk_content, str) and chunk_content:
+                            buffer_frase += chunk_content
+                            full_response += chunk_content
+                            
+                            if any(signo in chunk_content for signo in [".", "!", "?", "\n"]):
+                                texto_limpio = limpiar_texto_para_voz(buffer_frase)
+                                if len(texto_limpio) > 5:
+                                    audio_chunk_b64 = await _synthesize_base64(texto_limpio)
+                                    if audio_chunk_b64:
+                                        await websocket.send_json({
+                                            "type": "audio_chunk",
+                                            "payload": audio_chunk_b64,
+                                            "text_segment": texto_limpio
+                                        })
+                                buffer_frase = ""
+                                
+            if buffer_frase.strip():
+                texto_limpio = limpiar_texto_para_voz(buffer_frase)
+                if len(texto_limpio) > 2:
+                    audio_chunk_b64 = await _synthesize_base64(texto_limpio)
+                    if audio_chunk_b64:
+                        await websocket.send_json({
+                            "type": "audio_chunk",
+                            "payload": audio_chunk_b64,
+                            "text_segment": texto_limpio
+                        })
+
+            _session_history[session_id].append(HumanMessage(content=transcript))
+            _session_history[session_id].append(AIMessage(content=full_response))
+            _session_history[session_id] = _prune_history(list(_session_history[session_id]), _MAX_HISTORY)
+                        
+            await websocket.send_json({
+                "type": "done",
+                "transcript": transcript,
+                "response_text": full_response
+            })
+
+        except asyncio.CancelledError:
+            logger.info("process_audio was cancelled via Barge-in (abort).")
+            try:
+                await websocket.send_json({"type": "aborted"})
+            except Exception:
+                pass
+            raise
+        except Exception as e:
+            logger.error(f"Streaming LLM/TTS error: {e}")
+            await websocket.send_json({"type": "error", "payload": "Hubo un error procesando el audio en tiempo real."})
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            
+            # 1. Capturar el frame óptico enviado silenciosamente por React de fondo
+            if data.get("type") == "screen_chunk":
+                ultimo_frame_pantalla = data.get("payload")
+                continue
+            
+            if data.get("type") == "abort":
+                if stream_task and not stream_task.done():
+                    stream_task.cancel()
+                continue
+
+            if data.get("type") == "audio_input":
+                if stream_task and not stream_task.done():
+                    stream_task.cancel()
+
+                audio_base64 = data.get("payload")
+                session_id = data.get("session_id", "voice-session")
+                persona = data.get("persona", "profesional")
+                
+                audio_bytes = base64.b64decode(audio_base64)
+                stream_task = asyncio.create_task(process_audio(audio_bytes, session_id, persona))
+
+    except WebSocketDisconnect:
+        logger.info("[WebSocket Voice Stream Disconnected]")
+        if stream_task and not stream_task.done():
+            stream_task.cancel()
+
