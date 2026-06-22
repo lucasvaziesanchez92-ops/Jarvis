@@ -190,7 +190,7 @@ def _extract_image_with_groq_vision(data: bytes, filename: str) -> str:
         import time
         max_retries = 3
         for attempt in range(max_retries):
-            resp = requests.post(url, json=payload)
+            resp = requests.post(url, json=payload, timeout=15)
             if resp.status_code in (429, 500, 502, 503, 504):
                 if attempt < max_retries - 1:
                     time.sleep(2 ** attempt)
@@ -234,6 +234,7 @@ def build_file_context(file_keys: list[str], filenames: Optional[list[str]] = No
     for i, key in enumerate(file_keys):
         filename = filenames[i] if filenames and i < len(filenames) else key.split("/")[-1]
         parts.append(f"\n📄 **Archivo #{i + 1}**: {filename}")
+        parts.append(f"Clave de acceso (attachment_key): {key}")
         try:
             content = extract_text_from_file(key, filename)
             parts.append(content)
