@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import dynamic from 'next/dynamic';
-import { Network, FileText, Folder, File, Search, Database, RefreshCw, Loader2, AlertCircle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Network, FileText, Folder, File, Search, Database, RefreshCw, Loader2, AlertCircle, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 
 // Dynamic import with SSR false to prevent "window is not defined" error in Next.js
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
@@ -23,6 +23,7 @@ export default function WikiPanel() {
   
   const [stats, setStats] = useState<{ chunks: number; vault: string } | null>(null);
   const [reindexing, setReindexing] = useState(false);
+  const [previewNode, setPreviewNode] = useState<any>(null);
 
   const graphRef = useRef<any>(null);
 
@@ -79,6 +80,20 @@ export default function WikiPanel() {
     }
   }, [selectedFile]);
 
+  // Adjust force graph physics to reduce clustering
+  useEffect(() => {
+    if (viewMode === 'graph' && graphRef.current) {
+      setTimeout(() => {
+        if (graphRef.current) {
+          graphRef.current.d3Force('charge').strength(-400); // Stronger repulsion
+          graphRef.current.d3Force('link').distance(100);    // Longer links
+          // Re-heat simulation
+          graphRef.current.d3ReheatSimulation();
+        }
+      }, 100);
+    }
+  }, [viewMode, graphData]);
+
   async function handleReindex() {
     setReindexing(true);
     try {
@@ -124,6 +139,7 @@ export default function WikiPanel() {
           <button 
             onClick={() => {
               setViewMode('graph');
+              setPreviewNode(null);
               setTimeout(() => graphRef.current?.zoomToFit(400, 50), 100);
             }}
             className={`px-3 py-1.5 rounded flex items-center gap-2 text-xs font-medium transition-colors ${viewMode === 'graph' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/60 hover:text-white'}`}
@@ -262,13 +278,8 @@ export default function WikiPanel() {
                 }}
                 linkColor={() => 'rgba(255,255,255,0.1)'}
                 backgroundColor="#050510"
-                onNodeClick={node => {
-                  const file = files.find(f => f.path === `${node.id}.md`);
-                  if (file) {
-                    setSelectedFile(file.path);
-                    setViewMode('text');
-                  }
-                }}
+                onNodeClick={node => setPreviewNode(node)}
+                onBackgroundClick={() => setPreviewNode(null)}
                 nodeCanvasObject={(node: any, ctx, globalScale) => {
                   const label = node.id;
                   const fontSize = 12/globalScale;
@@ -286,6 +297,50 @@ export default function WikiPanel() {
                   ctx.fillText(label, node.x, node.y);
                 }}
               />
+              
+              {previewNode && (
+                <div className="absolute top-6 right-6 w-80 bg-[#0a0a1a] border border-white/20 rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.8)] p-5 z-50 flex flex-col gap-4 animate-in fade-in slide-in-from-right-8 duration-200">
+                  <div className="flex justify-between items-start gap-2">
+                    <h3 className="font-bold text-white text-lg leading-tight">{previewNode.id}</h3>
+                    <button onClick={() => setPreviewNode(null)} className="text-white/40 hover:text-white transition-colors p-1 bg-white/5 rounded-md hover:bg-white/10">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  {previewNode.tags && previewNode.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {previewNode.tags.map((t: string) => (
+                        <span key={t} className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] uppercase tracking-wider">{t}</span>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="bg-white/5 rounded-lg p-3 text-sm text-white/80 leading-relaxed border border-white/5">
+                    {previewNode.summary && previewNode.summary !== 'N/A' ? (
+                      previewNode.summary
+                    ) : (
+                      <span className="text-white/30 italic">Sin resumen detallado disponible.</span>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    className="w-full mt-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg border-0"
+                    onClick={() => {
+                      const file = files.find(f => f.path === `${previewNode.id}.md` || f.name === `${previewNode.id}.md` || f.name === previewNode.id);
+                      if (file) {
+                        setSelectedFile(file.path);
+                        setViewMode('text');
+                        setPreviewNode(null);
+                      } else {
+                        alert(`El nodo "${previewNode.id}" no tiene un archivo físico asignado, es una etiqueta o concepto agrupador.`);
+                      }
+                    }}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Abrir Nota Completa
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
