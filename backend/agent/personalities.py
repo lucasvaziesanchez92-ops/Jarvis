@@ -44,7 +44,7 @@ TODOS_TOOLS = ["create_todo", "list_todos", "complete_todo", "update_todo", "del
 WIKI_TOOLS  = ["wiki_query", "wiki_save_research", "wiki_ingest"]
 TIME_TOOLS  = ["get_current_time", "get_current_date"]
 MEMORY_TOOLS = ["search_memory", "save_memory", "list_memories", "delete_memory"]
-SEARCH_TOOLS = ["web_search", "search_notes_semantic", "search_wiki_semantic", "search_all_knowledge"]
+SEARCH_TOOLS = ["web_search", "buscar_imagenes_web", "buscar_reversa_gratis", "search_notes_semantic", "search_wiki_semantic", "search_all_knowledge"]
 CALENDAR_TOOLS = [
     "list_calendar_events", "create_calendar_event",
     "update_calendar_event", "delete_calendar_event",
