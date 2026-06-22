@@ -2,10 +2,11 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, Square, Volume2, VolumeX, X } from 'lucide-react'
+import { Mic, MicOff, Square, Volume2, VolumeX, X, Eye, EyeOff } from 'lucide-react'
 import { useJarvisStore } from '@/store/jarvisStore'
 import { speak as ttsSpeak, stop as ttsStop, onTTSEvent } from '@/lib/tts'
 import { AudioQueuePlayer } from '@/utils/AudioQueuePlayer'
+import { ScreenCapturer } from '@/utils/ScreenCapturer'
 import { useMicVAD, utils } from '@ricky0123/vad-react'
 
 const API = '/api'
@@ -20,10 +21,12 @@ export default function VoiceControls() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
   const [hoveredBtn, setHoveredBtn] = useState<string | null>(null)
+  const [visionActive, setVisionActive] = useState<boolean>(false)
 
   const isCancelledRef = useRef<boolean>(false)
   const wsRef = useRef<WebSocket | null>(null)
   const audioQueueRef = useRef<AudioQueuePlayer | null>(null)
+  const screenCapturerRef = useRef<ScreenCapturer | null>(null)
 
   const vad = useMicVAD({
     startOnLoad: true,
@@ -69,6 +72,12 @@ export default function VoiceControls() {
   useEffect(() => {
     if (typeof window !== 'undefined' && !audioQueueRef.current) {
       audioQueueRef.current = new AudioQueuePlayer()
+    }
+    if (typeof window !== 'undefined' && !screenCapturerRef.current) {
+      screenCapturerRef.current = new ScreenCapturer()
+    }
+    return () => {
+      screenCapturerRef.current?.detenerCaptura()
     }
   }, [])
 
@@ -347,6 +356,23 @@ export default function VoiceControls() {
     }
   }
 
+  const toggleVision = async () => {
+    if (visionActive) {
+      screenCapturerRef.current?.detenerCaptura()
+      setVisionActive(false)
+    } else {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        // Debemos asegurar que el ws esté abierto para transmitir
+        // Podemos iniciar la captura de todas formas y el ws transmitirá cuando esté ready
+        const ws = new WebSocket(WS_URL)
+        wsRef.current = ws
+        ws.onclose = () => { wsRef.current = null }
+      }
+      await screenCapturerRef.current?.iniciarCaptura(wsRef.current!, 3000, () => setVisionActive(false))
+      setVisionActive(true)
+    }
+  }
+
   const showControls = currentScreen === 'home'
     || activityState === 'listening'
     || activityState === 'speaking'
@@ -485,19 +511,36 @@ export default function VoiceControls() {
           {vad.loading ? "CARGANDO VAD..." : vad.userSpeaking ? "TE ESCUCHO" : vad.listening ? "CONECTADO" : "PAUSADO"}
         </span>
 
-        <button
-          onClick={toggleTTS}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] tracking-wider uppercase font-medium transition-all cursor-pointer"
-          style={{
-            background: voiceEnabled ? 'rgba(0,200,255,0.12)' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${voiceEnabled ? 'rgba(0,200,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
-            color: voiceEnabled ? 'rgba(0,200,255,0.8)' : 'rgba(255,255,255,0.3)',
-          }}
-          title={voiceEnabled ? 'Desactivar voz de JARVIS' : 'Activar voz de JARVIS'}
-        >
-          {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-          <span>{voiceEnabled ? 'Voz ON' : 'Voz OFF'}</span>
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={toggleTTS}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] tracking-wider uppercase font-medium transition-all cursor-pointer"
+            style={{
+              background: voiceEnabled ? 'rgba(0,200,255,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${voiceEnabled ? 'rgba(0,200,255,0.25)' : 'rgba(255,255,255,0.08)'}`,
+              color: voiceEnabled ? 'rgba(0,200,255,0.8)' : 'rgba(255,255,255,0.3)',
+            }}
+            title={voiceEnabled ? 'Desactivar voz de JARVIS' : 'Activar voz de JARVIS'}
+          >
+            {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span>{voiceEnabled ? 'Voz ON' : 'Voz OFF'}</span>
+          </button>
+          
+          <button
+            onClick={toggleVision}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] tracking-wider uppercase font-medium transition-all cursor-pointer"
+            style={{
+              background: visionActive ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${visionActive ? 'rgba(167,139,250,0.35)' : 'rgba(255,255,255,0.08)'}`,
+              color: visionActive ? 'rgba(167,139,250,0.9)' : 'rgba(255,255,255,0.3)',
+              boxShadow: visionActive ? '0 0 10px rgba(167,139,250,0.2)' : 'none'
+            }}
+            title={visionActive ? 'Desactivar Módulo de Visión' : 'Activar Módulo de Visión'}
+          >
+            {visionActive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            <span>{visionActive ? 'Visión ON' : 'Visión OFF'}</span>
+          </button>
+        </div>
       </div>
     </div>
   )
