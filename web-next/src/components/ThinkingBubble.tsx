@@ -44,8 +44,8 @@ export default function ThinkingBubble() {
       setShow(true)
       setLabel('Pensando')
       if (text) {
-        // Show the actual thought truncated to 60 chars
-        setSubtext(text.length > 60 ? text.slice(0, 60) + '...' : text)
+        // Show the actual thought completely without slicing
+        setSubtext(text)
       } else {
         // Rotate random phrases every 1.5 seconds to make the wait feel dynamic
         setSubtext(THINKING_LINES[Math.floor(Math.random() * THINKING_LINES.length)])
@@ -105,6 +105,7 @@ export default function ThinkingBubble() {
               backdropFilter: 'blur(20px) saturate(1.5)',
               border: `1px solid ${color}33`,
               boxShadow: `0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)`,
+              maxWidth: '90vw',
             }}
           >
             {/* Triangle */}
@@ -119,7 +120,7 @@ export default function ThinkingBubble() {
             />
 
             {/* Pulsing icon or audio waves */}
-            <div className="relative w-7 h-7 flex items-center justify-center"
+            <div className="relative w-7 h-7 flex-shrink-0 flex items-center justify-center"
               style={{ color }}
             >
               <motion.div
@@ -136,7 +137,7 @@ export default function ThinkingBubble() {
               <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/60">
                 {label}
               </span>
-              <span className="text-[11px] text-white/30 mt-0.5 max-w-[150px] truncate">
+              <span className="text-[11px] text-white/50 mt-0.5 line-clamp-3">
                 {subtext}
               </span>
             </div>
