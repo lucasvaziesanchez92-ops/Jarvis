@@ -85,8 +85,8 @@ export default function WikiPanel() {
     if (viewMode === 'graph' && graphRef.current) {
       setTimeout(() => {
         if (graphRef.current) {
-          graphRef.current.d3Force('charge').strength(-400); // Stronger repulsion
-          graphRef.current.d3Force('link').distance(100);    // Longer links
+          graphRef.current.d3Force('charge').strength(-800); // Much stronger repulsion to prevent clutter
+          graphRef.current.d3Force('link').distance(150);    // Even longer links
           // Re-heat simulation
           graphRef.current.d3ReheatSimulation();
         }
