@@ -249,8 +249,19 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
         voice_jobs[job_id]["status"] = "speaking"
         voice_jobs[job_id]["thought"] = "Generando voz..."
         try:
+            import re
+            def limpiar_texto_para_voz(texto_crudo):
+                texto = texto_crudo
+                texto = re.sub(r'<thought>.*?</thought>', '', texto, flags=re.DOTALL)
+                texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)
+                texto = re.sub(r'[*#_\-]', '', texto)
+                texto = texto.split("Visión general creada por IA")[0]
+                return texto.strip()
+                
+            texto_hablado = limpiar_texto_para_voz(final_msg_content)
+            
             audio_b64 = await asyncio.wait_for(
-                _synthesize_base64(final_msg_content), timeout=15
+                _synthesize_base64(texto_hablado), timeout=15
             )
             voice_jobs[job_id]["audio_base64"] = audio_b64
         except Exception as e:

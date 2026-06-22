@@ -97,15 +97,17 @@ export default function ThinkingBubble() {
             style={{ background: color }}
           />
 
-          {/* Compact orb */}
+          {/* Dynamic Bubble Container */}
           <div
-            className="relative flex items-center gap-3 rounded-[20px] px-4 py-2.5"
+            className="relative flex flex-col gap-3 rounded-[20px] px-4 py-3"
             style={{
               background: 'rgba(12,12,20,0.85)',
               backdropFilter: 'blur(20px) saturate(1.5)',
               border: `1px solid ${color}33`,
               boxShadow: `0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)`,
+              width: activityState === 'thinking' ? '24rem' : 'auto',
               maxWidth: '90vw',
+              transition: 'width 0.4s cubic-bezier(0.23, 1, 0.32, 1)'
             }}
           >
             {/* Triangle */}
@@ -119,54 +121,70 @@ export default function ThinkingBubble() {
               }}
             />
 
-            {/* Pulsing icon or audio waves */}
-            <div className="relative w-7 h-7 flex-shrink-0 flex items-center justify-center"
-              style={{ color }}
-            >
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{ background: color }}
-                animate={{ scale: [1, 1.6, 1], opacity: [0.3, 0, 0.3] }}
-                transition={{ duration: activityState === 'speaking' ? 0.8 : 2, repeat: Infinity, ease: 'easeInOut' }}
-              />
-              <Icon className="w-4 h-4 relative z-10" strokeWidth={2.5} />
+            <div className="flex items-center gap-3 w-full">
+              {/* Pulsing icon */}
+              <div className="relative w-7 h-7 flex-shrink-0 flex items-center justify-center"
+                style={{ color }}
+              >
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  style={{ background: color }}
+                  animate={{ scale: [1, 1.6, 1], opacity: [0.3, 0, 0.3] }}
+                  transition={{ duration: activityState === 'speaking' ? 0.8 : 2, repeat: Infinity, ease: 'easeInOut' }}
+                />
+                <Icon className="w-4 h-4 relative z-10" strokeWidth={2.5} />
+              </div>
+
+              {/* Text */}
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/60">
+                  {label}
+                </span>
+                <span className="text-xs font-mono text-zinc-300 mt-0.5 truncate">
+                  {subtext}
+                </span>
+              </div>
+
+              {/* Status Indicators */}
+              {activityState === 'listening' && (
+                <div className="flex gap-[3px] ml-1 flex-shrink-0">
+                  {[0,1,2].map(i => (
+                    <motion.div key={i} className="w-[3px] h-[3px] rounded-full"
+                      style={{ background: color }}
+                      animate={{ opacity: [0.2, 1, 0.2] }}
+                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
+                    />
+                  ))}
+                </div>
+              )}
+              
+              {/* Audio Waves */}
+              {activityState === 'speaking' && (
+                <div className="flex gap-[2px] ml-1 items-center h-4 flex-shrink-0">
+                  {[0,1,2,3].map(i => (
+                    <motion.div key={i} className="w-[3px] rounded-full"
+                      style={{ background: color }}
+                      animate={{ height: ['4px', '16px', '4px'] }}
+                      transition={{ duration: 0.5 + (Math.random() * 0.5), repeat: Infinity, delay: i * 0.1 }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Text */}
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/60">
-                {label}
-              </span>
-              <span className="text-[11px] text-white/50 mt-0.5 line-clamp-3">
-                {subtext}
-              </span>
-            </div>
+            {/* Progress Bar for Thinking */}
+            {activityState === 'thinking' && (
+              <div className="w-full bg-zinc-800/50 h-1.5 rounded-full overflow-hidden mt-1">
+                <motion.div 
+                  className="h-full rounded-full" 
+                  style={{ background: color }}
+                  animate={{ width: ["0%", "40%", "70%", "95%"] }}
+                  transition={{ duration: 8, ease: "easeOut" }}
+                />
+              </div>
+            )}
 
-            {/* Dots */}
-            {activityState !== 'speaking' && (
-              <div className="flex gap-[3px] ml-1">
-                {[0,1,2].map(i => (
-                  <motion.div key={i} className="w-[3px] h-[3px] rounded-full"
-                    style={{ background: color }}
-                    animate={{ opacity: [0.2, 1, 0.2] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
-                  />
-                ))}
-              </div>
-            )}
-            
-            {/* Audio Waves */}
-            {activityState === 'speaking' && (
-              <div className="flex gap-[2px] ml-1 items-center h-4">
-                {[0,1,2,3].map(i => (
-                  <motion.div key={i} className="w-[3px] rounded-full"
-                    style={{ background: color }}
-                    animate={{ height: ['4px', '14px', '4px', '10px', '4px'] }}
-                    transition={{ duration: 0.6 + (i * 0.1), repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                ))}
-              </div>
-            )}
+
           </div>
         </motion.div>
       )}
