@@ -198,9 +198,19 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
                 voice_jobs[job_id]["thought"] = f"Usando herramienta: {tool_name}..."
 
         try:
+            from langchain_core.messages import SystemMessage
+            voice_prompt = SystemMessage(
+                content="[MODO VOZ ACTIVO]: El usuario te está hablando por micrófono. "
+                        "REGLA 1: Debes MENCIONAR LA INFORMACIÓN CLAVE de los resultados (ej. los asuntos "
+                        "de los correos, los nombres de los eventos) de forma hablada y natural. NUNCA "
+                        "digas 'aquí los tienes' asumiendo que el usuario puede leerlos. "
+                        "REGLA 2: VELOCIDAD CRÍTICA. Cuando uses herramientas como listar correos o buscar "
+                        "en Drive, debes pasar OBLIGATORIAMENTE el parámetro max_results=3 (o similar) para "
+                        "que la búsqueda sea instantánea."
+            )
             history = list(_session_history[session_id])
             input_state = {
-                "messages": history + [HumanMessage(content=transcript)],
+                "messages": history + [voice_prompt, HumanMessage(content=transcript)],
                 "session_id": session_id or "voice-session",
                 "persona": persona,
             }
