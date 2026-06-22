@@ -61,7 +61,7 @@ def agent_node(state: JarvisState) -> dict:
             break
 
     if last_user_msg:
-        tools = _get_router().route(last_user_msg, top_k=8)
+        tools = _get_router().route(last_user_msg, top_k=20)
         persona_names = {t.name for t in persona_tools}
         tools = [t for t in tools if t.name in persona_names]
 
@@ -79,9 +79,8 @@ def agent_node(state: JarvisState) -> dict:
                 if pt not in tools:
                     tools.append(pt)
 
-        # Keyword-boost: if the user mentions Drive/Gmail/Calendar/Google
-        # explicitly, make sure the relevant Google tools are in the
-        # list. (Now redundant with the above, kept for clarity.)
+        # Keyword-boost: if the user mentions specific domains explicitly,
+        # make sure the relevant tools are in the list.
         q_lower = last_user_msg.lower()
         keyword_tool_map = {
             (
@@ -111,6 +110,15 @@ def agent_node(state: JarvisState) -> dict:
             ],
             ("storage", "bucket", "subido", "subir archivo", "guardar archivo"): [
                 "list_storage_files", "read_storage_file", "delete_storage_file",
+            ],
+            ("clima", "tiempo", "temperatura", "llover", "lluvia", "frio", "calor", "weather"): [
+                "get_weather",
+            ],
+            ("calcula", "calcular", "matematicas", "matemáticas", "porcentaje", "multiplica", "divide", "suma", "resta", "math"): [
+                "calculate_math",
+            ],
+            ("hora", "que hora", "fecha", "dia es hoy", "día es hoy"): [
+                "get_current_time", "get_current_date",
             ],
         }
         for keywords, tool_names in keyword_tool_map.items():
