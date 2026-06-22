@@ -185,42 +185,50 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
         voice_jobs[job_id]["thought"] = "Pensando..."
         
         from langchain_core.messages import HumanMessage
+        from langchain_core.callbacks import AsyncCallbackHandler
         from backend.api.dependencies import get_jarvis_graph
+        from backend.api.routers.chat import _session_history, _MAX_HISTORY, _prune_history
+        
         graph = get_jarvis_graph()
         config = {"configurable": {"thread_id": session_id or "voice-session"}}
         
+        class VoiceCallback(AsyncCallbackHandler):
+            async def on_tool_start(self, serialized, input_str, **kwargs):
+                tool_name = serialized.get("name", "tool")
+                voice_jobs[job_id]["thought"] = f"Usando herramienta: {tool_name}..."
+
         try:
-            final_msg_content = ""
+            history = list(_session_history[session_id])
+            input_state = {
+                "messages": history + [HumanMessage(content=transcript)],
+                "session_id": session_id or "voice-session",
+                "persona": persona,
+            }
             
-            # We use astream_events to catch tool calls and update the "thought"
-            async for event in graph.astream_events(
-                {
-                    "messages": [HumanMessage(content=transcript)],
-                    "session_id": session_id or "voice-session",
-                    "persona": persona,
-                },
-                config=config,
-                version="v2",
-            ):
-                if event["event"] == "on_tool_start":
-                    tool_name = event["name"]
-                    voice_jobs[job_id]["thought"] = f"Usando herramienta: {tool_name}..."
-                elif event["event"] == "on_chat_model_stream":
-                    chunk = event["data"]["chunk"]
-                    if hasattr(chunk, "content") and isinstance(chunk.content, str):
-                        final_msg_content += chunk.content
+            state = await asyncio.wait_for(
+                graph.ainvoke(
+                    input_state,
+                    config={"callbacks": [VoiceCallback()], **config}
+                ),
+                timeout=300
+            )
             
-            if not final_msg_content.strip():
-                # Fallback if stream didn't yield text chunks properly
-                state = await graph.aget_state(config)
-                ai_msgs = [m for m in state.values.get("messages", []) if hasattr(m, "type") and m.type == "ai"]
-                if not ai_msgs:
-                    raise ValueError("No AI messages generated")
-                final_msg_content = ai_msgs[-1].content
+            if state.get("messages"):
+                _session_history[session_id] = _prune_history(list(state["messages"]), _MAX_HISTORY)
+            
+            ai_msgs = [m for m in state.get("messages", []) if hasattr(m, "type") and m.type == "ai"]
+            if not ai_msgs:
+                raise ValueError("No AI messages generated")
+            final_msg_content = ai_msgs[-1].content
                 
             voice_jobs[job_id]["response_text"] = final_msg_content
             logger.info(f"[{job_id}] Voice LLM: {final_msg_content[:80]}")
             
+        except asyncio.TimeoutError:
+            logger.warning(f"[{job_id}] Graph timeout")
+            voice_jobs[job_id]["status"] = "error"
+            voice_jobs[job_id]["response_text"] = "Me tardé demasiado procesando eso. ¿Podés repetirlo más breve?"
+            return
         except Exception as e:
             logger.error(f"[{job_id}] Agent failed: {e}")
             voice_jobs[job_id]["status"] = "error"
