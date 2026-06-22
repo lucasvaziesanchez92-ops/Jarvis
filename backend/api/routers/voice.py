@@ -252,10 +252,27 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
             import re
             def limpiar_texto_para_voz(texto_crudo):
                 texto = texto_crudo
+                # 1. Quitar pensamientos
                 texto = re.sub(r'<thought>.*?</thought>', '', texto, flags=re.DOTALL)
+                # 2. Dejar solo texto visible de los links
                 texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)
-                texto = re.sub(r'[*#_\-]', '', texto)
+                # 3. Eliminar "Visión general..."
                 texto = texto.split("Visión general creada por IA")[0]
+                
+                # 4. Convertir viñetas en pausas (comas)
+                texto = re.sub(r'^\s*[-*•]\s+', ', ', texto, flags=re.MULTILINE)
+                
+                # 5. Eliminar hashtags y asteriscos
+                texto = re.sub(r'[*#_]', '', texto)
+                
+                # 6. Convertir saltos de línea en puntos para forzar la respiración del TTS
+                texto = re.sub(r'\n+', '. ', texto)
+                
+                # 7. Limpiar espacios y puntos redundantes
+                texto = re.sub(r'\.{2,}', '.', texto)
+                texto = re.sub(r'\s+', ' ', texto)
+                texto = texto.replace(" .", ".")
+                
                 return texto.strip()
                 
             texto_hablado = limpiar_texto_para_voz(final_msg_content)
