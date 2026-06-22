@@ -156,37 +156,13 @@ function BrainModel({ activityState, isMobile, activePersonality }: { activitySt
     };
   }, [outerMaterial, innerMaterial, glowMaterial]);
 
-  const currentRotation = useRef({ x: -Math.PI / 2, z: Math.PI / 3.5 });
-
-  useFrame(({ clock }, delta) => {
+  useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
 
-    let rotationSpeed = 0.1;
-    let targetScale = 1.0;
-
-    if (activityState === 'thinking') {
-      rotationSpeed = 0.5; // Spins much faster
-      targetScale = 1.02; 
-    } else if (activityState === 'speaking') {
-      rotationSpeed = 0.25;
-      // Pulse scale to speech
-      targetScale = 1.0 + Math.abs(Math.sin(t * 8)) * 0.05; 
-    } else if (activityState === 'listening') {
-      rotationSpeed = 0.05; // Slow down when listening
-      targetScale = 0.98;
-    }
-
     if (groupRef.current) {
-      // Rotate dynamically
-      currentRotation.current.x += delta * (rotationSpeed * 0.5);
-      currentRotation.current.z += delta * rotationSpeed;
-      
-      // Add a bit of natural bobbing
-      groupRef.current.rotation.x = currentRotation.current.x + Math.sin(t * 0.5) * 0.05;
-      groupRef.current.rotation.z = currentRotation.current.z + Math.cos(t * 0.5) * 0.05;
-
-      // Smooth scale interpolation
-      groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+      // === ROTACIÓN BASE (de brain-3d.html) ===
+      groupRef.current.rotation.x = -Math.PI / 2 + Math.sin(t * 0.15) * 0.05;
+      groupRef.current.rotation.z = Math.PI / 3.5 + Math.cos(t * 0.1) * 0.03;
     }
 
     const outer = outerMatRef.current;
@@ -208,37 +184,37 @@ function BrainModel({ activityState, isMobile, activePersonality }: { activitySt
 
     switch (activityState) {
       case 'thinking': {
-        // Erratic heavy processing pulse
-        const blink = (Math.sin(t * 15) + Math.sin(t * 10)) / 2;
-        outer.opacity = 0.8 + blink * 0.2;
-        outer.transmission = 0.05;
-        outer.emissiveIntensity = 0.8 + blink * 0.4;
-        glow.opacity = 0.3 + blink * 0.4;
-        bot.intensity = 0.6 + blink * 0.5;
+        // PARPADEO del brain-3d.html: blink a 3Hz
+        const blink = (Math.sin(t * 3) + 1) / 2;
+        outer.opacity = 0.7 + blink * 0.3;
+        outer.transmission = 0.05 + blink * 0.15;
+        outer.emissiveIntensity = 0.4 + blink * 0.5;
+        glow.opacity = 0.15 + blink * 0.4;
+        bot.intensity = 0.5 + blink * 0.5;
         break;
       }
       case 'speaking': {
-        // Deep rhythmic pulse
-        const pulse = (Math.sin(t * 8) + 1) / 2;
-        outer.opacity = 1.0;
-        outer.transmission = 0.1;
-        outer.emissiveIntensity = 0.7 + pulse * 0.3;
-        glow.opacity = 0.3 + pulse * 0.4;
-        bot.intensity = 0.6 + pulse * 0.5;
-        break;
-      }
-      case 'listening': {
-        // Smooth alert glow
+        // Pulso del glow + bottom light
         const pulse = (Math.sin(t * 2) + 1) / 2;
         outer.opacity = 1.0;
         outer.transmission = 0.1;
-        outer.emissiveIntensity = 0.5 + pulse * 0.2;
-        glow.opacity = 0.2 + pulse * 0.1;
+        outer.emissiveIntensity = 0.5;
+        glow.opacity = 0.2 + pulse * 0.3;
+        bot.intensity = 0.5 + pulse * 0.4;
+        break;
+      }
+      case 'listening': {
+        // Pulse suave
+        const pulse = (Math.sin(t * 1.5) + 1) / 2;
+        outer.opacity = 1.0;
+        outer.transmission = 0.1;
+        outer.emissiveIntensity = 0.4 + pulse * 0.2;
+        glow.opacity = 0.15 + pulse * 0.1;
         bot.intensity = 0.4 + pulse * 0.2;
         break;
       }
       case 'error': {
-        // Fast red flashing
+        // Parpadeo rápido rojo
         const blink = (Math.sin(t * 6) + 1) / 2;
         outer.emissive.setHex(0xff0033);
         outer.emissiveIntensity = 0.3 + blink * 0.7;
@@ -251,7 +227,7 @@ function BrainModel({ activityState, isMobile, activePersonality }: { activitySt
         break;
       }
       case 'sleep': {
-        // Almost static, very dim
+        // Casi estático, brillo bajo
         outer.opacity = 0.85;
         outer.transmission = 0.08;
         outer.emissiveIntensity = 0.25;
@@ -261,12 +237,12 @@ function BrainModel({ activityState, isMobile, activePersonality }: { activitySt
       }
       case 'idle':
       default: {
-        // IDLE: soft breathing
+        // IDLE: glow oscila suave
         outer.opacity = 1.0;
         outer.transmission = 0.1;
         outer.emissiveIntensity = 0.65;
-        glow.opacity = 0.3 + Math.sin(t * 1.2) * 0.1;
-        bot.intensity = 0.5 + Math.sin(t * 1.5) * 0.25;
+        glow.opacity = 0.3 + Math.sin(t * 0.8) * 0.08;
+        bot.intensity = 0.5 + Math.sin(t * 1.2) * 0.25;
         break;
       }
     }

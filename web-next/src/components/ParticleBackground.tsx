@@ -57,66 +57,89 @@ export default function ParticleBackground() {
     const draw = () => {
       // Speed multiplier based on voice activity
       let speedMultiplier = 1;
-      if (activityState === 'listening') speedMultiplier = 0.5;
-      else if (activityState === 'thinking') speedMultiplier = 5.0;
-      else if (activityState === 'speaking') speedMultiplier = 2.5;
+      if (activityState === 'listening') speedMultiplier = 0.2;
+      else if (activityState === 'thinking') speedMultiplier = 3.0;
+      else if (activityState === 'speaking') speedMultiplier = 1.5;
 
       const baseSpeed = theme.particleSpeed * speedMultiplier;
 
-      // Vortex effect with a trailing fade
-      ctx.fillStyle = `rgba(4, 4, 8, ${activityState === 'thinking' ? 0.3 : 0.1})`;
-      ctx.fillRect(0, 0, w, h);
-      
+      ctx.clearRect(0, 0, w, h);
       time += 0.01 * baseSpeed;
 
-      particles.forEach((p) => {
-        // Compute distance from center
-        const dx = p.x - w / 2;
-        const dy = p.y - h / 2;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        // Swirl angle
-        const angle = Math.atan2(dy, dx);
-        
-        // Vortex force: pulls inward slightly while rotating
-        const force = 100 / (dist + 1);
-        p.vx += Math.cos(angle + Math.PI / 2) * force * 0.01 * baseSpeed;
-        p.vy += Math.sin(angle + Math.PI / 2) * force * 0.01 * baseSpeed;
-        
-        // Add some noise
-        p.vx += (Math.random() - 0.5) * 0.1 * baseSpeed;
-        p.vy += (Math.random() - 0.5) * 0.1 * baseSpeed;
-        
-        // Friction
-        p.vx *= 0.98;
-        p.vy *= 0.98;
+      ctx.fillStyle = `rgba(${rgbColor}, 0.5)`;
+      ctx.strokeStyle = `rgba(${rgbColor}, 0.15)`;
 
-        p.x += p.vx;
-        p.y += p.vy;
-
-        // Wrap around if it goes way off screen or gets too close to center
-        if (p.x < 0 || p.x > w || p.y < 0 || p.y > h || dist < 20) {
-          p.x = Math.random() * w;
-          p.y = Math.random() * h;
-          p.vx = 0;
-          p.vy = 0;
+      if (theme.particleType === 'grid') {
+        const spacing = 40;
+        const offset = (time * 20) % spacing;
+        ctx.beginPath();
+        for (let x = offset; x < w; x += spacing) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, h);
         }
-
-        // Draw particle trail
-        ctx.beginPath();
-        const intensity = Math.max(0.1, 1 - dist / (w/2));
-        ctx.strokeStyle = `rgba(${rgbColor}, ${intensity * 0.8})`;
-        ctx.lineWidth = p.size * (activityState === 'thinking' ? 2 : 1);
-        ctx.moveTo(p.x - p.vx * 2, p.y - p.vy * 2);
-        ctx.lineTo(p.x, p.y);
+        for (let y = offset; y < h; y += spacing) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+        }
         ctx.stroke();
-        
-        // Draw particle head
-        ctx.fillStyle = `rgba(${rgbColor}, ${intensity})`;
+      } else if (theme.particleType === 'matrix') {
+        particles.forEach(p => {
+          p.y += p.speed * 5 * baseSpeed;
+          if (p.y > h) {
+            p.y = 0;
+            p.x = Math.random() * w;
+          }
+          ctx.fillRect(p.x, p.y, 2, 15);
+        });
+      } else if (theme.particleType === 'waves') {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      });
+        for (let i = 0; i < 5; i++) {
+          for (let x = 0; x < w; x += 10) {
+            const y = h / 2 + Math.sin(x * 0.01 + time + i) * 100;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+        }
+        ctx.stroke();
+      } else if (theme.particleType === 'pulses') {
+        const centerX = w / 2;
+        const centerY = h / 2;
+        for (let i = 0; i < 4; i++) {
+          const radius = ((time * 50) + i * 100) % 400;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      } else {
+        // Chaos / Vectors
+        particles.forEach(p => {
+          p.x += p.vx * baseSpeed;
+          p.y += p.vy * baseSpeed;
+          if (p.x < 0 || p.x > w) p.vx *= -1;
+          if (p.y < 0 || p.y > h) p.vy *= -1;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        if (theme.particleType === 'vectors') {
+          ctx.beginPath();
+          for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+              const dx = particles[i].x - particles[j].x;
+              const dy = particles[i].y - particles[j].y;
+              const dist = dx * dx + dy * dy;
+              if (dist < 10000) {
+                ctx.moveTo(particles[i].x, particles[i].y);
+                ctx.lineTo(particles[j].x, particles[j].y);
+              }
+            }
+          }
+          ctx.stroke();
+        }
+      }
+
       animationFrameId = requestAnimationFrame(draw);
     };
 
