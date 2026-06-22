@@ -13,11 +13,13 @@ import { PERSONALITY_THEMES } from '@/constants/colors'
 */
 
 const THINKING_LINES = [
-  'Analizando patrones...',
+  'Analizando espectro de voz...',
   'Sincronizando sinapsis...',
   'Optimizando inferencia...',
-  'Consultando memoria...',
-  'Procesando contexto...',
+  'Buscando en base de conocimientos...',
+  'Preparando ejecución de herramientas...',
+  'Procesando contexto neuronal...',
+  'Evaluando variables lógicas...',
 ]
 
 export default function ThinkingBubble() {
@@ -36,6 +38,8 @@ export default function ThinkingBubble() {
       if (match) text = match[1].trim()
     }
 
+    let intervalId: NodeJS.Timeout;
+
     if (activityState === 'thinking') {
       setShow(true)
       setLabel('Pensando')
@@ -43,7 +47,11 @@ export default function ThinkingBubble() {
         // Show the actual thought truncated to 60 chars
         setSubtext(text.length > 60 ? text.slice(0, 60) + '...' : text)
       } else {
+        // Rotate random phrases every 1.5 seconds to make the wait feel dynamic
         setSubtext(THINKING_LINES[Math.floor(Math.random() * THINKING_LINES.length)])
+        intervalId = setInterval(() => {
+          setSubtext(THINKING_LINES[Math.floor(Math.random() * THINKING_LINES.length)])
+        }, 1500)
       }
     } else if (activityState === 'listening') {
       setShow(true)
@@ -55,6 +63,10 @@ export default function ThinkingBubble() {
       setSubtext('Reproduciendo voz...')
     } else {
       setShow(false)
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
     }
   }, [activityState, lastAssistantText])
 
