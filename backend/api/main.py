@@ -168,6 +168,7 @@ if os.getenv("NODE_ENV") != "production":
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_ORIGINS,
+    allow_origin_regex=r"https://.*\.railway\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

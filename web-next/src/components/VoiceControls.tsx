@@ -12,6 +12,22 @@ import { useMicVAD, utils } from '@ricky0123/vad-react'
 const API = '/api'
 const WS_URL = typeof window !== 'undefined' ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/api/voice/stream` : ''
 
+if (typeof window !== 'undefined') {
+  // @ts-ignore
+  window.ort = window.ort || {};
+  // @ts-ignore
+  window.ort.env = window.ort.env || {};
+  // @ts-ignore
+  window.ort.env.wasm = window.ort.env.wasm || {};
+  // @ts-ignore
+  window.ort.env.wasm.wasmPaths = {
+    "ort-wasm-simd-threaded.wasm": "/ort-wasm-simd-threaded.wasm",
+    "ort-wasm-simd-threaded.mjs": "/ort-wasm-simd-threaded.mjs",
+    "ort-wasm-simd.wasm": "/ort-wasm-simd.wasm",
+    "ort-wasm.wasm": "/ort-wasm.wasm",
+  }
+}
+
 export default function VoiceControls() {
   const {
     activityState, setActivityState, setMicActive, micActive,
@@ -30,6 +46,8 @@ export default function VoiceControls() {
 
   const vad = useMicVAD({
     startOnLoad: true,
+    workletURL: "/vad.worklet.bundle.min.js",
+    modelURL: "/silero_vad_legacy.onnx",
     onSpeechStart: () => {
       console.log("🎙️ [VAD] Detección de habla iniciada.");
       // 1. BARGE-IN ORGÁNICO: Si JARVIS está hablando, lo callamos al instante
