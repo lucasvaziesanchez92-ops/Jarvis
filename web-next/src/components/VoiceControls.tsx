@@ -290,12 +290,6 @@ export default function VoiceControls() {
     }
   }
 
-  const playAudio = (b64: string, onEnd?: () => void) => {
-    if (audioElRef.current) {
-      audioElRef.current.onended = null
-      audioElRef.current.onerror = null
-      audioElRef.current.pause()
-      audioElRef.current.src = ''
   const playAudio = useCallback((base64: string, onEnded?: () => void) => {
     if (audioElRef.current) {
       audioElRef.current.onended = null
