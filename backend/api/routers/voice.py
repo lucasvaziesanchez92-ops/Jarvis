@@ -190,6 +190,8 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
         config = {"configurable": {"thread_id": session_id or "voice-session"}}
         
         try:
+            final_msg_content = ""
+            
             # We use astream_events to catch tool calls and update the "thought"
             async for event in graph.astream_events(
                 {
@@ -203,15 +205,21 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
                 if event["event"] == "on_tool_start":
                     tool_name = event["name"]
                     voice_jobs[job_id]["thought"] = f"Usando herramienta: {tool_name}..."
+                elif event["event"] == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    if hasattr(chunk, "content") and isinstance(chunk.content, str):
+                        final_msg_content += chunk.content
             
-            # Fetch final state after stream finishes
-            state = await graph.aget_state(config)
-            ai_msgs = [m for m in state.values.get("messages", []) if hasattr(m, "type") and m.type == "ai"]
-            if not ai_msgs:
-                raise ValueError("No AI messages generated")
-            final_msg = ai_msgs[-1].content
-            voice_jobs[job_id]["response_text"] = final_msg
-            logger.info(f"[{job_id}] Voice LLM: {final_msg[:80]}")
+            if not final_msg_content.strip():
+                # Fallback if stream didn't yield text chunks properly
+                state = await graph.aget_state(config)
+                ai_msgs = [m for m in state.values.get("messages", []) if hasattr(m, "type") and m.type == "ai"]
+                if not ai_msgs:
+                    raise ValueError("No AI messages generated")
+                final_msg_content = ai_msgs[-1].content
+                
+            voice_jobs[job_id]["response_text"] = final_msg_content
+            logger.info(f"[{job_id}] Voice LLM: {final_msg_content[:80]}")
             
         except Exception as e:
             logger.error(f"[{job_id}] Agent failed: {e}")
@@ -224,7 +232,7 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
         voice_jobs[job_id]["thought"] = "Generando voz..."
         try:
             audio_b64 = await asyncio.wait_for(
-                _synthesize_base64(final_msg), timeout=15
+                _synthesize_base64(final_msg_content), timeout=15
             )
             voice_jobs[job_id]["audio_base64"] = audio_b64
         except Exception as e:
