@@ -84,15 +84,15 @@ def _ddg_html_scraper(query: str) -> str:
 
 @tool
 def web_search(query: str) -> str:
-    """Busca en internet usando un buscador real y extrae el contenido de las páginas web más relevantes.
-    Úsala SIEMPRE que el usuario te pida buscar algo en internet, información externa o reciente."""
+    """Busca en internet usando un buscador real y extrae el texto de las páginas web más relevantes.
+    Úsala para obtener información textual y responder preguntas."""
     return _ddg_html_scraper(query)
 
 
 @tool
 def buscar_imagenes_web(query: str) -> str:
-    """Busca imágenes, diagramas o infografías en la web sobre un tema educativo, científico o visual.
-    Utiliza esta herramienta cuando el usuario quiera VER imágenes o ilustraciones sobre un concepto."""
+    """Busca imágenes (fotos, diagramas, infografías) en la web.
+    Usa ESTA herramienta (incluso en paralelo con web_search) siempre que el usuario te pida explícitamente que le muestres "una imagen", "fotos" o "diagramas" sobre un tema."""
     try:
         url = "https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=" + urllib.parse.quote(query) + "&gsrnamespace=6&prop=imageinfo&iiprop=url|size|mime&format=json&gsrlimit=3"
         req = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/2.0 (Bot)'})
