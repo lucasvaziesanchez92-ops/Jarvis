@@ -235,8 +235,12 @@ export default function VoiceControls() {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 180000)
     try {
+      const { chatSessionId, persona } = useJarvisStore.getState()
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
+      formData.append('session_id', chatSessionId)
+      formData.append('persona', persona?.name || 'profesional')
+
       const res = await fetch(`${API}/voice`, {
         method: 'POST',
         body: formData,

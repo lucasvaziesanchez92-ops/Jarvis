@@ -60,7 +60,7 @@ async def _transcribe(audio_bytes: bytes) -> str:
 
 # ── Module B: Agent Graph (TOOLS ENABLED) ─────────────────────────
 
-async def _chat_with_agent(transcript: str, session_id: str = "") -> tuple[str, bool]:
+async def _chat_with_agent(transcript: str, session_id: str = "", persona: str = "profesional") -> tuple[str, bool]:
     """Usa el agente completo con herramientas. Retorna (respuesta, tools_used).
     Timeout ampliado a 90s para permitir tareas complejas como buscar en Drive/Gmail."""
     from langchain_core.messages import HumanMessage
@@ -73,7 +73,7 @@ async def _chat_with_agent(transcript: str, session_id: str = "") -> tuple[str, 
                 {
                     "messages": [HumanMessage(content=transcript)],
                     "session_id": session_id or "voice-session",
-                    "persona": "profesional",
+                    "persona": persona,
                 },
                 config=config,
             ),
@@ -157,6 +157,7 @@ async def _synthesize_base64(text: str) -> str:
 async def voice_pipeline(
     audio: UploadFile = File(...),
     session_id: str = Form(default=""),
+    persona: str = Form(default="profesional"),
 ):
     if not audio.filename:
         raise HTTPException(status_code=400, detail="No audio file provided")
@@ -181,7 +182,7 @@ async def voice_pipeline(
     # LLM — Agent Graph con herramientas
     if transcript.strip():
         try:
-            response_text, _tools_used = await _chat_with_agent(transcript, session_id)
+            response_text, _tools_used = await _chat_with_agent(transcript, session_id, persona)
             logger.info(f"Voice LLM (agent): {response_text[:80]}")
         except Exception as e:
             logger.error(f"Agent failed: {e}")
