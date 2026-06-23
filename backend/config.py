@@ -29,11 +29,12 @@ class Settings(BaseSettings):
     lm_studio_model: str = Field(default="qwen/qwen2.5-vl-7b", alias="LM_STUDIO_MODEL")
 
     # OpenAI (or any OpenAI-compatible API: OpenRouter, Together, Groq, etc.)
-    # gpt-4o-mini is the best cheap model for tool-calling — fast, accurate,
-    # handles 30+ tools without hallucinating.
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
     openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
+
+    # Groq specific fallback
+    groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
 
     # LLM Provider: "bedrock" or "ollama" or "lm_studio" or "openai"
     llm_provider: str = Field(default="ollama", alias="LLM_PROVIDER")
@@ -48,6 +49,14 @@ class Settings(BaseSettings):
 
     # Memory
     max_context_messages: int = Field(default=50, alias="MAX_CONTEXT_MESSAGES")
+
+    def model_post_init(self, __context):
+        # Auto-configure Groq if GROQ_API_KEY is provided and openai_api_key is not
+        if self.groq_api_key and not self.openai_api_key:
+            self.openai_api_key = self.groq_api_key
+            self.openai_base_url = "https://api.groq.com/openai/v1"
+            self.openai_model = "llama-3.1-8b-instant" # Fast model for voice
+            self.llm_provider = "openai"
 
     # Web Search
     tavily_api_key: str | None = Field(default=None, alias="TAVILY_API_KEY")
