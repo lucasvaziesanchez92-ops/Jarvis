@@ -40,6 +40,7 @@ export default function VoiceControls() {
   const [visionActive, setVisionActive] = useState<boolean>(false)
 
   const isCancelledRef = useRef<boolean>(false)
+  const ignoreSpeechRef = useRef<boolean>(false)
   const wsRef = useRef<WebSocket | null>(null)
   const audioQueueRef = useRef<AudioQueuePlayer | null>(null)
   const screenCapturerRef = useRef<ScreenCapturer | null>(null)
@@ -55,9 +56,11 @@ export default function VoiceControls() {
       const currentState = useJarvisStore.getState().activityState;
       if (currentState === 'thinking') {
         console.log("⏳ [VAD] Ignorando ruido porque JARVIS está pensando...");
+        ignoreSpeechRef.current = true;
         return;
       }
       
+      ignoreSpeechRef.current = false;
       isCancelledRef.current = false;
       console.log("🎙️ [VAD] Detección de habla iniciada.");
       
@@ -75,10 +78,9 @@ export default function VoiceControls() {
       setActivityState('listening')
     },
     onSpeechEnd: (audioFloat32Array) => {
-      const currentState = useJarvisStore.getState().activityState;
-      // IMPORTANTE: Si NO estamos en listening o speaking, significa que ignoramos el inicio
-      if (currentState === 'thinking' || currentState === 'idle') {
-        console.log("⏳ [VAD] Fin de habla ignorado (JARVIS estaba pensando o inactivo).");
+      if (ignoreSpeechRef.current) {
+        console.log("⏳ [VAD] Fin de habla ignorado (inició mientras JARVIS pensaba).");
+        ignoreSpeechRef.current = false;
         return;
       }
 
@@ -331,7 +333,14 @@ export default function VoiceControls() {
               setLastAssistantText(data.response_text)
               appendChatMessage({ id: makeId(), role: 'assistant', content: data.response_text })
             }
-            
+
+            // Si el backend terminó y NO hay audio reproduciéndose (ej. gTTS falló o el LLM respondió muy poco)
+            // debemos liberar la interfaz, de lo contrario se quedará pensando para siempre.
+            if (!audioQueueRef.current || !audioQueueRef.current.isPlaying) {
+              setActivityState('idle')
+              hideThinkingBubble()
+            }
+
             // If the voice was disabled, just set idle immediately
             if (!useJarvisStore.getState().voiceEnabled) {
               setActivityState('idle')
