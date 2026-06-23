@@ -44,8 +44,8 @@ class TextToSpeechService:
                 
                 # Sintetizar con Piper
                 audio_parts = []
-                for chunk in self._piper_voice.synthesize_stream_raw(text):
-                    audio_parts.append(chunk)
+                for chunk in self._piper_voice.synthesize(text):
+                    audio_parts.append(chunk.audio_int16_bytes)
                 
                 combined_frames = b"".join(audio_parts)
                 
