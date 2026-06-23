@@ -222,8 +222,19 @@ async def ws_chat(websocket: WebSocket):
                 finally:
                     ping.cancel()
 
-                # La respuesta ya se streameó mediante los callbacks.
-                # Ya no reenviamos final.content completo al final para evitar duplicados.
+                # La respuesta no se streameó correctamente porque el nodo usa invoke síncrono.
+                # Debemos enviar el final.content completo aquí, pero limpiando tags crudos.
+                import re
+                final_msg = state["messages"][-1]
+                final_content = final_msg.content if hasattr(final_msg, "content") else str(final_msg)
+                if final_content:
+                    final_content = re.sub(r'<thought>.*?</thought>', '', final_content, flags=re.DOTALL)
+                    final_content = re.sub(r'<function=.*?</function>', '', final_content, flags=re.DOTALL)
+                    final_content = re.sub(r'<tool_call>.*?</tool_call>', '', final_content, flags=re.DOTALL)
+                    final_content = final_content.strip()
+                    if final_content:
+                        await send(StreamChunk(type="stream", content=final_content))
+                
                 await send(StreamChunk(type="done"))
 
                 # Persist this turn's full message list into the
