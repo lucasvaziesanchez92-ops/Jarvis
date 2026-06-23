@@ -28,6 +28,8 @@ if (typeof window !== 'undefined') {
   }
 }
 
+const WORKLET_OPTIONS = {}
+
 export default function VoiceControls() {
   const {
     activityState, setActivityState, setMicActive, micActive,
@@ -46,6 +48,7 @@ export default function VoiceControls() {
   const screenCapturerRef = useRef<ScreenCapturer | null>(null)
 
   const vad = useMicVAD({
+    workletOptions: WORKLET_OPTIONS, // ESTABLE: Previene bucle de destrucción de React
     startOnLoad: false,
     baseAssetPath: "/",
     onnxWASMBasePath: "/",
