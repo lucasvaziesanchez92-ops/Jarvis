@@ -383,8 +383,17 @@ export default function VoiceControls() {
 
 
 
-  const handleMicClick = () => {
-    // Reanudar el AudioContext del navegador con el gesto del usuario
+  const handleMicClick = async () => {
+    // 1. Reanudar explícitamente cualquier contexto de audio bloqueado por el navegador
+    if (typeof window !== "undefined" && (window as any).AudioContext) {
+      const tempCtx = new (window as any).AudioContext();
+      if (tempCtx.state === "suspended") {
+        await tempCtx.resume();
+        console.log("🔊 [Audio] Canal de audio nativo despertado a la fuerza de forma exitosa.");
+      }
+    }
+
+    // 2. Reanudar nuestro propio AudioQueuePlayer para el TTS
     if (audioQueueRef.current) {
       audioQueueRef.current.resumeContext()
     }
