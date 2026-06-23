@@ -72,19 +72,9 @@ class TextToSpeechService:
             audio_data = fp.getvalue()
             
             if output_format == "wav":
-                try:
-                    from pydub import AudioSegment
-                    fp.seek(0)
-                    sound = AudioSegment.from_file(fp, format="mp3")
-                    out_fp = io.BytesIO()
-                    sound.export(out_fp, format="wav")
-                    return out_fp.getvalue()
-                except ImportError:
-                    logger.warning("pydub no instalado, devolviendo mp3 directamente.")
-                    return audio_data
-                except Exception as e:
-                    logger.warning(f"Fallo pydub conversion: {e}")
-                    return audio_data
+                # Ignoramos la conversión a WAV para ahorrar memoria RAM y evitar crashes OOM en Railway.
+                # El frontend (AudioQueuePlayer) soporta MP3 (audio/mpeg) de forma nativa.
+                return audio_data
             
             return audio_data
             

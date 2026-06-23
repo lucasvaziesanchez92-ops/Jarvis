@@ -254,11 +254,13 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
                 texto = texto_crudo
                 # 1. Quitar pensamientos
                 texto = re.sub(r'<thought>.*?</thought>', '', texto, flags=re.DOTALL)
-                # 2. Dejar solo texto visible de los links
+                # 2. Eliminar imágenes
+                texto = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', texto)
+                # 3. Dejar solo texto visible de los links
                 texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)
-                # 2.5. Reemplazar URLs crudas (http/https) por la palabra "enlace"
-                texto = re.sub(r'https?://[^\s]+', 'enlace', texto)
-                # 3. Eliminar "Visión general..."
+                # 4. Eliminar URLs crudas
+                texto = re.sub(r'https?://[^\s]+', '', texto)
+                # 5. Eliminar "Visión general..."
                 texto = texto.split("Visión general creada por IA")[0]
                 
                 # 4. Convertir viñetas en pausas (comas)
@@ -367,7 +369,9 @@ async def websocket_voice_stream(websocket: WebSocket):
     def limpiar_texto_para_voz(texto_crudo):
         texto = texto_crudo
         texto = re.sub(r'<thought>.*?</thought>', '', texto, flags=re.DOTALL)
-        texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)
+        texto = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', texto) # Eliminar imágenes
+        texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto) # Mantener texto de links
+        texto = re.sub(r'https?://[^\s]+', '', texto) # Eliminar URLs sueltas
         texto = texto.split("Visión general creada por IA")[0]
         texto = re.sub(r'^\s*[-*•]\s+', ', ', texto, flags=re.MULTILINE)
         texto = re.sub(r'[*#_]', '', texto)
@@ -400,7 +404,8 @@ async def websocket_voice_stream(websocket: WebSocket):
                 content="[MODO VOZ ACTIVO]: El usuario te está hablando por micrófono. "
                         "REGLA 1: Debes MENCIONAR LA INFORMACIÓN CLAVE de los resultados de forma hablada y natural. "
                         "NUNCA digas 'aquí los tienes' asumiendo que el usuario puede leerlos. "
-                        "REGLA 2: VELOCIDAD CRÍTICA. Usa max_results=3 en herramientas para ser rápido."
+                        "REGLA 2: VELOCIDAD CRÍTICA. Usa max_results=3 en herramientas para ser rápido. "
+                        "REGLA 3: PROHIBIDO USAR URLs, hipervínculos o imágenes. Eres una voz, no una pantalla. Menciona los nombres en lugar de dar links."
             )
             
             history = list(_session_history[session_id])
