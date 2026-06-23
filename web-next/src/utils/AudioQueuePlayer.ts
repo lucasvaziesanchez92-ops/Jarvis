@@ -1,7 +1,7 @@
 export class AudioQueuePlayer {
   private audioCtx: AudioContext | null = null;
   private queue: AudioBuffer[] = [];
-  private isPlaying = false;
+  public isPlaying = false;
   private nextStartTime = 0;
 
   constructor() {
