@@ -163,7 +163,7 @@ _CORS_ORIGINS = [
     "https://front-end-production.up.railway.app",
 ]
 if os.getenv("NODE_ENV") != "production":
-    _CORS_ORIGINS += ["http://localhost:3010", "http://localhost:3001", "http://localhost:8001"]
+    _CORS_ORIGINS += ["http://localhost:3000", "http://localhost:3010", "http://localhost:3001", "http://localhost:8001"]
 
 app.add_middleware(
     CORSMiddleware,

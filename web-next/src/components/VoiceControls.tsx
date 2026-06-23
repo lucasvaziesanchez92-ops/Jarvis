@@ -23,8 +23,8 @@ if (typeof window !== 'undefined') {
   window.ort.env.wasm.wasmPaths = {
     "ort-wasm-simd-threaded.wasm": "/ort-wasm-simd-threaded.wasm",
     "ort-wasm-simd-threaded.mjs": "/ort-wasm-simd-threaded.mjs",
-    "ort-wasm-simd.wasm": "/ort-wasm-simd.wasm",
-    "ort-wasm.wasm": "/ort-wasm.wasm",
+    "ort-wasm-simd.wasm": "/ort-wasm-simd-threaded.wasm",
+    "ort-wasm.wasm": "/ort-wasm-simd-threaded.wasm",
   }
 }
 

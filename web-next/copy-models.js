@@ -26,6 +26,7 @@ const copyFile = (src, dest) => {
 copyFile(path.join(VAD_DIST, 'vad.worklet.bundle.min.js'), path.join(PUBLIC_DIR, 'vad.worklet.bundle.min.js'));
 copyFile(path.join(VAD_DIST, 'silero_vad.onnx'), path.join(PUBLIC_DIR, 'silero_vad.onnx'));
 copyFile(path.join(VAD_DIST, 'silero_vad_legacy.onnx'), path.join(PUBLIC_DIR, 'silero_vad_legacy.onnx'));
+copyFile(path.join(VAD_DIST, 'silero_vad_v5.onnx'), path.join(PUBLIC_DIR, 'silero_vad_v5.onnx'));
 
 // Copy ONNX files
 const ortFiles = [
