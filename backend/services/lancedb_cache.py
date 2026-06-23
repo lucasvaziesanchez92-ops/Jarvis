@@ -3,7 +3,7 @@ import os
 import lancedb
 import pandas as pd
 from loguru import logger
-from sentence_transformers import SentenceTransformer
+from chromadb.utils import embedding_functions
 
 class SemanticCache:
     def __init__(self, db_path="data/lancedb_store"):
@@ -11,9 +11,9 @@ class SemanticCache:
         os.makedirs(db_path, exist_ok=True)
         self.db = lancedb.connect(db_path)
         
-        # Cargar el modelo de embeddings local
-        logger.info("Cargando modelo de embeddings (all-MiniLM-L6-v2) para LanceDB...")
-        self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        # Cargar el modelo de embeddings local (via ONNX para ahorrar RAM en Railway)
+        logger.info("Cargando modelo de embeddings (all-MiniLM-L6-v2) vía ONNX para LanceDB...")
+        self.ef = embedding_functions.DefaultEmbeddingFunction()
         
         # Inicializar o recuperar las tablas vectoriales independientes
         self.tablas = {
@@ -59,7 +59,7 @@ class SemanticCache:
         try:
             # Generar embedding del texto completo (titulo + contenido)
             text_to_embed = f"{titulo} {contenido}"
-            vector = self.model.encode(text_to_embed).tolist()
+            vector = self.ef([text_to_embed])[0]
             
             df = pd.DataFrame([{
                 "vector": vector,
@@ -86,7 +86,7 @@ class SemanticCache:
             return []
 
         try:
-            query_vector = self.model.encode(query_texto).tolist()
+            query_vector = self.ef([query_texto])[0]
             
             # Consulta vectorial
             resultados = tabla.search(query_vector).limit(limit).to_pandas()
@@ -114,7 +114,7 @@ class SemanticCache:
         if not tabla: return
         
         try:
-            vector = self.model.encode(hecho_limpio).tolist()
+            vector = self.ef([hecho_limpio])[0]
             df = pd.DataFrame([{
                 "vector": vector,
                 "id_hecho": id_hecho,
