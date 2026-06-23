@@ -7,28 +7,9 @@ import { useJarvisStore } from '@/store/jarvisStore'
 import { speak as ttsSpeak, stop as ttsStop, onTTSEvent } from '@/lib/tts'
 import { AudioQueuePlayer } from '@/utils/AudioQueuePlayer'
 import { ScreenCapturer } from '@/utils/ScreenCapturer'
-import { useMicVAD, utils } from '@ricky0123/vad-react'
 
 const API = '/api'
 const WS_URL = typeof window !== 'undefined' ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/api/voice/stream` : ''
-
-if (typeof window !== 'undefined') {
-  // @ts-ignore
-  window.ort = window.ort || {};
-  // @ts-ignore
-  window.ort.env = window.ort.env || {};
-  // @ts-ignore
-  window.ort.env.wasm = window.ort.env.wasm || {};
-  // @ts-ignore
-  window.ort.env.wasm.wasmPaths = {
-    "ort-wasm-simd-threaded.wasm": "/ort-wasm-simd-threaded.wasm",
-    "ort-wasm-simd-threaded.mjs": "/ort-wasm-simd-threaded.mjs",
-    "ort-wasm-simd.wasm": "/ort-wasm-simd-threaded.wasm",
-    "ort-wasm.wasm": "/ort-wasm-simd-threaded.wasm",
-  }
-}
-
-const WORKLET_OPTIONS = {}
 
 export default function VoiceControls() {
   const {
@@ -42,120 +23,217 @@ export default function VoiceControls() {
   const [visionActive, setVisionActive] = useState<boolean>(false)
 
   const isCancelledRef = useRef<boolean>(false)
-  const ignoreSpeechRef = useRef<boolean>(false)
   const wsRef = useRef<WebSocket | null>(null)
   const audioQueueRef = useRef<AudioQueuePlayer | null>(null)
   const screenCapturerRef = useRef<ScreenCapturer | null>(null)
+  
+  // NATIVE RECORDING REFS
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const audioStreamRef = useRef<MediaStream | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
 
-  const vad = useMicVAD({
-    workletOptions: WORKLET_OPTIONS, // ESTABLE: Previene bucle de destrucción de React
-    startOnLoad: false,
-    baseAssetPath: "/",
-    onnxWASMBasePath: "/",
-    positiveSpeechThreshold: 0.1, // Extrema sensibilidad para atrapar cualquier susurro
-    negativeSpeechThreshold: 0.05,
-    minSpeechMs: 10, // Cualquier sílaba activa la grabación
-    redemptionMs: 60000, // 60 segundos: MODO WALKIE-TALKIE. NUNCA te corta, espera a que apagues el micrófono.
-    submitUserSpeechOnPause: true, // Envía el audio acumulado en el instante en el que presionas el botón
-    onSpeechStart: () => {
-      const currentState = useJarvisStore.getState().activityState;
-      if (currentState === 'thinking') {
-        console.log("⏳ [VAD] Ignorando ruido porque JARVIS está pensando...");
-        ignoreSpeechRef.current = true;
-        return;
-      }
-      
-      ignoreSpeechRef.current = false;
+  // VAD MOCK STATES (to replace vad logic visually)
+  const [vadListening, setVadListening] = useState(false)
+  const [vadLoading, setVadLoading] = useState(false)
+
+  /* ── WebSocket Setup y Envío ────────────────────────────────────────── */
+  const sendVoice = async (audioBlob: Blob) => {
+    if (isCancelledRef.current) {
+      console.log("❌ Audio descartado por cancelación manual.");
       isCancelledRef.current = false;
-      console.log("🎙️ [VAD] Detección de habla iniciada.");
-      
-      // 1. BARGE-IN ORGÁNICO: Si JARVIS está hablando, lo callamos al instante
-      if (currentState === 'speaking') {
-        console.log("🛑 [VAD] Interrupción detectada. Enviando señal de aborto...");
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'abort' }))
-        }
-        if (audioQueueRef.current) {
-          audioQueueRef.current.clearQueue()
-        }
-        window.speechSynthesis?.cancel()
+      return;
+    }
+
+    setActivityState('thinking')
+    const { chatSessionId, persona, showThinkingBubble, hideThinkingBubble, setLastUserText, setLastAssistantText, appendChatMessage } = useJarvisStore.getState()
+    
+    try {
+      if (wsRef.current) {
+        wsRef.current.close()
       }
-      setActivityState('listening')
-    },
-    onSpeechEnd: (audioFloat32Array) => {
-      if (ignoreSpeechRef.current) {
-        console.log("⏳ [VAD] Fin de habla ignorado (inició mientras JARVIS pensaba).");
-        ignoreSpeechRef.current = false;
-        return;
+      
+      const ws = new WebSocket(WS_URL)
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        const reader = new FileReader()
+        reader.readAsDataURL(audioBlob)
+        reader.onloadend = () => {
+          const base64data = (reader.result as string).split(',')[1]
+          ws.send(JSON.stringify({
+            type: 'audio_input',
+            payload: base64data,
+            session_id: chatSessionId,
+            persona: persona?.name || 'profesional'
+          }))
+        }
       }
 
-      if (isCancelledRef.current) {
-        console.log("❌ [VAD] Audio descartado por cancelación.");
-        isCancelledRef.current = false;
-        return;
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+
+          if (data.type === 'state') {
+            if (data.status === 'thinking') {
+              showThinkingBubble('Procesando...')
+            }
+          }
+
+          if (data.type === 'thought') {
+            showThinkingBubble(data.payload)
+          }
+
+          if (data.type === 'audio_chunk') {
+            hideThinkingBubble()
+            setActivityState('speaking')
+            if (audioQueueRef.current) {
+              audioQueueRef.current.queueAudioChunk(data.payload)
+            }
+          }
+
+          if (data.type === 'done') {
+            hideThinkingBubble()
+            
+            if (data.transcript) {
+              setLastUserText(data.transcript)
+              appendChatMessage({ id: makeId(), role: 'user', content: data.transcript })
+            }
+            if (data.response_text) {
+              setLastAssistantText(data.response_text)
+              appendChatMessage({ id: makeId(), role: 'assistant', content: data.response_text })
+            }
+
+            if (!audioQueueRef.current || !audioQueueRef.current.isPlaying) {
+              setActivityState('idle')
+              hideThinkingBubble()
+            }
+
+            if (!useJarvisStore.getState().voiceEnabled) {
+              setActivityState('idle')
+              ws.close()
+            }
+          }
+          
+          if (data.type === 'error') {
+            console.error('WS Voice Error:', data.payload)
+            hideThinkingBubble()
+            setActivityState('idle')
+            ws.close()
+          }
+
+        } catch (err) {
+          console.error("Error parsing WS message:", err)
+        }
       }
-      console.log("✅ [VAD] Fin del habla detectado. Procesando audio...");
-      const wavBuffer = utils.encodeWAV(audioFloat32Array)
-      const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' })
-      sendVoice(audioBlob)
-    },
-    onVADMisfire: () => {
-      console.log("💨 [VAD] Ruido ambiental o respiración corta descartada.");
+
+      ws.onerror = (error) => {
+        console.error('WebSocket Error:', error)
+        hideThinkingBubble()
+        setActivityState('idle')
+      }
+
+      ws.onclose = () => {
+        wsRef.current = null
+      }
+
+    } catch (error) {
+      console.error('Error enviando audio por WebSocket:', error)
+      hideThinkingBubble()
       setActivityState('idle')
     }
-  })
-
-  // Sincronizar el estado de animación del Canvas con la energía detectada
-  useEffect(() => {
-    const currentState = useJarvisStore.getState().activityState;
-    if (vad.userSpeaking && currentState !== 'listening' && currentState !== 'thinking') {
-      setActivityState('listening')
-    } else if (!vad.userSpeaking && currentState === 'listening') {
-      // Solo transicionar a thinking si el VAD fue quien nos puso en listening
-      setActivityState('thinking')
-    }
-    setMicActive(!vad.loading && vad.listening)
-  }, [vad.userSpeaking, vad.loading, vad.listening, setActivityState, setMicActive])
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !audioQueueRef.current) {
-      audioQueueRef.current = new AudioQueuePlayer(() => {
-        setActivityState('idle')
-      })
-    }
-    if (typeof window !== 'undefined' && !screenCapturerRef.current) {
-      screenCapturerRef.current = new ScreenCapturer()
-    }
-    return () => {
-      screenCapturerRef.current?.detenerCaptura()
-    }
-  }, [])
-
-  // Sync activity state with TTS events (so the UI shows
-  // 'speaking' even when Web Speech API is the one playing).
-  useEffect(() => {
-    const off = onTTSEvent((e) => {
-      if (e.type === 'start') {
-        setActivityState('speaking')
-      } else if (e.type === 'end' || e.type === 'error') {
-        setActivityState('idle')
-      }
-    })
-    return () => off()
-  }, [setActivityState])
-
-  const audioElRef = useRef<HTMLAudioElement | null>(null)
-  const transcriptRef = useRef('')
-  const responseRef = useRef('')
-
-  function makeId(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID()
-    }
-    return `vc_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
   }
 
-  /* ── Voice waveform canvas ────────────────────────────────── */
+  /* ── Native Recorder Control ────────────────────────────────────────── */
+  const startRecording = async () => {
+    setVadLoading(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioStreamRef.current = stream
+
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      if (AudioContextClass) {
+        audioCtxRef.current = new AudioContextClass()
+        const source = audioCtxRef.current.createMediaStreamSource(stream)
+        analyserRef.current = audioCtxRef.current.createAnalyser()
+        analyserRef.current.fftSize = 256
+        source.connect(analyserRef.current)
+      }
+
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data)
+        }
+      }
+
+      mediaRecorder.onstop = () => {
+        if (!isCancelledRef.current && audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+          sendVoice(audioBlob)
+        }
+        
+        stream.getTracks().forEach(track => track.stop())
+        if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+          audioCtxRef.current.close()
+        }
+        setVadListening(false)
+        setMicActive(false)
+      }
+
+      mediaRecorder.start(250) // timeslice para recolectar chunks continuamente
+      setVadListening(true)
+      setMicActive(true)
+      setActivityState('listening')
+      isCancelledRef.current = false
+      setVadLoading(false)
+    } catch (err) {
+      console.error("Error accediendo al micrófono:", err)
+      setVadLoading(false)
+      setActivityState('idle')
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    } else {
+      setVadListening(false)
+      setMicActive(false)
+    }
+  }
+
+  /* ── Cancelar TODO ────────────────────────────────────────── */
+  const cancelEverything = useCallback((e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    isCancelledRef.current = true
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+
+    if (wsRef.current) {
+      if (wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'abort' }))
+      }
+      wsRef.current.close()
+      wsRef.current = null
+    }
+
+    if (audioQueueRef.current) {
+      audioQueueRef.current.clearQueue()
+    }
+
+    window.speechSynthesis?.cancel()
+
+    setActivityState('idle')
+  }, [setActivityState])
+
+  /* ── Sincronizar Canvas con Energía Nativa ────────────────── */
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -175,6 +253,7 @@ export default function VoiceControls() {
 
     const bars = 64
     const barArray = new Float32Array(bars)
+    const dataArray = new Uint8Array(64)
     let phase = 0
 
     const render = () => {
@@ -182,7 +261,16 @@ export default function VoiceControls() {
       const h = 120
       const isListening = activityState === 'listening'
       const isSpeaking = activityState === 'speaking'
-      const amp = visualizerAmplitude || (isListening ? 0.8 : isSpeaking ? 0.5 : 0.05)
+      
+      let realVolume = 0
+      if (isListening && analyserRef.current) {
+        analyserRef.current.getByteFrequencyData(dataArray)
+        let sum = 0
+        for(let i=0; i<dataArray.length; i++) sum += dataArray[i]
+        realVolume = (sum / dataArray.length) / 255.0
+      }
+
+      const amp = visualizerAmplitude || (isListening ? Math.max(0.1, realVolume * 1.5) : isSpeaking ? 0.5 : 0.05)
 
       ctx.clearRect(0, 0, w, h)
 
@@ -241,186 +329,65 @@ export default function VoiceControls() {
     }
   }, [activityState, visualizerAmplitude])
 
-  /* ── Cancelar TODO ────────────────────────────────────────── */
-  const cancelEverything = useCallback((e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    isCancelledRef.current = true
-    
-    if (wsRef.current) {
-      if (wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'abort' }))
-      }
-      wsRef.current.close()
-      wsRef.current = null
-    }
-
-    if (audioQueueRef.current) {
-      audioQueueRef.current.clearQueue()
-    }
-
-    window.speechSynthesis?.cancel()
-
-    setActivityState('idle')
-  }, [setActivityState])
-
   useEffect(() => {
+    if (typeof window !== 'undefined' && !audioQueueRef.current) {
+      audioQueueRef.current = new AudioQueuePlayer(() => {
+        setActivityState('idle')
+      })
+    }
+    if (typeof window !== 'undefined' && !screenCapturerRef.current) {
+      screenCapturerRef.current = new ScreenCapturer()
+    }
     return () => {
-      if (audioElRef.current) {
-        audioElRef.current.pause()
-        audioElRef.current.src = ''
-        audioElRef.current.load()
-      }
+      screenCapturerRef.current?.detenerCaptura()
     }
   }, [])
 
-
-
-  /* ── Send to backend via WebSocket (Real-Time Audio Streaming) ──── */
-  const sendVoice = async (audioBlob: Blob) => {
-    setActivityState('thinking')
-    const { chatSessionId, persona, showThinkingBubble, hideThinkingBubble, setLastUserText, setLastAssistantText, appendChatMessage } = useJarvisStore.getState()
-    
-    try {
-      if (wsRef.current) {
-        wsRef.current.close()
-      }
-      
-      const ws = new WebSocket(WS_URL)
-      wsRef.current = ws
-
-      ws.onopen = () => {
-        // Convert Blob to Base64
-        const reader = new FileReader()
-        reader.readAsDataURL(audioBlob)
-        reader.onloadend = () => {
-          const base64data = (reader.result as string).split(',')[1]
-          ws.send(JSON.stringify({
-            type: 'audio_input',
-            payload: base64data,
-            session_id: chatSessionId,
-            persona: persona?.name || 'profesional'
-          }))
-        }
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-
-          if (data.type === 'state') {
-            if (data.status === 'thinking') {
-              showThinkingBubble('Procesando...')
-            } else if (data.status === 'idle') {
-              // Si ya terminó de mandar audio, podemos esperar a que la cola termine o forzar idle
-              // Pero lo manejamos en el onended del AudioQueuePlayer idealmente
-            }
-          }
-
-          if (data.type === 'thought') {
-            showThinkingBubble(data.payload)
-          }
-
-          if (data.type === 'audio_chunk') {
-            hideThinkingBubble()
-            setActivityState('speaking')
-            if (audioQueueRef.current) {
-              audioQueueRef.current.queueAudioChunk(data.payload)
-            }
-          }
-
-          if (data.type === 'done') {
-            hideThinkingBubble()
-            
-            // Append to chat panel
-            if (data.transcript) {
-              setLastUserText(data.transcript)
-              appendChatMessage({ id: makeId(), role: 'user', content: data.transcript })
-            }
-            if (data.response_text) {
-              setLastAssistantText(data.response_text)
-              appendChatMessage({ id: makeId(), role: 'assistant', content: data.response_text })
-            }
-
-            // Si el backend terminó y NO hay audio reproduciéndose (ej. gTTS falló o el LLM respondió muy poco)
-            // debemos liberar la interfaz, de lo contrario se quedará pensando para siempre.
-            if (!audioQueueRef.current || !audioQueueRef.current.isPlaying) {
-              setActivityState('idle')
-              hideThinkingBubble()
-            }
-
-            // If the voice was disabled, just set idle immediately
-            if (!useJarvisStore.getState().voiceEnabled) {
-              setActivityState('idle')
-              ws.close()
-            }
-          }
-          
-          if (data.type === 'error') {
-            console.error('WS Voice Error:', data.payload)
-            hideThinkingBubble()
-            setActivityState('idle')
-            ws.close()
-          }
-
-        } catch (err) {
-          console.error("Error parsing WS message:", err)
-        }
-      }
-
-      ws.onerror = (error) => {
-        console.error('WebSocket Error:', error)
-        hideThinkingBubble()
+  useEffect(() => {
+    const off = onTTSEvent((e) => {
+      if (e.type === 'start') {
+        setActivityState('speaking')
+      } else if (e.type === 'end' || e.type === 'error') {
         setActivityState('idle')
       }
+    })
+    return () => off()
+  }, [setActivityState])
 
-      ws.onclose = () => {
-        wsRef.current = null
-      }
+  const audioElRef = useRef<HTMLAudioElement | null>(null)
 
-    } catch (error) {
-      console.error('Error enviando audio por WebSocket:', error)
-      hideThinkingBubble()
-      setActivityState('idle')
+  function makeId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
     }
+    return `vc_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
   }
 
-
-
   const handleMicClick = async () => {
-    // 1. Reanudar explícitamente cualquier contexto de audio bloqueado por el navegador
     if (typeof window !== "undefined" && (window as any).AudioContext) {
       const tempCtx = new (window as any).AudioContext();
-      if (tempCtx.state === "suspended") {
-        await tempCtx.resume();
-      }
+      if (tempCtx.state === "suspended") await tempCtx.resume();
     }
 
-    // 2. Reanudar nuestro propio AudioQueuePlayer para el TTS
     if (audioQueueRef.current) {
       audioQueueRef.current.resumeContext()
     }
     
-    // Si JARVIS está hablando y queremos interrumpir para hablar nosotros
     if (activityState === 'speaking') {
       cancelEverything()
-      setTimeout(() => {
-        vad.start()
-      }, 100)
+      setTimeout(() => startRecording(), 100)
       return
     }
     
-    // Si JARVIS está pensando, lo cancelamos
     if (activityState === 'thinking') {
       cancelEverything()
       return
     }
 
-    // Comportamiento WALKIE-TALKIE puro
-    if (vad.listening) {
-      vad.pause() // Esto disparará submitUserSpeechOnPause y onSpeechEnd
+    if (vadListening || activityState === 'listening') {
+      stopRecording()
     } else {
-      setActivityState('listening')
-      vad.start() // Empieza a escuchar
+      startRecording()
     }
   }
 
@@ -452,8 +419,6 @@ export default function VoiceControls() {
       }
     } else {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        // Debemos asegurar que el ws esté abierto para transmitir
-        // Podemos iniciar la captura de todas formas y el ws transmitirá cuando esté ready
         const ws = new WebSocket(WS_URL)
         wsRef.current = ws
         ws.onclose = () => { wsRef.current = null }
@@ -549,7 +514,7 @@ export default function VoiceControls() {
               initial={{ opacity: 0, scale: 0.5, x: -20 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.5, x: -20 }}
-              onClick={(e) => { cancelEverything(e); vad.pause(); }}
+              onClick={(e) => { cancelEverything(e) }}
               className="absolute -left-16 w-12 h-12 flex items-center justify-center transition-all bg-red-500/10 hover:bg-red-500/30 border border-red-500/30 text-red-400 rounded-full"
               title="Cancelar (borrar grabación)"
             >
@@ -597,8 +562,8 @@ export default function VoiceControls() {
           </button>
         </div>
 
-        <span className="text-[10px] font-mono tracking-widest font-medium" style={{ color: vad.loading ? '#888' : vad.userSpeaking ? '#00ff96' : '#64c8ff' }}>
-          {vad.loading ? "CARGANDO VAD..." : vad.userSpeaking ? "TE ESCUCHO" : vad.listening ? "CONECTADO" : "PAUSADO"}
+        <span className="text-[10px] font-mono tracking-widest font-medium" style={{ color: vadLoading ? '#888' : vadListening ? '#00ff96' : '#64c8ff' }}>
+          {vadLoading ? "INICIANDO..." : vadListening ? "GRABANDO" : "LISTO"}
         </span>
 
         <div className="flex gap-4">
