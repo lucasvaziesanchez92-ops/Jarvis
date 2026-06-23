@@ -23,6 +23,7 @@ COPY web-next/ .
 # Build with production env
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+RUN cd web-next && node copy-models.js
 RUN npm run build
 
 # ── Production stage ──────────────────────────────────────────
