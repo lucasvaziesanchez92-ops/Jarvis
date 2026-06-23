@@ -48,6 +48,9 @@ export default function VoiceControls() {
     startOnLoad: false,
     baseAssetPath: "/",
     onnxWASMBasePath: "/",
+    positiveSpeechThreshold: 0.7, // Umbral más alto para ignorar ruidos/estornudos
+    negativeSpeechThreshold: 0.4,
+    redemptionMs: 2000, // 2 segundos de pausa tolerada antes de enviar
     onSpeechStart: () => {
       console.log("🎙️ [VAD] Detección de habla iniciada.");
       // 1. BARGE-IN ORGÁNICO: Si JARVIS está hablando, lo callamos al instante
@@ -72,9 +75,7 @@ export default function VoiceControls() {
     onVADMisfire: () => {
       console.log("💨 [VAD] Ruido ambiental o respiración corta descartada.");
       setActivityState('idle')
-    },
-    positiveSpeechThreshold: 0.6,
-    negativeSpeechThreshold: 0.45
+    }
   })
 
   // Sincronizar el estado de animación del Canvas con la energía detectada
@@ -350,6 +351,7 @@ export default function VoiceControls() {
   const handleMicClick = () => {
     if (activityState === 'speaking' || activityState === 'thinking') {
       cancelEverything()
+      vad.pause()
       return
     }
     vad.toggle()
@@ -477,8 +479,8 @@ export default function VoiceControls() {
               initial={{ opacity: 0, scale: 0.5, x: -20 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.5, x: -20 }}
-              onClick={cancelEverything}
-              className="absolute -left-16 w-12 h-12 rounded-full flex items-center justify-center transition-all bg-red-500/10 hover:bg-red-500/30 border border-red-500/30 text-red-400"
+              onClick={(e) => { cancelEverything(e); vad.pause(); }}
+              className="absolute -left-16 w-12 h-12 flex items-center justify-center transition-all bg-red-500/10 hover:bg-red-500/30 border border-red-500/30 text-red-400 rounded-full"
               title="Cancelar (borrar grabación)"
             >
               <X className="w-5 h-5" />
