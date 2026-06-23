@@ -52,6 +52,7 @@ export default function VoiceControls() {
     negativeSpeechThreshold: 0.4,
     redemptionMs: 2000, // 2 segundos de pausa tolerada antes de enviar
     onSpeechStart: () => {
+      isCancelledRef.current = false;
       console.log("🎙️ [VAD] Detección de habla iniciada.");
       // 1. BARGE-IN ORGÁNICO: Si JARVIS está hablando, lo callamos al instante
       if (useJarvisStore.getState().activityState === 'speaking') {
@@ -67,6 +68,11 @@ export default function VoiceControls() {
       setActivityState('listening')
     },
     onSpeechEnd: (audioFloat32Array) => {
+      if (isCancelledRef.current) {
+        console.log("❌ [VAD] Audio descartado por cancelación.");
+        isCancelledRef.current = false;
+        return;
+      }
       console.log("✅ [VAD] Fin del habla detectado. Procesando audio...");
       const wavBuffer = utils.encodeWAV(audioFloat32Array)
       const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' })
@@ -380,6 +386,9 @@ export default function VoiceControls() {
     if (visionActive) {
       screenCapturerRef.current?.detenerCaptura()
       setVisionActive(false)
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'clear_screen' }))
+      }
     } else {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         // Debemos asegurar que el ws esté abierto para transmitir

@@ -506,6 +506,11 @@ async def websocket_voice_stream(websocket: WebSocket):
             if data.get("type") == "screen_chunk":
                 ultimo_frame_pantalla = data.get("payload")
                 continue
+                
+            if data.get("type") == "clear_screen":
+                ultimo_frame_pantalla = None
+                logger.info("👁️ [Visión Omnisciente] Memoria óptica borrada.")
+                continue
             
             if data.get("type") == "abort":
                 if stream_task and not stream_task.done():
