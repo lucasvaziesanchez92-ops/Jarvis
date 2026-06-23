@@ -251,7 +251,7 @@ async def tool_node(state: JarvisState) -> dict:
                 else:
                     out = str(await asyncio.to_thread(t.invoke, coerced))
                     
-                logger.info(f"tool_node: {name} returned {len(out)} chars: {out[:200]}")
+                logger.opt(colors=False).info(f"tool_node: {name} returned {len(out)} chars: {out[:200]}")
                 return ToolMessage(content=out, tool_call_id=tc["id"], name=name), name
             except Exception as ex:
                 logger.error("Tool '{}' crashed: {}: {}", name, type(ex).__name__, str(ex), exc_info=True)
