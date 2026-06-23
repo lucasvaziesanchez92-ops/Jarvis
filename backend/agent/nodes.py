@@ -164,6 +164,30 @@ def call_model_with_tools(
             logger.error(f"plain LLM también falló: {type(e2).__name__}: {e2}")
             import traceback as tb
             logger.error(tb.format_exc()[:1500])
-            raise RuntimeError(f"Falla crítica en LLM. Contexto muy grande o límite de tokens: {e2}")
+            response = AIMessage(content=(
+                f"Error crítico de red o de memoria del modelo. Detalle: {type(e2).__name__}: {str(e2)[:200]}"
+            ))
+
+    # FALLBACK PARSER: If Llama-3.1 outputs raw tags instead of native tool calls
+    if isinstance(response, AIMessage) and not getattr(response, "tool_calls", None) and response.content:
+        import re
+        import json
+        import uuid
+        matches = re.finditer(r'<function=([^>]+)>(.*?)</function>', response.content, re.DOTALL)
+        tool_calls = []
+        for match in matches:
+            name = match.group(1).strip()
+            args_str = match.group(2).strip()
+            try:
+                args = json.loads(args_str) if args_str else {}
+            except json.JSONDecodeError:
+                args = {}
+            tool_calls.append({
+                "name": name,
+                "args": args,
+                "id": f"call_{uuid.uuid4().hex[:10]}"
+            })
+        if tool_calls:
+            response.tool_calls = tool_calls
 
     return {"messages": [response]}
