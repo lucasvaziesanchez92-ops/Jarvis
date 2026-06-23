@@ -49,9 +49,10 @@ export default function VoiceControls() {
     startOnLoad: false,
     baseAssetPath: "/",
     onnxWASMBasePath: "/",
-    positiveSpeechThreshold: 0.4, // Umbral bajo para que no corte si baja un poco la voz
-    negativeSpeechThreshold: 0.2, // Umbral bajo para mantenerlo activo
+    positiveSpeechThreshold: 0.25, // Ultra sensible para que te escuche aunque hables bajo
+    negativeSpeechThreshold: 0.15, // Corta más rápido
     redemptionMs: 2000, // 2 segundos enteros de pausa tolerada antes de enviar el audio
+    submitUserSpeechOnPause: true, // ¡Permite que al presionar el botón se envíe el audio inmediatamente!
     onSpeechStart: () => {
       const currentState = useJarvisStore.getState().activityState;
       if (currentState === 'thinking') {
