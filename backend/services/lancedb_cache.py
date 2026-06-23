@@ -11,9 +11,9 @@ class SemanticCache:
         os.makedirs(db_path, exist_ok=True)
         self.db = lancedb.connect(db_path)
         
-        # Cargar el modelo de embeddings local (via ONNX para ahorrar RAM en Railway)
-        logger.info("Cargando modelo de embeddings (all-MiniLM-L6-v2) vía ONNX para LanceDB...")
-        self.ef = embedding_functions.DefaultEmbeddingFunction()
+        # Cargar el modelo de embeddings local (via ONNX en instancia COMPARTIDA para ahorrar RAM en Railway)
+        from backend.core.embeddings import get_shared_embedding_function
+        self.ef = get_shared_embedding_function()
         
         # Inicializar o recuperar las tablas vectoriales independientes
         self.tablas = {

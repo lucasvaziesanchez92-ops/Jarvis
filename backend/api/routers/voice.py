@@ -38,9 +38,9 @@ _VOICE_FALLBACK_PROMPT = (
 async def _transcribe(audio_bytes: bytes) -> str:
     if not settings.groq_api_key:
         raise ValueError("GROQ_API_KEY no configurada.")
-    from groq import Groq
-    client = Groq(api_key=settings.groq_api_key)
-    response = client.audio.transcriptions.create(
+    from groq import AsyncGroq
+    client = AsyncGroq(api_key=settings.groq_api_key)
+    response = await client.audio.transcriptions.create(
         model=settings.groq_stt_model,
         file=("audio.webm", io.BytesIO(audio_bytes), "audio/webm"),
         language="es",

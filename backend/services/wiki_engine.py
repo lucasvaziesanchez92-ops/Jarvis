@@ -41,9 +41,11 @@ def _get_collection() -> chromadb.Collection:
     global _collection
     if _collection is None:
         client = _get_client()
+        from backend.core.embeddings import get_shared_embedding_function
         _collection = client.get_or_create_collection(
             name="obsidian_notes",
             metadata={"hnsw:space": "cosine"},
+            embedding_function=get_shared_embedding_function(),
         )
     return _collection
 
