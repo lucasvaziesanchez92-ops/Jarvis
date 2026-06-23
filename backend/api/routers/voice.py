@@ -366,9 +366,15 @@ async def websocket_voice_stream(websocket: WebSocket):
     import re
     import asyncio
     
-    def limpiar_texto_para_voz(texto_crudo):
+    def limpiar_texto_para_ui(texto_crudo):
         texto = texto_crudo
         texto = re.sub(r'<thought>.*?</thought>', '', texto, flags=re.DOTALL)
+        texto = re.sub(r'<function=.*?</function>', '', texto, flags=re.DOTALL)
+        texto = re.sub(r'<tool_call>.*?</tool_call>', '', texto, flags=re.DOTALL)
+        return texto.strip()
+
+    def limpiar_texto_para_voz(texto_crudo):
+        texto = limpiar_texto_para_ui(texto_crudo)
         texto = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', texto) # Eliminar imágenes
         texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto) # Mantener texto de links
         texto = re.sub(r'https?://[^\s]+', '', texto) # Eliminar URLs sueltas
@@ -461,7 +467,13 @@ async def websocket_voice_stream(websocket: WebSocket):
                             buffer_frase += chunk_content
                             full_response += chunk_content
                             
-                            if any(signo in chunk_content for signo in [".", "!", "?", "\n"]):
+                            open_tags = len(re.findall(r'<(?:thought|function|tool_call)', buffer_frase))
+                            closed_tags = len(re.findall(r'</(?:thought|function|tool_call)>', buffer_frase))
+                            is_inside_tag = open_tags > closed_tags
+                            ends_with_partial = re.search(r'<[^>]*$', buffer_frase) is not None
+                            can_flush = not is_inside_tag and not ends_with_partial
+
+                            if can_flush and any(signo in chunk_content for signo in [".", "!", "?", "\n"]):
                                 texto_limpio = limpiar_texto_para_voz(buffer_frase)
                                 if len(texto_limpio) > 5:
                                     audio_chunk_b64 = await _synthesize_base64(texto_limpio)
@@ -484,14 +496,16 @@ async def websocket_voice_stream(websocket: WebSocket):
                             "text_segment": texto_limpio
                         })
 
+            full_response_limpia = limpiar_texto_para_ui(full_response)
+            
             _session_history[session_id].append(HumanMessage(content=transcript))
-            _session_history[session_id].append(AIMessage(content=full_response))
+            _session_history[session_id].append(AIMessage(content=full_response_limpia))
             _session_history[session_id] = _prune_history(list(_session_history[session_id]), _MAX_HISTORY)
                         
             await websocket.send_json({
                 "type": "done",
                 "transcript": transcript,
-                "response_text": full_response
+                "response_text": full_response_limpia
             })
 
         except asyncio.CancelledError:
