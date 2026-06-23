@@ -135,6 +135,10 @@ def call_model_with_tools(
     last_is_tool = bool(base) and isinstance(base[-1], ToolMessage)
 
     if extra_context and base and not last_is_tool:
+        # Prevent context limit exceeded errors (llama-3.1-8b has 8k limit)
+        if len(extra_context) > 6000:
+            extra_context = extra_context[:6000] + "\n\n...[CONTEXTO TRUNCADO POR TAMAÑO]..."
+            
         ctx = HumanMessage(content=(
             "[INFORMACIÓN RELEVANTE DE TU MEMORIA EXTERNA]\n" + extra_context
         ))
@@ -160,8 +164,6 @@ def call_model_with_tools(
             logger.error(f"plain LLM también falló: {type(e2).__name__}: {e2}")
             import traceback as tb
             logger.error(tb.format_exc()[:1500])
-            response = AIMessage(content=(
-                f"Error técnico con el modelo. Detalle: {type(e2).__name__}: {str(e2)[:200]}"
-            ))
+            raise RuntimeError(f"Falla crítica en LLM. Contexto muy grande o límite de tokens: {e2}")
 
     return {"messages": [response]}

@@ -120,6 +120,11 @@ export default function VoiceControls() {
             console.error('WS Voice Error:', data.payload)
             hideThinkingBubble()
             setActivityState('idle')
+            appendChatMessage({ id: makeId(), role: 'assistant', content: `[Error de Conexión] ${data.payload}` })
+            if (audioQueueRef.current && useJarvisStore.getState().voiceEnabled) {
+              const fallbackMsg = new SpeechSynthesisUtterance("Hubo un error de red.")
+              window.speechSynthesis.speak(fallbackMsg)
+            }
             ws.close()
           }
 
