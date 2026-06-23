@@ -52,9 +52,9 @@ export default function VoiceControls() {
     startOnLoad: false,
     baseAssetPath: "/",
     onnxWASMBasePath: "/",
-    positiveSpeechThreshold: 0.5, // 50% de probabilidad de que sea voz humana
-    negativeSpeechThreshold: 0.35,
-    minSpeechMs: 500, // Medio segundo mínimo para considerarlo una palabra real (evita clics y respiración)
+    positiveSpeechThreshold: 0.1, // Extrema sensibilidad para atrapar cualquier susurro
+    negativeSpeechThreshold: 0.05,
+    minSpeechMs: 10, // Cualquier sílaba activa la grabación
     redemptionMs: 60000, // 60 segundos: MODO WALKIE-TALKIE. NUNCA te corta, espera a que apagues el micrófono.
     submitUserSpeechOnPause: true, // Envía el audio acumulado en el instante en el que presionas el botón
     onSpeechStart: () => {
@@ -392,7 +392,6 @@ export default function VoiceControls() {
       const tempCtx = new (window as any).AudioContext();
       if (tempCtx.state === "suspended") {
         await tempCtx.resume();
-        console.log("🔊 [Audio] Canal de audio nativo despertado a la fuerza de forma exitosa.");
       }
     }
 
@@ -401,12 +400,28 @@ export default function VoiceControls() {
       audioQueueRef.current.resumeContext()
     }
     
-    if (activityState === 'speaking' || activityState === 'thinking') {
+    // Si JARVIS está hablando y queremos interrumpir para hablar nosotros
+    if (activityState === 'speaking') {
       cancelEverything()
-      vad.pause()
+      setTimeout(() => {
+        vad.start()
+      }, 100)
       return
     }
-    vad.toggle()
+    
+    // Si JARVIS está pensando, lo cancelamos
+    if (activityState === 'thinking') {
+      cancelEverything()
+      return
+    }
+
+    // Comportamiento WALKIE-TALKIE puro
+    if (vad.listening) {
+      vad.pause() // Esto disparará submitUserSpeechOnPause y onSpeechEnd
+    } else {
+      setActivityState('listening')
+      vad.start() // Empieza a escuchar
+    }
   }
 
   const toggleTTS = () => {
