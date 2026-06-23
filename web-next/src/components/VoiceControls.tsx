@@ -45,7 +45,7 @@ export default function VoiceControls() {
   const screenCapturerRef = useRef<ScreenCapturer | null>(null)
 
   const vad = useMicVAD({
-    startOnLoad: true,
+    startOnLoad: false,
     baseAssetPath: "/",
     onnxWASMBasePath: "/",
     onSpeechStart: () => {

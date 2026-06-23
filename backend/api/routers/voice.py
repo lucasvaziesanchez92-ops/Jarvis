@@ -352,7 +352,7 @@ async def text_to_speech(request: TTSRequest):
 # Variable global que actúa como un búfer circular de tamaño 1 en la RAM
 ultimo_frame_pantalla = None
 
-@router.websocket("/ws/stream")
+@router.websocket("/stream")
 async def websocket_voice_stream(websocket: WebSocket):
     global ultimo_frame_pantalla
     await websocket.accept()
