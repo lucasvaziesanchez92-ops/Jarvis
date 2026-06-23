@@ -26,24 +26,52 @@ class TextToSpeechService:
         pass
 
     def synthesize(self, text: str, output_format: str = "wav", speed: float = 1.0) -> bytes:
-        """Sintetiza texto usando gTTS (requiere conexion a internet, pero no binarios locales)."""
-        logger.info(f"[gTTS] Sintetizando: {text[:50]}...")
+        """Sintetiza texto usando Piper TTS si esta instalado, sino usa gTTS."""
+        logger.info(f"Sintetizando: {text[:50]}...")
         if not text.strip():
             return b""
             
+        # Intentar con Piper primero (Rápido y Local)
+        try:
+            from backend.config import settings
+            import os
+            
+            if os.path.exists(settings.piper_model_path):
+                if getattr(self, '_piper_voice', None) is None:
+                    from piper.voice import PiperVoice
+                    logger.info(f"Cargando modelo Piper desde {settings.piper_model_path}")
+                    self._piper_voice = PiperVoice.load(settings.piper_model_path)
+                
+                # Sintetizar con Piper
+                audio_parts = []
+                for chunk in self._piper_voice.synthesize_stream_raw(text):
+                    audio_parts.append(chunk)
+                
+                combined_frames = b"".join(audio_parts)
+                
+                if output_format == "wav":
+                    # Crear WAV header
+                    sr = self._piper_voice.config.sample_rate
+                    bytes_per_sec = sr * 1 * 2
+                    data_size = len(combined_frames)
+                    header = b'RIFF' + (data_size + 36).to_bytes(4, 'little') + b'WAVEfmt ' + (16).to_bytes(4, 'little') + (1).to_bytes(2, 'little') + (1).to_bytes(2, 'little') + sr.to_bytes(4, 'little') + bytes_per_sec.to_bytes(4, 'little') + (2).to_bytes(2, 'little') + (16).to_bytes(2, 'little') + b'data' + data_size.to_bytes(4, 'little')
+                    return header + combined_frames
+                
+                return combined_frames # PCM crudo si no es wav
+        except Exception as e:
+            logger.warning(f"Piper TTS falló, intentando gTTS como fallback. Error: {e}")
+
+        # Fallback a gTTS
         try:
             from gtts import gTTS
+            logger.info(f"[gTTS] Fallback para: {text[:50]}...")
             tts = gTTS(text=text, lang="es", tld="es")
             
-            # gTTS genera mp3 internamente.
-            # Convertimos el mp3 a wav en memoria si output_format es wav (el frontend espera webm o wav base64).
             fp = io.BytesIO()
             tts.write_to_fp(fp)
             audio_data = fp.getvalue()
             
             if output_format == "wav":
-                # Convert MP3 to WAV using pydub if available, otherwise just return the mp3 data 
-                # (browsers like Chrome/Safari can usually play mp3 data via base64 audio tags directly).
                 try:
                     from pydub import AudioSegment
                     fp.seek(0)
@@ -52,7 +80,7 @@ class TextToSpeechService:
                     sound.export(out_fp, format="wav")
                     return out_fp.getvalue()
                 except ImportError:
-                    logger.warning("pydub no instalado, devolviendo mp3 directamente aunque se pidio wav.")
+                    logger.warning("pydub no instalado, devolviendo mp3 directamente.")
                     return audio_data
                 except Exception as e:
                     logger.warning(f"Fallo pydub conversion: {e}")
