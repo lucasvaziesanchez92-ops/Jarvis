@@ -278,7 +278,7 @@ export default function VoiceControls() {
   /* ── Send to backend via WebSocket (Real-Time Audio Streaming) ──── */
   const sendVoice = async (audioBlob: Blob) => {
     setActivityState('thinking')
-    const { chatSessionId, persona, showThinkingBubble, hideThinkingBubble, setLastUserText, setLastAssistantText } = useJarvisStore.getState()
+    const { chatSessionId, persona, showThinkingBubble, hideThinkingBubble, setLastUserText, setLastAssistantText, appendChatMessage } = useJarvisStore.getState()
     
     try {
       if (wsRef.current) {
