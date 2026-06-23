@@ -256,6 +256,8 @@ async def _process_voice_job(job_id: str, audio_bytes: bytes, session_id: str, p
                 texto = re.sub(r'<thought>.*?</thought>', '', texto, flags=re.DOTALL)
                 # 2. Dejar solo texto visible de los links
                 texto = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', texto)
+                # 2.5. Reemplazar URLs crudas (http/https) por la palabra "enlace"
+                texto = re.sub(r'https?://[^\s]+', 'enlace', texto)
                 # 3. Eliminar "Visión general..."
                 texto = texto.split("Visión general creada por IA")[0]
                 
