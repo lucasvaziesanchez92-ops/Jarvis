@@ -52,11 +52,11 @@ export default function VoiceControls() {
     startOnLoad: false,
     baseAssetPath: "/",
     onnxWASMBasePath: "/",
-    positiveSpeechThreshold: 0.1, // Sensibilidad extrema para forzar el trigger
-    negativeSpeechThreshold: 0.05,
-    minSpeechMs: 10, // Evita descartar audios que duran menos de 400ms al pausar manualmente
-    redemptionMs: 2000, // 2 segundos enteros de pausa tolerada antes de enviar el audio
-    submitUserSpeechOnPause: true, // ¡Permite que al presionar el botón se envíe el audio inmediatamente!
+    positiveSpeechThreshold: 0.5, // 50% de probabilidad de que sea voz humana
+    negativeSpeechThreshold: 0.35,
+    minSpeechMs: 500, // Medio segundo mínimo para considerarlo una palabra real (evita clics y respiración)
+    redemptionMs: 1500, // 1.5 segundos de pausa tolerada antes de enviar el audio
+    submitUserSpeechOnPause: true, // Permite que al presionar el botón se envíe el audio inmediatamente
     onSpeechStart: () => {
       const currentState = useJarvisStore.getState().activityState;
       if (currentState === 'thinking') {
