@@ -64,89 +64,9 @@ def agent_node(state: JarvisState) -> dict:
             break
 
     if last_user_msg:
-        tools = _get_router().route(last_user_msg, top_k=20)
-        persona_names = {t.name for t in persona_tools}
-        tools = [t for t in tools if t.name in persona_names]
-
-        # ALWAYS include all available Google tools if OAuth is configured.
-        # The TF-IDF router otherwise drops them on generic queries like
-        # "test all your tools", and the LLM hallucinates that the tools
-        # don't exist. Better to show the LLM every available tool than
-        # to filter too aggressively.
-        for pt in persona_tools:
-            if pt.name.startswith(("list_gmail", "search_gmail", "send_gmail",
-                                    "list_drive", "search_drive", "read_drive",
-                                    "get_drive", "upload_drive", "delete_drive",
-                                    "analyze_drive", "list_calendar_google",
-                                    "create_calendar_event_google")):
-                if pt not in tools:
-                    tools.append(pt)
-
-        # Keyword-boost: if the user mentions specific domains explicitly,
-        # make sure the relevant tools are in the list.
-        q_lower = last_user_msg.lower()
-        keyword_tool_map = {
-            (
-                "drive", "google drive", "archivo", "archivos", "fichero", "ficheros",
-                "documento", "documentos", "imagen", "imagenes", "foto", "fotos",
-                "qr", "codigo qr", "código qr", "buscalo", "busca", "en mi drive",
-                "en mi unidad", "mi nube", "nube",
-            ): [
-                "search_drive", "list_drive_files", "list_drive_folder",
-                "read_drive_file", "get_drive_file_info", "upload_drive_file",
-                "delete_drive_file", "analyze_drive_image",
-            ],
-            (
-                "mail", "gmail", "correo", "correos", "email", "emails",
-                "inbox", "bandeja", "mensaje", "mensajes",
-            ): [
-                "list_gmail", "search_gmail", "send_gmail",
-                "get_gmail_detail", "delete_gmail_message", "trash_gmail_message",
-            ],
-            (
-                "calendar", "calendario", "evento", "eventos", "reunion", "reunión",
-                "agenda", "agendar", "agendame", "cita", "citas",
-            ): [
-                "list_calendar_events", "create_calendar_event",
-                "update_calendar_event", "delete_calendar_event",
-                "list_calendar_google", "create_calendar_event_google",
-            ],
-            ("storage", "bucket", "subido", "subir archivo", "guardar archivo"): [
-                "list_storage_files", "read_storage_file", "delete_storage_file",
-            ],
-            ("clima", "tiempo", "temperatura", "llover", "lluvia", "frio", "calor", "weather"): [
-                "get_weather",
-            ],
-            ("calcula", "calcular", "matematicas", "matemáticas", "porcentaje", "multiplica", "divide", "suma", "resta", "math"): [
-                "calculate_math",
-            ],
-            ("hora", "que hora", "fecha", "dia es hoy", "día es hoy"): [
-                "get_current_time", "get_current_date",
-            ],
-        }
-        for keywords, tool_names in keyword_tool_map.items():
-            if any(kw in q_lower for kw in keywords):
-                for tn in tool_names:
-                    for pt in persona_tools:
-                        if pt.name == tn and pt not in tools:
-                            tools.append(pt)
-                            break
-
-        # Always include the most-used critical tools
-        critical = {"create_note", "create_todo", "wiki_query", "web_search"}
-        for critical_name in critical:
-            for pt in persona_tools:
-                if pt.name == critical_name and pt not in tools:
-                    tools.append(pt)
-        # NO MORE 15-tool cap. The previous cap was dropping Google
-        # tools the user expected ('buscalo en mi drive' was missing
-        # search_drive). The LLM is now able to handle 40+ tools
-        # (devstral-small-2:24b has 32k context, plenty for schemas).
-        # We still cap at len(persona_tools) so the persona's
-        # allowed set is respected.
-        tools = tools[: len(persona_tools)]
-    else:
-        tools = list(persona_tools)
+    # El usuario ha ordenado explícitamente usar el prompt masivo con TODAS las herramientas,
+    # eliminando el enrutador semántico (TF-IDF) para evitar que la IA alucine que no tiene herramientas.
+    tools = list(persona_tools)
 
     retrieved = "\n".join(state.get("retrieved_context", [])) if state.get("retrieved_context") else ""
 
