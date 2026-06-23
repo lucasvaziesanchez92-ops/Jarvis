@@ -49,8 +49,9 @@ export default function VoiceControls() {
     startOnLoad: false,
     baseAssetPath: "/",
     onnxWASMBasePath: "/",
-    positiveSpeechThreshold: 0.25, // Ultra sensible para que te escuche aunque hables bajo
-    negativeSpeechThreshold: 0.15, // Corta más rápido
+    positiveSpeechThreshold: 0.1, // Sensibilidad extrema para forzar el trigger
+    negativeSpeechThreshold: 0.05,
+    minSpeechMs: 10, // Evita descartar audios que duran menos de 400ms al pausar manualmente
     redemptionMs: 2000, // 2 segundos enteros de pausa tolerada antes de enviar el audio
     submitUserSpeechOnPause: true, // ¡Permite que al presionar el botón se envíe el audio inmediatamente!
     onSpeechStart: () => {
