@@ -60,6 +60,7 @@ export default function VoiceControls() {
       
       isCancelledRef.current = false;
       console.log("🎙️ [VAD] Detección de habla iniciada.");
+      
       // 1. BARGE-IN ORGÁNICO: Si JARVIS está hablando, lo callamos al instante
       if (currentState === 'speaking') {
         console.log("🛑 [VAD] Interrupción detectada. Enviando señal de aborto...");
@@ -75,8 +76,9 @@ export default function VoiceControls() {
     },
     onSpeechEnd: (audioFloat32Array) => {
       const currentState = useJarvisStore.getState().activityState;
-      if (currentState === 'thinking') {
-        console.log("⏳ [VAD] Fin de habla ignorado (JARVIS está pensando).");
+      // IMPORTANTE: Si NO estamos en listening o speaking, significa que ignoramos el inicio
+      if (currentState === 'thinking' || currentState === 'idle') {
+        console.log("⏳ [VAD] Fin de habla ignorado (JARVIS estaba pensando o inactivo).");
         return;
       }
 
@@ -98,9 +100,11 @@ export default function VoiceControls() {
 
   // Sincronizar el estado de animación del Canvas con la energía detectada
   useEffect(() => {
-    if (vad.userSpeaking && useJarvisStore.getState().activityState !== 'listening') {
+    const currentState = useJarvisStore.getState().activityState;
+    if (vad.userSpeaking && currentState !== 'listening' && currentState !== 'thinking') {
       setActivityState('listening')
-    } else if (!vad.userSpeaking && useJarvisStore.getState().activityState === 'listening') {
+    } else if (!vad.userSpeaking && currentState === 'listening') {
+      // Solo transicionar a thinking si el VAD fue quien nos puso en listening
       setActivityState('thinking')
     }
     setMicActive(!vad.loading && vad.listening)
