@@ -46,8 +46,8 @@ export default function VoiceControls() {
 
   const vad = useMicVAD({
     startOnLoad: true,
-    workletURL: "/vad.worklet.bundle.min.js",
-    modelURL: "/silero_vad_legacy.onnx",
+    baseAssetPath: "/",
+    onnxWASMBasePath: "/",
     onSpeechStart: () => {
       console.log("🎙️ [VAD] Detección de habla iniciada.");
       // 1. BARGE-IN ORGÁNICO: Si JARVIS está hablando, lo callamos al instante
