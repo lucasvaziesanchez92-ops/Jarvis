@@ -1,37 +1,28 @@
 export class AudioQueuePlayer {
-  private audioCtx: AudioContext | null = null;
-  private queue: AudioBuffer[] = [];
+  private queue: string[] = [];
   public isPlaying = false;
-  private nextStartTime = 0;
   private onIdle?: () => void;
+  private audioEl?: HTMLAudioElement;
 
   constructor(onIdle?: () => void) {
     this.onIdle = onIdle;
     if (typeof window !== 'undefined') {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass) {
-        this.audioCtx = new AudioContextClass();
-      }
+      this.audioEl = new Audio();
+      this.audioEl.onended = () => {
+        this.playNext();
+      };
+      this.audioEl.onerror = (e) => {
+        console.error("Audio element error", e);
+        this.playNext();
+      };
     }
   }
 
   async resumeContext() {
-    if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      try {
-        await this.audioCtx.resume();
-      } catch (e) {
-        console.error("Failed to resume AudioContext", e);
-      }
-    }
+    // No-op for HTMLAudioElement, but kept for compatibility with VoiceControls.tsx
   }
 
   async queueAudioChunk(base64Data: string) {
-    if (!this.audioCtx) return;
-
-    if (this.audioCtx.state === 'suspended') {
-      await this.audioCtx.resume();
-    }
-
     try {
       const binaryString = window.atob(base64Data);
       const len = binaryString.length;
@@ -40,47 +31,43 @@ export class AudioQueuePlayer {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      const audioBuffer = await this.audioCtx.decodeAudioData(bytes.buffer);
-      this.queue.push(audioBuffer);
+      // Creamos un Blob de audio (soporta MP3 nativamente en todos los navegadores)
+      const blob = new Blob([bytes], { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+      
+      this.queue.push(url);
       
       if (!this.isPlaying) {
         this.playNext();
       }
     } catch (e) {
-      console.error("Error decodificando el fragmento de audio stream:", e);
+      console.error("Error queueing audio chunk:", e);
     }
   }
 
   private playNext() {
-    if (this.queue.length === 0 || !this.audioCtx) {
+    if (this.queue.length === 0 || !this.audioEl) {
       this.isPlaying = false;
       if (this.onIdle) this.onIdle();
       return;
     }
 
     this.isPlaying = true;
-    const buffer = this.queue.shift()!;
-    const source = this.audioCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(this.audioCtx.destination);
-
-    const currentTime = this.audioCtx.currentTime;
-    
-    if (this.nextStartTime < currentTime) {
-      this.nextStartTime = currentTime;
-    }
-
-    source.start(this.nextStartTime);
-    this.nextStartTime += buffer.duration;
-    
-    source.onended = () => {
+    const url = this.queue.shift()!;
+    this.audioEl.src = url;
+    this.audioEl.play().catch(e => {
+      console.error("Audio play failed:", e);
       this.playNext();
-    };
+    });
   }
 
   clearQueue() {
     this.queue = [];
     this.isPlaying = false;
-    this.nextStartTime = 0;
+    if (this.audioEl) {
+      this.audioEl.pause();
+      this.audioEl.src = '';
+    }
   }
 }
+
