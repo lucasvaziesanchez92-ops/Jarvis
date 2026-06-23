@@ -4,10 +4,10 @@ export class AudioQueuePlayer {
   private onIdle?: () => void;
   private audioEl?: HTMLAudioElement;
 
-  constructor(onIdle?: () => void) {
+  constructor(onIdle?: () => void, audioEl?: HTMLAudioElement) {
     this.onIdle = onIdle;
     if (typeof window !== 'undefined') {
-      this.audioEl = new Audio();
+      this.audioEl = audioEl || new Audio();
       this.audioEl.onended = () => {
         this.playNext();
       };
@@ -19,7 +19,15 @@ export class AudioQueuePlayer {
   }
 
   async resumeContext() {
-    // No-op for HTMLAudioElement, but kept for compatibility with VoiceControls.tsx
+    if (this.audioEl && this.audioEl.paused && !this.isPlaying) {
+      try {
+        // Reproducir un sonido en blanco para desbloquear el Autoplay Policy del navegador
+        this.audioEl.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+        await this.audioEl.play();
+      } catch (e) {
+        // Se ignora, el intento ya cuenta como interacción para desbloquear
+      }
+    }
   }
 
   async queueAudioChunk(base64Data: string) {

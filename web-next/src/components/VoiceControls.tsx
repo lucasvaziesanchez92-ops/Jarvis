@@ -330,10 +330,10 @@ export default function VoiceControls() {
   }, [activityState, visualizerAmplitude])
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && !audioQueueRef.current) {
+    if (typeof window !== 'undefined' && !audioQueueRef.current && audioElRef.current) {
       audioQueueRef.current = new AudioQueuePlayer(() => {
         setActivityState('idle')
-      })
+      }, audioElRef.current)
     }
     if (typeof window !== 'undefined' && !screenCapturerRef.current) {
       screenCapturerRef.current = new ScreenCapturer()
@@ -597,6 +597,7 @@ export default function VoiceControls() {
           </button>
         </div>
       </div>
+      <audio ref={audioElRef} className="hidden" />
     </div>
   )
 }
