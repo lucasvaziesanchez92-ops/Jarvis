@@ -42,7 +42,7 @@ async def _transcribe(audio_bytes: bytes) -> str:
     client = Groq(api_key=settings.groq_api_key)
     response = client.audio.transcriptions.create(
         model=settings.groq_stt_model,
-        file=("audio.webm", io.BytesIO(audio_bytes), "audio/webm"),
+        file=("audio.wav", io.BytesIO(audio_bytes), "audio/wav"),
         language="es",
     )
     

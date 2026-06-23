@@ -114,7 +114,9 @@ export default function VoiceControls() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !audioQueueRef.current) {
-      audioQueueRef.current = new AudioQueuePlayer()
+      audioQueueRef.current = new AudioQueuePlayer(() => {
+        setActivityState('idle')
+      })
     }
     if (typeof window !== 'undefined' && !screenCapturerRef.current) {
       screenCapturerRef.current = new ScreenCapturer()

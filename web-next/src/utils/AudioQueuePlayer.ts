@@ -3,8 +3,10 @@ export class AudioQueuePlayer {
   private queue: AudioBuffer[] = [];
   public isPlaying = false;
   private nextStartTime = 0;
+  private onIdle?: () => void;
 
-  constructor() {
+  constructor(onIdle?: () => void) {
+    this.onIdle = onIdle;
     if (typeof window !== 'undefined') {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
@@ -52,6 +54,7 @@ export class AudioQueuePlayer {
   private playNext() {
     if (this.queue.length === 0 || !this.audioCtx) {
       this.isPlaying = false;
+      if (this.onIdle) this.onIdle();
       return;
     }
 
