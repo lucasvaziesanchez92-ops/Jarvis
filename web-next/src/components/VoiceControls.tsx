@@ -48,9 +48,9 @@ export default function VoiceControls() {
     startOnLoad: false,
     baseAssetPath: "/",
     onnxWASMBasePath: "/",
-    positiveSpeechThreshold: 0.7, // Umbral más alto para ignorar ruidos/estornudos
-    negativeSpeechThreshold: 0.4,
-    redemptionMs: 2000, // 2 segundos de pausa tolerada antes de enviar
+    positiveSpeechThreshold: 0.4, // Umbral bajo para que no corte si baja un poco la voz
+    negativeSpeechThreshold: 0.2, // Umbral bajo para mantenerlo activo
+    redemptionMs: 3500, // 3.5 segundos enteros de pausa tolerada antes de enviar el audio
     onSpeechStart: () => {
       const currentState = useJarvisStore.getState().activityState;
       if (currentState === 'thinking') {
@@ -367,6 +367,11 @@ export default function VoiceControls() {
 
 
   const handleMicClick = () => {
+    // Reanudar el AudioContext del navegador con el gesto del usuario
+    if (audioQueueRef.current) {
+      audioQueueRef.current.resumeContext()
+    }
+    
     if (activityState === 'speaking' || activityState === 'thinking') {
       cancelEverything()
       vad.pause()

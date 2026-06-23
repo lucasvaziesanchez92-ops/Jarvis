@@ -13,6 +13,16 @@ export class AudioQueuePlayer {
     }
   }
 
+  async resumeContext() {
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      try {
+        await this.audioCtx.resume();
+      } catch (e) {
+        console.error("Failed to resume AudioContext", e);
+      }
+    }
+  }
+
   async queueAudioChunk(base64Data: string) {
     if (!this.audioCtx) return;
 
