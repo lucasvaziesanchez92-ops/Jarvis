@@ -55,8 +55,8 @@ export default function VoiceControls() {
     positiveSpeechThreshold: 0.5, // 50% de probabilidad de que sea voz humana
     negativeSpeechThreshold: 0.35,
     minSpeechMs: 500, // Medio segundo mínimo para considerarlo una palabra real (evita clics y respiración)
-    redemptionMs: 1500, // 1.5 segundos de pausa tolerada antes de enviar el audio
-    submitUserSpeechOnPause: true, // Permite que al presionar el botón se envíe el audio inmediatamente
+    redemptionMs: 60000, // 60 segundos: MODO WALKIE-TALKIE. NUNCA te corta, espera a que apagues el micrófono.
+    submitUserSpeechOnPause: true, // Envía el audio acumulado en el instante en el que presionas el botón
     onSpeechStart: () => {
       const currentState = useJarvisStore.getState().activityState;
       if (currentState === 'thinking') {
