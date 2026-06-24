@@ -6,7 +6,8 @@ import os
 
 @tool
 def wiki_query(query: str) -> str:
-    """Busca en tu segundo cerebro (Obsidian) usando búsqueda semántica con ChromaDB."""
+    """Busca en tu segundo cerebro (Obsidian) usando búsqueda semántica con ChromaDB.
+    PRIORIDAD MÁXIMA: Úsala SIEMPRE ANTES que web_search cuando el usuario pregunte por sus notas, sus proyectos, o temas que probablemente tenga guardados en su cerebro digital."""
     try:
         from backend.services.wiki_engine import search_vault
         results = search_vault(query, n_results=5)
