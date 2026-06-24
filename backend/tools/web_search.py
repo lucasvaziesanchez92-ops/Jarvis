@@ -30,40 +30,39 @@ def _wiki_fallback(query: str) -> str:
     except Exception as e:
         return f"Error crítico durante la búsqueda web: {str(e)}"
 
-def _ddg_html_scraper(query: str) -> str:
-    """Scrapes DDG HTML lite using httpx to avoid 403 Forbidden blocks."""
+def _bing_html_scraper(query: str) -> str:
+    """Scrapes Bing HTML using httpx since DDG Lite is now returning 202 Accepted blocks."""
     import httpx
     try:
-        url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(query)
+        url = "https://www.bing.com/search?q=" + urllib.parse.quote(query)
         with httpx.Client(http2=True, timeout=10, follow_redirects=True) as client:
             res = client.get(
                 url,
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
+                }
             )
             html = res.text
             
-        # Parse result snippets individually to filter out Ads
         results = []
-        # Split HTML by result blocks
-        blocks = re.split(r'class="result ', html)[1:]
+        blocks = re.findall(r'<li class="b_algo".*?>(.*?)</li>', html, re.IGNORECASE | re.DOTALL)
         
         for block in blocks:
-            # Ignore ads
-            if "badge--ad" in block or "result--ad" in block:
-                continue
+            title_match = re.search(r'<h2><a[^>]*href="([^"]+)"[^>]*>(.*?)</a></h2>', block, re.IGNORECASE | re.DOTALL)
+            snippet_match = re.search(r'<div class="b_caption"><p[^>]*>(.*?)</p></div>', block, re.IGNORECASE | re.DOTALL)
+            # A veces el snippet no está en b_caption p
+            if not snippet_match:
+                snippet_match = re.search(r'<div class="b_lineclamp[^>]*>(.*?)</div>', block, re.IGNORECASE | re.DOTALL)
                 
-            title_match = re.search(r'<h2 class="result__title">.*?<a[^>]*>(.*?)</a>', block, re.IGNORECASE | re.DOTALL)
-            href_match = re.search(r'<h2 class="result__title">.*?<a[^>]*href="([^"]+)"', block, re.IGNORECASE | re.DOTALL)
-            snippet_match = re.search(r'<a class="result__snippet[^>]*>(.*?)</a>', block, re.IGNORECASE | re.DOTALL)
-            
             if title_match and snippet_match:
-                title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
+                title = re.sub(r'<[^>]+>', '', title_match.group(2)).strip()
                 body = re.sub(r'<[^>]+>', '', snippet_match.group(1)).strip()
-                url = href_match.group(1) if href_match else ""
-                if url.startswith("//duckduckgo.com/l/?uddg="):
-                    url = urllib.parse.unquote(url.split("uddg=")[1].split("&")[0])
-                elif url.startswith("//"):
-                    url = "https:" + url
+                url = title_match.group(1)
+                
+                # Ignorar links de videos o similares
+                if not url.startswith("http"):
+                    continue
                     
                 results.append(f"### Fuente {len(results)+1}: [{title}]({url})\n{body}")
                 
@@ -71,11 +70,9 @@ def _ddg_html_scraper(query: str) -> str:
                 break
                 
         if results:
-            # Get URL of the first source to generate preview
             first_url_match = re.search(r'\[.*?\]\((.*?)\)', results[0])
             first_url = first_url_match.group(1) if first_url_match else ""
             
-            # Add strict instruction for the LLM to output the preview markdown
             prefix = ""
             if first_url:
                 encoded_url = urllib.parse.quote(first_url)
@@ -86,14 +83,15 @@ def _ddg_html_scraper(query: str) -> str:
             
             return prefix + "\n\n---\n\n".join(results)
         return _wiki_fallback(query)
-    except Exception:
+    except Exception as e:
+        print(f"Bing scraper error: {e}")
         return _wiki_fallback(query)
 
 @tool
 def web_search(query: str) -> str:
     """Busca en internet usando un buscador real y extrae el texto de las páginas web más relevantes.
     Úsala para obtener información textual y responder preguntas."""
-    return _ddg_html_scraper(query)
+    return _bing_html_scraper(query)
 
 
 # Spanish→English keyword map for better DDG/Bing results
