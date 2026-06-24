@@ -327,13 +327,14 @@ export default function ChatModePanel() {
                       components={{
                         a: ({node, href, children, ...props}) => {
                           if (href?.startsWith('#wikilink:')) {
+                            const noteName = decodeURIComponent(href.replace('#wikilink:', ''));
                             return (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  alert(`Busca "${decodeURIComponent(href.replace('#wikilink:', ''))}" en el panel de Wiki para ver esta nota.`);
+                                  useJarvisStore.setState({ currentScreen: 'notes', panelMode: 'notes', panelExpanded: true });
                                 }}
                                 className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 bg-cyan-400/10 px-1 rounded"
                               >
@@ -342,6 +343,13 @@ export default function ChatModePanel() {
                             );
                           }
                           return <a href={href} {...props} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2" />;
+                        },
+                        img: ({node, src, alt, ...props}) => {
+                          let finalSrc = src;
+                          if (typeof src === 'string' && src.startsWith('/api/v1/proxy-image')) {
+                            finalSrc = `${API_BASE}${src}`;
+                          }
+                          return <img src={finalSrc} alt={alt || ''} {...props} className="max-w-full rounded-lg my-2" loading="lazy" />;
                         }
                       }}
                     >

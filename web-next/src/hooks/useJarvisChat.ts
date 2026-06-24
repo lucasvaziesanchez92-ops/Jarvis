@@ -182,11 +182,19 @@ function ensureConnection() {
         const msgs = useJarvisStore.getState().chatMessages;
         const last = msgs[msgs.length - 1];
         if (last && last.role === 'assistant') {
-          let updated = false;
           const newToolCalls = last.toolCalls?.map(tc => {
-            if (!updated && !tc.output && (!data.tool_name || tc.tool === data.tool_name)) {
-              updated = true;
+            // Strict matching: only assign output if the tool name matches,
+            // OR if tool_name is empty AND this is the only unmatched tool.
+            if (tc.output) return tc;
+            if (data.tool_name && tc.tool === data.tool_name) {
               return { ...tc, output: typeof data.tool_output === 'string' ? data.tool_output : JSON.stringify(data.tool_output) };
+            }
+            // Fallback: if no tool_name provided, only match if there's exactly one unmatched tool
+            if (!data.tool_name) {
+              const unmatchedCount = (last.toolCalls || []).filter(t => !t.output).length;
+              if (unmatchedCount === 1) {
+                return { ...tc, output: typeof data.tool_output === 'string' ? data.tool_output : JSON.stringify(data.tool_output) };
+              }
             }
             return tc;
           });

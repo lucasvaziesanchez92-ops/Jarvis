@@ -1,28 +1,43 @@
-"""Servicio de Caché Vectorial con LanceDB para alta velocidad de respuesta local."""
+"""Servicio de Cache Vectorial con LanceDB para alta velocidad de respuesta local.
+
+Lazy-loaded: the embedding model (~90MB ONNX) is NOT loaded at import time.
+It is loaded on first use (first guardar/buscar call) to keep Railway startup
+memory low (~130MB instead of ~700MB).
+"""
 import os
 import lancedb
 import pandas as pd
 from loguru import logger
-from chromadb.utils import embedding_functions
+
 
 class SemanticCache:
     def __init__(self, db_path="data/lancedb_store"):
-        # Asegurar la existencia del directorio local
         os.makedirs(db_path, exist_ok=True)
         self.db = lancedb.connect(db_path)
-        
-        # Cargar el modelo de embeddings local (via ONNX en instancia COMPARTIDA para ahorrar RAM en Railway)
-        from backend.core.embeddings import get_shared_embedding_function
-        self.ef = get_shared_embedding_function()
-        
-        # Inicializar o recuperar las tablas vectoriales independientes
-        self.tablas = {
-            "drive": self._obtener_o_crear_tabla("drive_cache"),
-            "gmail": self._obtener_o_crear_tabla("gmail_cache"),
-            "wiki":  self._obtener_o_crear_tabla("wiki_cache"),
-            "perfil": self._obtener_o_crear_tabla_perfil("user_profile_cache")
-        }
-        logger.info("LanceDB Cache inicializado exitosamente.")
+        self._ef = None
+        self._tablas = None
+
+    @property
+    def ef(self):
+        """Embedding function — loaded lazily on first use to save RAM at startup."""
+        if self._ef is None:
+            from backend.core.embeddings import get_shared_embedding_function
+            logger.info("Cargando modelo de embeddings (all-MiniLM-L6-v2) para LanceDB...")
+            self._ef = get_shared_embedding_function()
+        return self._ef
+
+    @property
+    def tablas(self):
+        """Tables — initialized lazily to avoid DB operations at import time."""
+        if self._tablas is None:
+            self._tablas = {
+                "drive": self._obtener_o_crear_tabla("drive_cache"),
+                "gmail": self._obtener_o_crear_tabla("gmail_cache"),
+                "wiki":  self._obtener_o_crear_tabla("wiki_cache"),
+                "perfil": self._obtener_o_crear_tabla_perfil("user_profile_cache")
+            }
+            logger.info("LanceDB Cache inicializado exitosamente.")
+        return self._tablas
 
     def _obtener_o_crear_tabla(self, nombre_tabla: str):
         if nombre_tabla in self.db.table_names():

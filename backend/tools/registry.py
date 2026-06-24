@@ -21,7 +21,7 @@ from backend.tools.email_tools import search_emails, send_email, list_emails
 from backend.tools.wiki import wiki_query, wiki_capture
 
 # Utility
-from backend.tools.utility import get_current_time, get_current_date
+from backend.tools.utility import get_current_time, get_current_date, calculate_math, get_weather
 
 # Memory
 from backend.tools.memory import search_memory, save_memory, list_memories, delete_memory
@@ -125,8 +125,8 @@ CORE_TOOLS = [
     create_todo, list_todos, complete_todo, update_todo, delete_todo,
     # Wiki
     wiki_query, wiki_capture,
-    # Time
-    get_current_time, get_current_date,
+    # Time + Utility
+    get_current_time, get_current_date, calculate_math, get_weather,
 ]
 
 # Web search (if playwright installed)
@@ -211,7 +211,6 @@ TOOL_ALIASES: dict[str, str] = {
     "add_calendar_event": "create_calendar_event_google",
     "analyze_image":      "analyze_drive_image",
     "describe_image":     "analyze_drive_image",
-    "get_weather":        "web_search",
 }
 
 

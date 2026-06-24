@@ -43,7 +43,9 @@ NOTES_TOOLS = ["create_note", "list_notes", "get_note", "update_note", "delete_n
 TODOS_TOOLS = ["create_todo", "list_todos", "complete_todo", "update_todo", "delete_todo"]
 WIKI_TOOLS  = ["wiki_query", "wiki_capture"]
 TIME_TOOLS  = ["get_current_time", "get_current_date"]
-MEMORY_TOOLS = ["search_memory", "save_memory", "list_memories", "delete_memory"]
+UTILITY_TOOLS = ["calculate_math", "get_weather"]
+MEMORY_TOOLS = ["search_memory", "save_memory", "list_memories", "delete_memory", "compact_memory", "diagnose_agent"]
+UTILITY_TOOLS = ["calculate_math", "get_weather"]
 SEARCH_TOOLS = ["web_search", "buscar_imagenes_web", "buscar_reversa_gratis", "search_notes_semantic", "search_wiki_semantic", "search_all_knowledge"]
 CALENDAR_TOOLS = [
     "list_calendar_events", "create_calendar_event",
@@ -64,7 +66,7 @@ STORAGE_TOOLS = ["list_storage_files", "read_storage_file", "delete_storage_file
 GOOGLE_TOOLS = GMAIL_TOOLS + DRIVE_TOOLS + CALENDAR_TOOLS + STORAGE_TOOLS
 
 ALL_ALLOWED = (
-    NOTES_TOOLS + TODOS_TOOLS + WIKI_TOOLS + TIME_TOOLS + MEMORY_TOOLS
+    NOTES_TOOLS + TODOS_TOOLS + WIKI_TOOLS + TIME_TOOLS + UTILITY_TOOLS + MEMORY_TOOLS
     + SEARCH_TOOLS + CALENDAR_TOOLS + EMAIL_TOOLS + GMAIL_TOOLS
     + DRIVE_TOOLS + STORAGE_TOOLS + GOOGLE_TOOLS
 )
@@ -233,7 +235,7 @@ def get_persona(name: str) -> PersonaConfig:
     
     # Inyectar reglas globales (Drive, Markdown links) sin reescribir todo
     # SYSTEM_RFP_PROMPT eliminado — tenía info desactualizada (wiki="LanceDB" cuando es ChromaDB)
-    # Las reglas vigentes viven en nodes.py (REGLA 1-15)
+    # Las reglas vigentes viven en nodes.py (3 reglas universales + lista de tools reales)
     prompt_con_reglas = base_persona.system_prompt + DRIVE_SUPER_PROMPT + NARRATIVE_SUPER_PROMPT
     
     # Retornar una copia para no mutar el dict original

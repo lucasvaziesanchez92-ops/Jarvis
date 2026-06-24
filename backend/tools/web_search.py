@@ -116,7 +116,8 @@ def buscar_imagenes_web(query: str) -> str:
             img_url = item.get("image", "")
             title = item.get("title", query)[:60]
             if img_url and any(img_url.lower().endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
-                resultados.append(f"![{title}]({img_url})")
+                proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
+                resultados.append(f"![{title}]({proxy_url})")
                 if len(resultados) >= 3:
                     break
     except Exception:
@@ -135,7 +136,8 @@ def buscar_imagenes_web(query: str) -> str:
                 html = res.read().decode('utf-8', errors='ignore')
             matches = re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', html)
             for img_url in matches:
-                resultados.append(f"![{query}]({img_url})")
+                proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
+                resultados.append(f"![{query}]({proxy_url})")
                 if len(resultados) >= 3:
                     break
         except Exception:

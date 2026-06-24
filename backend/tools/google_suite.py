@@ -140,7 +140,10 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                 lines = ["⚡ **[Cache Hit - Resultados ultrarrápidos]**\nINSTRUCCIÓN OBLIGATORIA: Debes mostrar estos archivos a los usuarios COMO ENLACES CLICKABLES en Markdown, usando este formato exacto: [Nombre del Archivo](URL)"]
                 for hit in cache_hits:
                     url = hit.get("link_directo", "")
-                    lines.append(f"- 📄 [{hit['nombre']}]({url})")
+                    if url:
+                        lines.append(f"- 📄 [{hit['nombre']}]({url})")
+                    else:
+                        lines.append(f"- 📄 {hit['nombre']}")
                 return "\n".join(lines)
 
         # Cache Miss - Ir a los servidores de Google reales
@@ -170,11 +173,14 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                     size = f"{int(size)/1024:.1f}KB"
             except Exception:
                 pass
-            url = f.get("webViewLink", "")
-            lines.append(f"- {ftype} [{f['name']}]({url}) ({size})")
+            # Robust URL: prefer webViewLink, fall back to constructed URL with file ID
+            url = f.get("webViewLink", "") or f.get("alternateLink", "")
+            if not url and f.get("id"):
+                url = f"https://drive.google.com/file/d/{f['id']}/view"
+            lines.append(f"- {ftype} [{f['name']}]({url}) ({size})" if url else f"- {ftype} {f['name']} ({size})")
             
             # Guardar el resultado en la caché para la próxima consulta
-            if ftype == "📄" and query:  # Solo cachear archivos (no carpetas) si hubo query
+            if ftype == "📄" and query and url:  # Solo cachear archivos (no carpetas) si hubo query
                 semantic_cache.guardar_en_cache(
                     categoria="drive",
                     id_doc=f["id"],
