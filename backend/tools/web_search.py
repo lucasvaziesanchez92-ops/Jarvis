@@ -31,15 +31,16 @@ def _wiki_fallback(query: str) -> str:
         return f"Error crítico durante la búsqueda web: {str(e)}"
 
 def _ddg_html_scraper(query: str) -> str:
-    """Scrapes DDG HTML lite directly using urllib to avoid curl_cffi deadlocks."""
+    """Scrapes DDG HTML lite using httpx to avoid 403 Forbidden blocks."""
+    import httpx
     try:
         url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(query)
-        req = urllib.request.Request(
-            url, 
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-        )
-        with urllib.request.urlopen(req, timeout=10) as res:
-            html = res.read().decode('utf-8', errors='ignore')
+        with httpx.Client(http2=True, timeout=10, follow_redirects=True) as client:
+            res = client.get(
+                url,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+            )
+            html = res.text
             
         # Parse result snippets individually to filter out Ads
         results = []
@@ -247,9 +248,7 @@ def buscar_imagenes_web(query: str) -> str:
         )
 
     return (
-        "IMÁGENES ENCONTRADAS. DEBES incluir EXACTAMENTE estos bloques en tu respuesta "
-        "final para que el usuario los vea. NO los modifiques, NO los resumas, NO los omitas. "
-        "Copia y pega cada línea tal cual:\n\n"
+        "IMÁGENES ENCONTRADAS. INSTRUCCIÓN CRÍTICA Y OBLIGATORIA: DEBES copiar y pegar EXACTAMENTE los siguientes enlaces Markdown en tu respuesta para que el usuario pueda ver las imágenes. NO los modifiques, NO escribas solo el título, DEBES incluir los corchetes y paréntesis tal cual (ej. ![Título](URL)).\n\n"
         + "\n\n".join(resultados)
     )
 
@@ -304,17 +303,29 @@ def buscar_reversa_gratis(attachment_key: str) -> str:
         }]
     }
 
-    try:
-        resp = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
-            json=vision_payload,
-            timeout=15,
-        )
-        resp.raise_for_status()
-        vision_result = resp.json()
-        description = vision_result["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        return f"Error al analizar la imagen con visión artificial: {e}"
+    import time
+    description = ""
+    for attempt in range(3):
+        try:
+            resp = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+                json=vision_payload,
+                timeout=25,
+            )
+            resp.raise_for_status()
+            vision_result = resp.json()
+            description = vision_result["candidates"][0]["content"]["parts"][0]["text"]
+            break
+        except requests.exceptions.HTTPError as e:
+            if resp.status_code in (429, 503) and attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
+            return f"Error al analizar la imagen con visión artificial: {e}"
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
+            return f"Error al analizar la imagen con visión artificial: {e}"
 
     # ── Paso 3: Buscar en web con la descripción ─────────────────
     # Extract search keywords from vision result (last line of the response)
