@@ -1,5 +1,13 @@
 """FastAPI application -- Jarvis backend (v2 with production improvements)."""
 import os
+# Fix ONNX/PyTorch memory spikes on Railway
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 os.environ['HF_HOME'] = os.path.join(os.getcwd(), 'data', 'hf_cache')
 os.environ['XDG_CACHE_HOME'] = os.path.join(os.getcwd(), 'data', 'xdg_cache')
 import warnings
