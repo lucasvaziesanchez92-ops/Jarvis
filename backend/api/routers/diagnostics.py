@@ -194,21 +194,18 @@ async def nuke_data():
                     os.remove(item_path)
 
         # Clear LanceDB Cache
-        from backend.services.lancedb_cache import get_lancedb_cache
+        from backend.services.lancedb_cache import semantic_cache
         try:
-            cache = get_lancedb_cache()
-            if cache and hasattr(cache, 'table') and cache.table:
-                # LanceDB doesn't have a simple wipe, so we drop and recreate
-                cache.db.drop_table("memory_chunks")
-                import pyarrow as pa
-                schema = pa.schema([
-                    pa.field("id", pa.string()),
-                    pa.field("vector", pa.list_(pa.float32(), 384)),
-                    pa.field("text", pa.string()),
-                    pa.field("source", pa.string()),
-                    pa.field("metadata", pa.string())
-                ])
-                cache.table = cache.db.create_table("memory_chunks", schema=schema)
+            if semantic_cache and hasattr(semantic_cache, 'db'):
+                for table_name in ["wiki_cache", "user_profile_cache", "drive_cache", "gmail_cache"]:
+                    if table_name in semantic_cache.db.table_names():
+                        semantic_cache.db.drop_table(table_name)
+                        # Re-initialize empty tables
+                        if table_name == "user_profile_cache":
+                            semantic_cache.tablas["perfil"] = semantic_cache._obtener_o_crear_tabla_perfil(table_name)
+                        else:
+                            cache_key = table_name.replace("_cache", "")
+                            semantic_cache.tablas[cache_key] = semantic_cache._obtener_o_crear_tabla(table_name)
         except Exception as e:
             logger.warning(f"Error clearing LanceDB: {e}")
 
