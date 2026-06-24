@@ -188,7 +188,8 @@ def buscar_imagenes_web(query: str) -> str:
                     img_url = img_info.get("url", "")
                     mime = img_info.get("mime", "")
                     if img_url and mime in ("image/jpeg", "image/png", "image/webp"):
-                        resultados.append(f"![{title}]({img_url})")
+                        proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
+                        resultados.append(f"![{title}]({proxy_url})")
                         if len(resultados) >= 2:
                             break
             except Exception:
@@ -213,8 +214,8 @@ def buscar_imagenes_web(query: str) -> str:
                 img_url = original or thumbnail
                 if img_url:
                     title = data.get("title", query)
-                    # Wikipedia images are open-access, no proxy needed
-                    resultados.append(f"![{title}]({img_url})")
+                    proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
+                    resultados.append(f"![{title}]({proxy_url})")
                     break
             except Exception:
                 pass
@@ -233,7 +234,8 @@ def buscar_imagenes_web(query: str) -> str:
                 thumbnail = data.get("thumbnail", {}).get("source", "")
                 if thumbnail:
                     title = data.get("title", query)
-                    resultados.append(f"![{title}]({thumbnail})")
+                    proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(thumbnail, safe='')}"
+                    resultados.append(f"![{title}]({proxy_url})")
             except Exception:
                 pass
 
@@ -245,8 +247,9 @@ def buscar_imagenes_web(query: str) -> str:
         )
 
     return (
-        "CRITICO: Encontraste imágenes reales. DEBES copiar e incluir estos bloques Markdown EXACTAMENTE "
-        "en tu respuesta final sin modificarlos. Una frase introductoria y luego las imágenes:\n\n"
+        "IMÁGENES ENCONTRADAS. DEBES incluir EXACTAMENTE estos bloques en tu respuesta "
+        "final para que el usuario los vea. NO los modifiques, NO los resumas, NO los omitas. "
+        "Copia y pega cada línea tal cual:\n\n"
         + "\n\n".join(resultados)
     )
 
