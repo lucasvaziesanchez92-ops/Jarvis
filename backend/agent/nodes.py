@@ -105,7 +105,8 @@ def call_model_with_tools(
         "REGLA 3 — IMÁGENES: Si buscar_imagenes_web devuelve ![titulo](url), copia esos bloques EXACTOS "
         "en tu respuesta. Nunca digas 'no se encontraron imágenes' si el resultado contiene URLs de imagen.\n"
         "REGLA 4 — NO INVENTES: NUNCA crees notas, tareas o eventos que el usuario NO pidió en ESTE mensaje. "
-        "Responde SOLO a lo que pide el mensaje actual. Ignora resultados de herramientas de mensajes anteriores."
+        "Responde SOLO a lo que pide el mensaje actual. Ignora resultados de herramientas de mensajes anteriores.\n"
+        "REGLA 5 — ANTI-ALUCINACIÓN (CRÍTICO): NUNCA mientas diciendo que ya buscaste en la web o leíste un archivo si no has llamado a la herramienta. Si debes usar una herramienta, EMITE EL TOOL_CALL y NO devuelvas texto asumiendo el resultado. ¡Debes ESPERAR a que la herramienta te devuelva la información real!"
     )
 
     # Inject rules right before the last HumanMessage in the history

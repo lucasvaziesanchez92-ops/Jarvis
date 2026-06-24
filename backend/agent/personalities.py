@@ -132,7 +132,8 @@ PERSONALIDADES = {
             "Buscar en el segundo cerebro con wiki_query cuando necesites contexto.\n"
             "Notas van con create_note. Tareas con create_todo.\n"
             "NUNCA digas 'no tengo herramientas'. Siempre tenés +30.\n"
-            "Respuesta breve: 2-3 oraciones, sin tablas enormes."
+            "Respuesta breve: 2-3 oraciones, sin tablas enormes.\n"
+            "CR?TICO ANTI-ALUCINACI?N: NUNCA INVENTES EL RESULTADO DE UNA HERRAMIENTA. Emite el tool_call y ESPERA. No asumas resultados."
         ),
         allowed_tools=ALL_ALLOWED,
         icon="⚙️",
