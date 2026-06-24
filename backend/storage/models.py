@@ -25,6 +25,18 @@ class UserModel(Base):
 
 
 
+class GoogleTokenModel(Base):
+    __tablename__ = "google_tokens"
+    __table_args__ = {"extend_existing": True}
+
+    user_id = Column(String, primary_key=True)
+    refresh_token = Column(String, nullable=False)
+    access_token = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
 class NoteModel(Base):
     __tablename__ = "notes"
     __table_args__ = {"extend_existing": True}

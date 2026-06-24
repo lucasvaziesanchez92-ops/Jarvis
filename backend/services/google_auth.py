@@ -232,93 +232,93 @@ class GoogleAuthService:
         return build("calendar", "v3", credentials=creds)
 
 
-def _get_auth_db_path() -> Path:
-    data_dir = os.environ.get("DATA_DIR", "data")
-    return Path(data_dir) / "google_tokens.db"
-
-
-def _get_auth_conn():
-    db_path = _get_auth_db_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    conn.execute("PRAGMA busy_timeout=5000;")
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS tokens (
-            user_id TEXT PRIMARY KEY,
-            refresh_token TEXT NOT NULL,
-            access_token TEXT,
-            email TEXT,
-            expires_at REAL,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
-    try:
-        conn.execute("ALTER TABLE tokens ADD COLUMN access_token TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute("ALTER TABLE tokens ADD COLUMN expires_at REAL")
-    except sqlite3.OperationalError:
-        pass
-    conn.commit()
-    return conn
-
+# No longer using local SQLite db for tokens. We use backend.storage now.
+from backend.storage import get_store
+from backend.storage.models import GoogleTokenModel
 
 def save_tokens(user_id: str, refresh_token: str, email: str = "", access_token: str = "", expires_at: float = 0):
-    conn = _get_auth_conn()
-    conn.execute(
-        """INSERT OR REPLACE INTO tokens
-           (user_id, refresh_token, access_token, email, expires_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, datetime('now'))""",
-        (user_id, refresh_token, access_token, email, expires_at),
-    )
-    conn.commit()
-    conn.close()
+    store = get_store()
+    session = store.get_session()
+    try:
+        token_entry = session.query(GoogleTokenModel).filter(GoogleTokenModel.user_id == user_id).first()
+        exp_dt = datetime.fromtimestamp(expires_at, timezone.utc) if expires_at else None
+        if token_entry:
+            token_entry.refresh_token = refresh_token
+            token_entry.access_token = access_token
+            token_entry.email = email
+            token_entry.expires_at = exp_dt
+        else:
+            token_entry = GoogleTokenModel(
+                user_id=user_id,
+                refresh_token=refresh_token,
+                access_token=access_token,
+                email=email,
+                expires_at=exp_dt
+            )
+            session.add(token_entry)
+        session.commit()
+    finally:
+        session.close()
 
 
 def _update_access_token_in_db(refresh_token: str, new_access_token: str, new_expires_at: float):
-    conn = _get_auth_conn()
-    conn.execute(
-        "UPDATE tokens SET access_token = ?, expires_at = ?, updated_at = datetime('now') WHERE refresh_token = ?",
-        (new_access_token, new_expires_at, refresh_token),
-    )
-    conn.commit()
-    conn.close()
-    logger.info("Access token actualizado en DB")
+    store = get_store()
+    session = store.get_session()
+    try:
+        token_entry = session.query(GoogleTokenModel).filter(GoogleTokenModel.refresh_token == refresh_token).first()
+        if token_entry:
+            token_entry.access_token = new_access_token
+            token_entry.expires_at = datetime.fromtimestamp(new_expires_at, timezone.utc) if new_expires_at else None
+            session.commit()
+            logger.info("Access token actualizado en DB")
+    finally:
+        session.close()
 
 
 def get_refresh_token(user_id: str) -> Optional[str]:
-    conn = _get_auth_conn()
-    row = conn.execute("SELECT refresh_token FROM tokens WHERE user_id = ?", (user_id,)).fetchone()
-    conn.close()
-    return row[0] if row else None
+    store = get_store()
+    session = store.get_session()
+    try:
+        token_entry = session.query(GoogleTokenModel).filter(GoogleTokenModel.user_id == user_id).first()
+        return token_entry.refresh_token if token_entry else None
+    finally:
+        session.close()
+
 
 
 def get_token_pair(user_id: str) -> tuple[str | None, str | None, float | None]:
-    conn = _get_auth_conn()
-    row = conn.execute(
-        "SELECT refresh_token, access_token, expires_at FROM tokens WHERE user_id = ?", (user_id,)
-    ).fetchone()
-    conn.close()
-    if row:
-        return row[0], row[1], row[2]
-    return None, None, None
+    store = get_store()
+    session = store.get_session()
+    try:
+        token_entry = session.query(GoogleTokenModel).filter(GoogleTokenModel.user_id == user_id).first()
+        if token_entry:
+            exp_float = token_entry.expires_at.timestamp() if token_entry.expires_at else None
+            return token_entry.refresh_token, token_entry.access_token, exp_float
+        return None, None, None
+    finally:
+        session.close()
 
 
-def get_user_info(user_id: str) -> Optional[dict]:
-    conn = _get_auth_conn()
-    row = conn.execute("SELECT user_id, email, created_at FROM tokens WHERE user_id = ?", (user_id,)).fetchone()
-    conn.close()
-    if row:
-        return {"user_id": row[0], "email": row[1], "created_at": row[2]}
-    return None
+
+def get_user_info(user_id: str) -> dict | None:
+    store = get_store()
+    session = store.get_session()
+    try:
+        token_entry = session.query(GoogleTokenModel).filter(GoogleTokenModel.user_id == user_id).first()
+        if not token_entry:
+            return None
+        return {"email": token_entry.email or ""}
+    finally:
+        session.close()
 
 
 def delete_token(user_id: str):
-    conn = _get_auth_conn()
-    conn.execute("DELETE FROM tokens WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    store = get_store()
+    session = store.get_session()
+    try:
+        token_entry = session.query(GoogleTokenModel).filter(GoogleTokenModel.user_id == user_id).first()
+        if token_entry:
+            session.delete(token_entry)
+            session.commit()
+    finally:
+        session.close()
