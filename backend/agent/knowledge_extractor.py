@@ -99,15 +99,25 @@ JSON Format:
         
         # Try to find the JSON object
         json_match = re.search(r'\{\s*"notes".*\}\s*\}', content, re.DOTALL)
+        if not json_match:
+            # Fallback for single quotes or slightly mangled roots
+            json_match = re.search(r'\{\s*\'notes\'.*\}\s*\}', content, re.DOTALL)
+            
         if json_match:
+            raw_json = json_match.group(0)
             try:
-                parsed_data = json.loads(json_match.group(0), strict=False)
+                parsed_data = json.loads(raw_json, strict=False)
             except json.JSONDecodeError:
-                cleaned = json_match.group(0).replace('\n', '\\n').replace('\r', '')
+                import ast
                 try:
-                    parsed_data = json.loads(cleaned, strict=False)
-                except Exception as e:
-                    logger.error(f"Failed to parse cleaned JSON object: {e}")
+                    # ast.literal_eval handles single quotes and python dict strings perfectly
+                    parsed_data = ast.literal_eval(raw_json)
+                except Exception:
+                    cleaned = raw_json.replace('\n', '\\n').replace('\r', '')
+                    try:
+                        parsed_data = json.loads(cleaned, strict=False)
+                    except Exception as e:
+                        logger.error(f"Failed to parse cleaned JSON object: {e}")
         else:
             logger.error("No valid JSON found in extraction.")
 
