@@ -55,8 +55,12 @@ class Settings(BaseSettings):
         if self.groq_api_key and not self.openai_api_key:
             self.openai_api_key = self.groq_api_key
             self.openai_base_url = "https://api.groq.com/openai/v1"
-            self.openai_model = "llama-3.1-8b-instant" # Fast model for voice
+            # llama-3.3-70b-versatile: Groq's best model for reliable function/tool calling.
+            # llama-3.1-8b-instant was causing tools to be emitted as plain text
+            # instead of proper tool_call JSON, making all integrations fail.
+            self.openai_model = "llama-3.3-70b-versatile"
             self.llm_provider = "openai"
+
 
     # Web Search
     tavily_api_key: str | None = Field(default=None, alias="TAVILY_API_KEY")
