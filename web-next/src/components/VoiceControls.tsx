@@ -49,6 +49,9 @@ export default function VoiceControls() {
     setActivityState('thinking')
     const { chatSessionId, persona, showThinkingBubble, hideThinkingBubble, setLastUserText, setLastAssistantText, appendChatMessage } = useJarvisStore.getState()
     
+    // Inmediatamente mostrar feedback visual mientras el WS conecta
+    showThinkingBubble('Subiendo audio al servidor...')
+
     try {
       if (wsRef.current) {
         wsRef.current.close()
