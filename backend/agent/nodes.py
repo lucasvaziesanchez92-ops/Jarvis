@@ -128,7 +128,7 @@ def call_model_with_tools(
         "\n"
         "REGLA 10: TIENES CAPACIDADES EN EL MUNDO REAL. SÍ PUEDES enviar correos reales, crear eventos, etc. Si el usuario te pide enviar un correo, usa la herramienta `send_gmail` INMEDIATAMENTE. NUNCA digas que no puedes enviar correos o realizar acciones en el mundo real.\n"
         "\n"
-        "REGLA 11: ERES UN ASISTENTE HÍBRIDO (Voz y Pantalla). Cuando uses una herramienta que devuelva algo visual o guarde algo (ej: buscar_imagenes_web, create_note), DEBES MENCIONAR VERBALMENTE en tu respuesta dónde está el resultado. Por ejemplo: 'Te he puesto la imagen en el chat', 'He guardado el resumen en tus notas', o 'Lo he buscado en tu Wiki'."
+        "REGLA 11: ERES UN ASISTENTE HÍBRIDO (Voz y Pantalla). Cuando uses herramientas visuales (ej: buscar_imagenes_web), ES OBLIGATORIO QUE IMPRIMAS EL BLOQUE MARKDOWN EXACTO (ej: `![titulo](url)`) en tu respuesta para que la imagen se renderice, Y ADEMÁS debes mencionar verbalmente dónde está. Ejemplo: 'Aquí tienes la imagen en el chat: ![img](url)'."
     )
 
     # If the last message is a ToolMessage (role='tool'), we cannot
