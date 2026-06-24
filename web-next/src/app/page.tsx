@@ -227,12 +227,8 @@ function WelcomeScreen() {
   }
 
   useEffect(() => {
-    if (googleConnected === null) {
-      doCheck()
-    } else {
-      // Background verification without blocking UI
-      checkGoogleAuth(API_BASE)
-    }
+    // ALWAYS verify against backend — localStorage can be stale if backend restarted
+    doCheck()
   }, [])
 
   // Auto-retry every 5 seconds while backend is down
@@ -317,9 +313,12 @@ export default function RootPage() {
 
   useEffect(() => {
     checkGoogleAuth(API_BASE)
-    const t = setTimeout(() => setShowApp(true), 2000)
-    return () => clearTimeout(t)
-  }, [checkGoogleAuth])
+    // Only show app after Google is confirmed connected (not just after 2s timer)
+    if (googleConnected === true) {
+      const t = setTimeout(() => setShowApp(true), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [checkGoogleAuth, googleConnected])
 
   const [showApp, setShowApp] = useState(false)
 
