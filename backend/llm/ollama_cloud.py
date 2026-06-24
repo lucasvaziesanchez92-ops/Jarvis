@@ -33,7 +33,6 @@ def get_llm() -> BaseChatModel:
         max_tokens=2048,
         timeout=httpx.Timeout(connect=15.0, read=90.0, write=15.0, pool=10.0),
         model_kwargs={
-            "frequency_penalty": 1.2,
             # tool_choice removed — was causing "problema de latencia" with
             # devstral-small-2:24b because Ollama Cloud expects tool_choice
             # to be omitted for the model to use its native tool-calling.

@@ -20,9 +20,6 @@ def get_llm():
         "model": settings.openai_model,
         "api_key": settings.openai_api_key,
         "temperature": 0.2,  # low for tool-calling consistency
-        "model_kwargs": {
-            "frequency_penalty": 1.2,
-        },
     }
     if settings.openai_base_url and settings.openai_base_url != "https://api.openai.com/v1":
         kwargs["base_url"] = settings.openai_base_url

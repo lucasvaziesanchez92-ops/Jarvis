@@ -8,7 +8,6 @@ def get_llm() -> BaseChatModel:
     return ChatOllama(
         model=settings.ollama_model,
         base_url=settings.ollama_base_url.rstrip("/"),
-        temperature=0.2,
+        temperature=0.7,
         streaming=True,
-        repeat_penalty=1.2,
     )
