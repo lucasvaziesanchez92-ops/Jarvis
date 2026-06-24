@@ -55,7 +55,9 @@ class WebSocketCallback(BaseCallbackHandler):
         self._emit(type="stream", content=token)
 
     def on_tool_start(self, serialized, input_str, **kw):
-        name = serialized.get("name", "unknown")
+        name = kw.get("name") or serialized.get("name") or "unknown"
+        if isinstance(name, list) and len(name) > 0:
+            name = name[-1]
         self._pending_tools.append(name)
         self._emit(type="tool_start", content=f"Usando {name}...", tool_name=name)
 
