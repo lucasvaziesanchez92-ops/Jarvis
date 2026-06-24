@@ -53,7 +53,6 @@ const markdownComponents: Components = {
         className="rounded-xl border border-white/10 object-cover max-w-full sm:max-w-sm h-48 shadow-lg bg-black/20 my-2" 
         loading="lazy" 
         referrerPolicy="no-referrer"
-        crossOrigin="anonymous"
         onError={(e) => { 
             const target = e.target as HTMLImageElement;
             target.onerror = null;
