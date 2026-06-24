@@ -124,7 +124,9 @@ def call_model_with_tools(
         "REGLA 8: NUNCA ejecutes la misma tool_call dos veces en la misma respuesta. Si ya ejecutaste list_gmail, no la ejecutes de nuevo. "
         "Una tool_call por accion. En paralelo si son independientes.\n"
         "\n"
-        "REGLA 9: SIEMPRE utiliza 'wiki_query' o 'search_memory' de forma proactiva al inicio de la conversación si el usuario menciona proyectos pasados, ideas, o hace preguntas que requieran contexto previo. Demuestra que conectas la información a largo plazo."
+        "REGLA 9: SIEMPRE utiliza 'wiki_query' o 'search_memory' de forma proactiva al inicio de la conversación si el usuario menciona proyectos pasados, ideas, o hace preguntas que requieran contexto previo. Demuestra que conectas la información a largo plazo.\n"
+        "\n"
+        "REGLA 10: TIENES CAPACIDADES EN EL MUNDO REAL. SÍ PUEDES enviar correos reales, crear eventos, etc. Si el usuario te pide enviar un correo, usa la herramienta `send_gmail` INMEDIATAMENTE. NUNCA digas que no puedes enviar correos o realizar acciones en el mundo real."
     )
 
     # If the last message is a ToolMessage (role='tool'), we cannot
