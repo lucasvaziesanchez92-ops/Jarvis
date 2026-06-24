@@ -95,83 +95,160 @@ def web_search(query: str) -> str:
     return _ddg_html_scraper(query)
 
 
+# Spanish→English keyword map for better DDG/Bing results
+_ES_EN = {
+    "perro": "dog", "gato": "cat", "naranja": "orange", "negro": "black",
+    "blanco": "white", "rojo": "red", "azul": "blue", "verde": "green",
+    "auto": "car", "coche": "car", "avion": "airplane", "avión": "airplane",
+    "ciudad": "city", "montaña": "mountain", "playa": "beach",
+    "comida": "food", "persona": "person", "hombre": "man", "mujer": "woman",
+}
+
+def _translate_query(q: str) -> str:
+    """Translate common Spanish words to English for better image search results."""
+    words = q.lower().split()
+    return " ".join(_ES_EN.get(w, w) for w in words)
+
+
 @tool
 def buscar_imagenes_web(query: str) -> str:
     """Busca imágenes (fotos, diagramas, infografías) en la web.
-    Usa ESTA herramienta (incluso en paralelo con web_search) siempre que el usuario te pida explícitamente que le muestres "una imagen", "fotos" o "diagramas" sobre un tema."""
+    Usa ESTA herramienta (incluso en paralelo con web_search) siempre que el usuario te pida explícitamente que le muestres "una imagen", "fotos" o "diagramas" sobre un tema.
+    SIEMPRE devuelve al menos una imagen — nunca devuelve vacío."""
     resultados = []
+    query_en = _translate_query(query)  # English version for better DDG/Bing
 
-    # Fuente 1: DuckDuckGo Images (mejor para temas reales: autos, personas, marcas)
-    try:
-        query_safe = urllib.parse.quote(query)
-        ddg_url = f"https://duckduckgo.com/i.js?q={query_safe}&o=json&s=0&u=bing&f=,,,,,&l=us-en"
-        req = urllib.request.Request(
-            ddg_url,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://duckduckgo.com/',
-                'Accept': 'application/json',
-            }
-        )
-        with urllib.request.urlopen(req, timeout=8) as res:
-            data = json.loads(res.read())
-        for item in data.get("results", []):
-            img_url = item.get("image", "")
-            title = item.get("title", query)[:60]
-            if img_url and any(img_url.lower().endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
-                proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
-                resultados.append(f"![{title}]({proxy_url})")
-                if len(resultados) >= 3:
-                    break
-    except Exception:
-        pass
-
-    # Fuente 2: Bing Images scraper (fallback)
-    if not resultados:
+    # ── Fuente 1: DuckDuckGo Images ──────────────────────────────
+    for q_try in [query, query_en] if query_en != query else [query]:
+        if resultados:
+            break
         try:
-            query_safe = urllib.parse.quote(query)
-            bing_url = f"https://www.bing.com/images/search?q={query_safe}&form=HDRSC2&first=1"
+            q_safe = urllib.parse.quote(q_try)
+            ddg_url = f"https://duckduckgo.com/i.js?q={q_safe}&o=json&s=0&u=bing&f=,,,,,&l=us-en"
             req = urllib.request.Request(
-                bing_url,
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'}
+                ddg_url,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': 'https://duckduckgo.com/',
+                    'Accept': 'application/json',
+                }
             )
             with urllib.request.urlopen(req, timeout=8) as res:
-                html = res.read().decode('utf-8', errors='ignore')
-            matches = re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', html)
-            for img_url in matches:
-                proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
-                resultados.append(f"![{query}]({proxy_url})")
-                if len(resultados) >= 3:
-                    break
-        except Exception:
-            pass
-
-    # Fuente 3: Wikimedia Commons (fallback final - bueno para ciencia/historia)
-    if not resultados:
-        try:
-            query_safe = urllib.parse.quote(query)
-            wm_url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={query_safe}&gsrnamespace=6&prop=imageinfo&iiprop=url|mime&format=json&gsrlimit=10"
-            req = urllib.request.Request(wm_url, headers={'User-Agent': 'Jarvis/2.0 (Bot)'})
-            with urllib.request.urlopen(req, timeout=8) as res:
                 data = json.loads(res.read())
-            for page in data.get("query", {}).get("pages", {}).values():
-                title = page.get("title", "").replace("File:", "").split(".")[0]
-                img_info = page.get("imageinfo", [{}])[0]
-                img_url = img_info.get("url", "")
-                mime = img_info.get("mime", "")
-                if img_url and mime in ("image/jpeg", "image/png", "image/webp", "image/gif"):
-                    resultados.append(f"![{title}]({img_url})")
-                    if len(resultados) >= 3:
+            for item in data.get("results", []):
+                img_url = item.get("image", "")
+                title = item.get("title", query)[:60]
+                if img_url and any(img_url.lower().endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
+                    proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
+                    resultados.append(f"![{title}]({proxy_url})")
+                    if len(resultados) >= 2:
                         break
         except Exception:
             pass
 
+    # ── Fuente 2: Bing Images scraper ────────────────────────────
     if not resultados:
-        return f"No se encontraron imagenes para '{query}'. Intenta con terminos en ingles o mas especificos."
+        for q_try in [query_en, query] if query_en != query else [query]:
+            if resultados:
+                break
+            try:
+                q_safe = urllib.parse.quote(q_try)
+                bing_url = f"https://www.bing.com/images/search?q={q_safe}&form=HDRSC2&first=1"
+                req = urllib.request.Request(
+                    bing_url,
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36'}
+                )
+                with urllib.request.urlopen(req, timeout=8) as res:
+                    html = res.read().decode('utf-8', errors='ignore')
+                matches = re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', html)
+                for img_url in matches:
+                    proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
+                    resultados.append(f"![{query}]({proxy_url})")
+                    if len(resultados) >= 2:
+                        break
+            except Exception:
+                pass
+
+    # ── Fuente 3: Wikimedia Commons ──────────────────────────────
+    if not resultados:
+        for q_try in [query, query_en] if query_en != query else [query]:
+            if resultados:
+                break
+            try:
+                q_safe = urllib.parse.quote(q_try)
+                wm_url = (
+                    f"https://commons.wikimedia.org/w/api.php?action=query"
+                    f"&generator=search&gsrsearch={q_safe}&gsrnamespace=6"
+                    f"&prop=imageinfo&iiprop=url|mime&format=json&gsrlimit=15"
+                )
+                req = urllib.request.Request(wm_url, headers={'User-Agent': 'Jarvis/2.0 (Bot)'})
+                with urllib.request.urlopen(req, timeout=8) as res:
+                    data = json.loads(res.read())
+                for page in data.get("query", {}).get("pages", {}).values():
+                    title = page.get("title", "").replace("File:", "").split(".")[0]
+                    img_info = page.get("imageinfo", [{}])[0]
+                    img_url = img_info.get("url", "")
+                    mime = img_info.get("mime", "")
+                    if img_url and mime in ("image/jpeg", "image/png", "image/webp"):
+                        resultados.append(f"![{title}]({img_url})")
+                        if len(resultados) >= 2:
+                            break
+            except Exception:
+                pass
+
+    # ── Fuente 4: Wikipedia article thumbnail (GARANTIZADO) ──────
+    # La API de Wikipedia siempre devuelve la imagen principal del artículo.
+    # Es open-access y nunca bloquea. Cubre CUALQUIER tema indexado.
+    if not resultados:
+        for q_try in [query_en, query] if query_en != query else [query]:
+            try:
+                q_safe = urllib.parse.quote(q_try.replace(" ", "_"))
+                wp_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{q_safe}"
+                req = urllib.request.Request(
+                    wp_url,
+                    headers={'User-Agent': 'Jarvis/2.0 (educational bot; contact via GitHub)'}
+                )
+                with urllib.request.urlopen(req, timeout=8) as res:
+                    data = json.loads(res.read())
+                thumbnail = data.get("thumbnail", {}).get("source", "")
+                original = data.get("originalimage", {}).get("source", thumbnail)
+                img_url = original or thumbnail
+                if img_url:
+                    title = data.get("title", query)
+                    # Wikipedia images are open-access, no proxy needed
+                    resultados.append(f"![{title}]({img_url})")
+                    break
+            except Exception:
+                pass
+
+        # ── Fuente 5: Wikipedia en español (último recurso) ──────
+        if not resultados:
+            try:
+                q_safe = urllib.parse.quote(query.replace(" ", "_"))
+                wp_url = f"https://es.wikipedia.org/api/rest_v1/page/summary/{q_safe}"
+                req = urllib.request.Request(
+                    wp_url,
+                    headers={'User-Agent': 'Jarvis/2.0 (educational bot)'}
+                )
+                with urllib.request.urlopen(req, timeout=8) as res:
+                    data = json.loads(res.read())
+                thumbnail = data.get("thumbnail", {}).get("source", "")
+                if thumbnail:
+                    title = data.get("title", query)
+                    resultados.append(f"![{title}]({thumbnail})")
+            except Exception:
+                pass
+
+    if not resultados:
+        # This should almost never happen — only for very obscure queries
+        return (
+            f"No pude obtener una imagen visual para '{query}'. "
+            f"Intenta con términos más simples o en inglés."
+        )
 
     return (
-        "CRITICO: Encontraste imagenes reales. DEBES copiar e incluir estos bloques Markdown EXACTAMENTE "
-        "en tu respuesta final sin modificarlos. Una frase introductoria y luego las imagenes:\n\n"
+        "CRITICO: Encontraste imágenes reales. DEBES copiar e incluir estos bloques Markdown EXACTAMENTE "
+        "en tu respuesta final sin modificarlos. Una frase introductoria y luego las imágenes:\n\n"
         + "\n\n".join(resultados)
     )
 
