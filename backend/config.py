@@ -60,11 +60,10 @@ class Settings(BaseSettings):
             if not self.openai_api_key or self.openai_api_key == self.groq_api_key:
                 self.openai_api_key = self.groq_api_key
                 self.openai_base_url = "https://api.groq.com/openai/v1"
-            # llama-3.3-70b-versatile: Groq's best model for reliable function/tool
-            # calling. llama-3.1-8b-instant emitted tools as plain text instead of
-            # proper tool_call JSON, breaking all integrations.
-            if not self.openai_model or self.openai_model.startswith(("gpt-", "devstral", "qwen")):
-                self.openai_model = "llama-3.3-70b-versatile"
+            
+            # Using Qwen3-32b as the absolute best combination of speed and 
+            # intelligence available on Groq for agentic tool calling
+            self.openai_model = "qwen/qwen3-32b"
             self.llm_provider = "openai"
 
 
