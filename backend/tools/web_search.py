@@ -97,8 +97,8 @@ def buscar_imagenes_web(query: str) -> str:
     """Busca imágenes (fotos, diagramas, infografías) en la web.
     Usa ESTA herramienta (incluso en paralelo con web_search) siempre que el usuario te pida explícitamente que le muestres "una imagen", "fotos" o "diagramas" sobre un tema."""
     try:
-        # Forzamos filetype:bitmap para evitar PDFs o documentos
-        query_safe = urllib.parse.quote(f"{query} filetype:bitmap")
+        # Usamos MIME filtering en su lugar para evitar PDFs
+        query_safe = urllib.parse.quote(query)
         url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={query_safe}&gsrnamespace=6&prop=imageinfo&iiprop=url|size|mime&format=json&gsrlimit=10"
         req = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/2.0 (Bot)'})
         with urllib.request.urlopen(req, timeout=10) as res:
