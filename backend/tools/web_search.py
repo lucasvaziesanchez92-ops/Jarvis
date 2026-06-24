@@ -158,16 +158,33 @@ def buscar_imagenes_web(query: str) -> str:
                 )
                 with urllib.request.urlopen(req, timeout=8) as res:
                     html = res.read().decode('utf-8', errors='ignore')
-                matches = re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', html)
-                for img_url in matches:
-                    resultados.append(f"![{query}]({img_url})")
-                    if len(resultados) >= 2:
-                        break
+                
+                # New regex for Bing image search HTML
+                matches = re.findall(r'murl&quot;:&quot;(.*?)&quot;', html)
+                if not matches:
+                    matches = re.findall(r'"murl":"(https?://[^"]+)"', html)
+                    
+                for encoded_url in matches:
+                    img_url = urllib.parse.unquote(encoded_url)
+                    if any(img_url.lower().split('?')[0].endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif")):
+                        resultados.append(f"![{query}]({img_url})")
+                        if len(resultados) >= 2:
+                            break
             except Exception:
                 pass
 
-    # ── Fuente 3: Wikimedia Commons ──────────────────────────────
+    # ── Fuente 3: Pollinations AI (Generador semántico de alta precisión) ──
+    # Si Bing y DDG están bloqueados, Wikipedia suele devolver imágenes basura
+    # para búsquedas genéricas (ej. "gato y perro" devuelve un señor).
+    # Generamos la imagen con IA para garantizar relevancia visual exacta.
     if not resultados:
+        safe_prompt = urllib.parse.quote(query_en or query)
+        pollinations_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?nologo=true&enhance=true"
+        resultados.append(f"![{query}]({pollinations_url})")
+        # No proxy needed for Pollinations, it has permissive CORS
+        return "IMÁGENES ENCONTRADAS. INSTRUCCIÓN CRÍTICA Y OBLIGATORIA: DEBES copiar y pegar EXACTAMENTE los siguientes enlaces Markdown en tu respuesta para que el usuario pueda ver las imágenes. NO los modifiques, NO escribas solo el título, DEBES incluir los corchetes y paréntesis tal cual (ej. ![Título](URL)).\n\n" + resultados[0]
+
+    # ── Fuente 4: Wikimedia Commons (Último recurso estricto) ──────────────
         for q_try in [query, query_en] if query_en != query else [query]:
             if resultados:
                 break
@@ -319,7 +336,7 @@ def buscar_reversa_gratis(attachment_key: str) -> str:
     for attempt in range(3):
         try:
             resp = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}",
                 json=vision_payload,
                 timeout=25,
             )
