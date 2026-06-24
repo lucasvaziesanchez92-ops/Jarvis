@@ -241,7 +241,11 @@ async def ws_chat(websocket: WebSocket):
                 if final_content:
                     final_content = re.sub(r'<thought>.*?</thought>', '', final_content, flags=re.DOTALL)
                     final_content = re.sub(r'<function=.*?</function>', '', final_content, flags=re.DOTALL)
-                    final_content = re.sub(r'<tool_call>.*?</tool_call>', '', final_content, flags=re.DOTALL)
+                    final_content = re.sub(r'\[START_REF\].*?\[END_REF\]', '', final_content, flags=re.DOTALL)
+                    # Limpiar jerga técnica que el LLM no debería mostrar
+                    final_content = re.sub(r'La herramienta \w+ ha sido ejecutada con éxito\.?\s*', '', final_content, flags=re.IGNORECASE)
+                    final_content = re.sub(r'El ToolMessage indica que .*?(?=\.)\. ', '', final_content, flags=re.IGNORECASE | re.DOTALL)
+                    final_content = re.sub(r'La herramienta \w+ ha sido ejecutada con éxito y .*?(?=\.)\. ', '', final_content, flags=re.IGNORECASE | re.DOTALL)
                     final_content = final_content.strip()
                     if final_content:
                         await send(StreamChunk(type="stream", content=final_content))

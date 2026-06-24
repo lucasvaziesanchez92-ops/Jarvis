@@ -370,7 +370,11 @@ async def websocket_voice_stream(websocket: WebSocket):
         texto = texto_crudo
         texto = re.sub(r'<thought>.*?</thought>', '', texto, flags=re.DOTALL)
         texto = re.sub(r'<function=.*?</function>', '', texto, flags=re.DOTALL)
-        texto = re.sub(r'<tool_call>.*?</tool_call>', '', texto, flags=re.DOTALL)
+        texto = re.sub(r'\[START_REF\].*?\[END_REF\]', '', texto, flags=re.DOTALL)
+        # Limpiar jerga técnica que el LLM no debería mostrar
+        texto = re.sub(r'La herramienta \w+ ha sido ejecutada con éxito\.?\s*', '', texto, flags=re.IGNORECASE)
+        texto = re.sub(r'El ToolMessage indica que .*?(?=\.)\. ', '', texto, flags=re.IGNORECASE | re.DOTALL)
+        texto = re.sub(r'La herramienta \w+ ha sido ejecutada con éxito y .*?(?=\.)\. ', '', texto, flags=re.IGNORECASE | re.DOTALL)
         return texto.strip()
 
     def limpiar_texto_para_voz(texto_crudo):
@@ -498,6 +502,9 @@ async def websocket_voice_stream(websocket: WebSocket):
 
             full_response_limpia = limpiar_texto_para_ui(full_response)
             
+            logger.info(f"VOICE DEBUG - full_response crudo: {repr(full_response)}")
+            logger.info(f"VOICE DEBUG - full_response_limpia: {repr(full_response_limpia)}")
+
             _session_history[session_id].append(HumanMessage(content=transcript))
             _session_history[session_id].append(AIMessage(content=full_response_limpia))
             _session_history[session_id] = _prune_history(list(_session_history[session_id]), _MAX_HISTORY)
