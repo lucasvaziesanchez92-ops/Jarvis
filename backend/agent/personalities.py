@@ -41,7 +41,7 @@ class PersonaConfig:
 # ── Tool name shortcuts ──────────────────────────────────────────
 NOTES_TOOLS = ["create_note", "list_notes", "get_note", "update_note", "delete_note"]
 TODOS_TOOLS = ["create_todo", "list_todos", "complete_todo", "update_todo", "delete_todo"]
-WIKI_TOOLS  = ["wiki_query", "wiki_save_research", "wiki_ingest"]
+WIKI_TOOLS  = ["wiki_query", "wiki_capture"]
 TIME_TOOLS  = ["get_current_time", "get_current_date"]
 MEMORY_TOOLS = ["search_memory", "save_memory", "list_memories", "delete_memory"]
 SEARCH_TOOLS = ["web_search", "buscar_imagenes_web", "buscar_reversa_gratis", "search_notes_semantic", "search_wiki_semantic", "search_all_knowledge"]
@@ -50,7 +50,7 @@ CALENDAR_TOOLS = [
     "update_calendar_event", "delete_calendar_event",
     "list_calendar_google", "create_calendar_event_google",
 ]
-EMAIL_TOOLS = ["list_emails", "send_email", "search_emails", "send_email", "list_emails"]
+EMAIL_TOOLS = ["list_emails", "send_email", "search_emails"]
 GMAIL_TOOLS = [
     "list_gmail", "search_gmail", "send_gmail",
     "get_gmail_detail", "delete_gmail_message", "trash_gmail_message",
@@ -231,8 +231,10 @@ def get_persona(name: str) -> PersonaConfig:
     """Obtener configuracion de personalidad por nombre y aplicar reglas globales."""
     base_persona = PERSONALIDADES.get(name, PERSONALIDADES["profesional"])
     
-    # Inyectar reglas globales (RFP, Drive, Markdown links) sin reescribir todo
-    prompt_con_reglas = SYSTEM_RFP_PROMPT + base_persona.system_prompt + DRIVE_SUPER_PROMPT + NARRATIVE_SUPER_PROMPT
+    # Inyectar reglas globales (Drive, Markdown links) sin reescribir todo
+    # SYSTEM_RFP_PROMPT eliminado — tenía info desactualizada (wiki="LanceDB" cuando es ChromaDB)
+    # Las reglas vigentes viven en nodes.py (REGLA 1-15)
+    prompt_con_reglas = base_persona.system_prompt + DRIVE_SUPER_PROMPT + NARRATIVE_SUPER_PROMPT
     
     # Retornar una copia para no mutar el dict original
     return PersonaConfig(
