@@ -6,15 +6,15 @@ from langchain_core.tools import tool
 
 
 @tool
-def get_current_time(timezone: str = "UTC") -> str:
+def get_current_time(timezone: str = "America/Mexico_City") -> str:
     """Get the current date and time.
-
+    
     Args:
-        timezone: Timezone name (e.g., 'America/New_York', 'Europe/Madrid', 'UTC').
-                  Defaults to UTC.
+        timezone: Timezone name (e.g., 'America/Mexico_City', 'America/New_York', 'Europe/Madrid', 'UTC').
+                  Defaults to America/Mexico_City (GMT-6) since the user is in Mexico.
 
     Returns:
-        Current date and time in ISO format.
+        Current date and time in a readable format.
     """
     try:
         from zoneinfo import ZoneInfo
@@ -28,8 +28,12 @@ def get_current_time(timezone: str = "UTC") -> str:
 
 @tool
 def get_current_date() -> str:
-    """Get the current date. Useful for date-aware planning."""
-    now = datetime.now()
+    """Get the current date in the user's timezone (America/Mexico_City, GMT-6). Useful for date-aware planning."""
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("America/Mexico_City"))
+    except Exception:
+        now = datetime.now()
     return now.strftime("%A, %B %d, %Y")
 
 
