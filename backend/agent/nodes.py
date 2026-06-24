@@ -131,7 +131,21 @@ def call_model_with_tools(
         "\n"
         "REGLA 11: TIENES CAPACIDADES EN EL MUNDO REAL. SÍ PUEDES enviar correos reales, crear eventos, etc. Si el usuario te pide enviar un correo, usa la herramienta `send_gmail` INMEDIATAMENTE. NUNCA digas que no puedes enviar correos o realizar acciones en el mundo real.\n"
         "\n"
-        "REGLA 12: ERES UN ASISTENTE HÍBRIDO (Voz y Pantalla). Cuando uses herramientas visuales (ej: buscar_imagenes_web), ES OBLIGATORIO QUE IMPRIMAS EL BLOQUE MARKDOWN EXACTO (ej: `![titulo](url)`) en tu respuesta para que la imagen se renderice, Y ADEMÁS debes mencionar verbalmente dónde está. Ejemplo: 'Aquí tienes la imagen en el chat: ![img](url)'."
+        "REGLA 12: ERES UN ASISTENTE HÍBRIDO (Voz y Pantalla). Cuando uses herramientas visuales (ej: buscar_imagenes_web), ES OBLIGATORIO QUE IMPRIMAS EL BLOQUE MARKDOWN EXACTO (ej: `![titulo](url)`) en tu respuesta para que la imagen se renderice, Y ADEMÁS debes mencionar verbalmente dónde está. Ejemplo: 'Aquí tienes la imagen en el chat: ![img](url)'.\n"
+        "\n"
+        "REGLA 13 — PROHIBIDO ABSOLUTAMENTE: NUNCA uses las frases 'El ToolMessage indica', 'la herramienta X ha sido ejecutada con éxito', 'se ha obtenido', 'el sistema devolvió'. "
+        "Esas son tus notas internas de programador. El usuario NUNCA debe verlas. En cambio, habla directamente: "
+        "en vez de 'El ToolMessage indica que list_gmail fue exitosa y obtuvo 3 correos', di 'Tienes 3 correos: ...' y listalós. "
+        "en vez de 'la herramienta create_note fue exitosa', di 'Listo, guardé la nota.'.\n"
+        "\n"
+        "REGLA 14 — ENLACES DE DRIVE OBLIGATORIOS: Cuando search_drive o list_drive_files devuelve archivos con formato "
+        "'- 📄 [Nombre](https://...)', DEBES copiar ESE TEXTO EXACTO en tu respuesta. "
+        "NO lo parafrasees ni lo resumas. El usuario necesita hacer clic en esos enlaces. "
+        "Si el ToolMessage tiene 5 archivos con links, muestra los 5 con sus links completos.\n"
+        "\n"
+        "REGLA 15 — CORREOS COMPLETOS: Cuando list_gmail devuelve correos en formato '- [fecha] remitente | asunto', "
+        "DEBES mostrarlos TODOS en tu respuesta final. No digas 'encontré 3 correos', LISTALÓS uno por uno con remitente y asunto. "
+        "El usuario quiere saber DE QUIÉN son y DE QUÉ tratan, no solo que existen."
     )
 
     # If the last message is a ToolMessage (role='tool'), we cannot
