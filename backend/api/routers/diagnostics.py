@@ -151,3 +151,70 @@ async def clear_errors():
     """Clear the error log."""
     _error_log.clear()
     return {"cleared": True}
+
+
+@router.post("/nuke_data")
+async def nuke_data():
+    """Wipe all conversations, wiki, notes, and todos. Preserves Google Calendar/Auth."""
+    import os
+    import shutil
+    from loguru import logger
+    from backend.storage import get_store
+    from backend.storage.models import NoteModel, TodoModel, ThreadModel, MessageModel, GraphNodeModel, GraphEdgeModel
+    from backend.services.wiki_engine import _get_collection
+
+    store = get_store()
+    session = store.get_session()
+    try:
+        # Clear SQLite Relational Models
+        session.query(NoteModel).delete()
+        session.query(TodoModel).delete()
+        session.query(ThreadModel).delete()
+        session.query(MessageModel).delete()
+        session.query(GraphNodeModel).delete()
+        session.query(GraphEdgeModel).delete()
+        session.commit()
+        
+        # Clear ChromaDB Wiki
+        try:
+            col = _get_collection()
+            if col.get()["ids"]:
+                col.delete(ids=col.get()["ids"])
+        except Exception as e:
+            logger.warning(f"Error clearing ChromaDB: {e}")
+            
+        # Clear brain directory
+        brain_dir = os.path.join(os.getcwd(), 'backend', 'data', 'brain')
+        if os.path.exists(brain_dir):
+            for item in os.listdir(brain_dir):
+                item_path = os.path.join(brain_dir, item)
+                if os.path.isdir(item_path):
+                    shutil.rmtree(item_path, ignore_errors=True)
+                else:
+                    os.remove(item_path)
+
+        # Clear LanceDB Cache
+        from backend.services.lancedb_cache import get_lancedb_cache
+        try:
+            cache = get_lancedb_cache()
+            if cache and hasattr(cache, 'table') and cache.table:
+                # LanceDB doesn't have a simple wipe, so we drop and recreate
+                cache.db.drop_table("memory_chunks")
+                import pyarrow as pa
+                schema = pa.schema([
+                    pa.field("id", pa.string()),
+                    pa.field("vector", pa.list_(pa.float32(), 384)),
+                    pa.field("text", pa.string()),
+                    pa.field("source", pa.string()),
+                    pa.field("metadata", pa.string())
+                ])
+                cache.table = cache.db.create_table("memory_chunks", schema=schema)
+        except Exception as e:
+            logger.warning(f"Error clearing LanceDB: {e}")
+
+        return {"status": "success", "message": "All conversations, notes, todos, and wiki data have been wiped."}
+    except Exception as e:
+        session.rollback()
+        return {"status": "error", "message": str(e)}
+    finally:
+        session.close()
