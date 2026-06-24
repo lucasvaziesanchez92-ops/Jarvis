@@ -246,6 +246,20 @@ async def ws_chat(websocket: WebSocket):
                     final_content = re.sub(r'La herramienta \w+ ha sido ejecutada con éxito\.?\s*', '', final_content, flags=re.IGNORECASE)
                     final_content = re.sub(r'El ToolMessage indica que .*?(?=\.)\. ', '', final_content, flags=re.IGNORECASE | re.DOTALL)
                     final_content = re.sub(r'La herramienta \w+ ha sido ejecutada con éxito y .*?(?=\.)\. ', '', final_content, flags=re.IGNORECASE | re.DOTALL)
+
+                    # INYECCIÓN DE IMÁGENES: Si buscar_imagenes_web devolvió imágenes en un ToolMessage
+                    # pero el LLM no las incluyó en su respuesta, las inyectamos nosotros al final.
+                    if '!' not in final_content or '](' not in final_content:
+                        for msg in state.get("messages", []):
+                            msg_type = getattr(msg, "type", "")
+                            msg_content = getattr(msg, "content", "")
+                            if msg_type == "tool" and "IMÁGENES ENCONTRADAS" in str(msg_content):
+                                # Extract image markdown blocks from the tool response
+                                img_blocks = re.findall(r'!\[[^\]]*\]\([^)]+\)', str(msg_content))
+                                if img_blocks:
+                                    final_content += "\n\n" + "\n\n".join(img_blocks[:3])
+                                    break
+
                     final_content = final_content.strip()
                     if final_content:
                         await send(StreamChunk(type="stream", content=final_content))
