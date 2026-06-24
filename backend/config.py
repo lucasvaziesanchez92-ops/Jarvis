@@ -51,22 +51,17 @@ class Settings(BaseSettings):
     max_context_messages: int = Field(default=50, alias="MAX_CONTEXT_MESSAGES")
 
     def model_post_init(self, __context):
-        # Auto-configure Groq if GROQ_API_KEY is provided.
-        # This takes priority over the "ollama" default so that Railway works
-        # out-of-the-box when the user sets only GROQ_API_KEY.
-        if self.groq_api_key:
-            # Only override if the user hasn't explicitly configured a different
-            # OpenAI-compatible endpoint (e.g. OpenRouter, Together).
+        # Allow user to use Groq as OpenAI drop-in if they set GROQ_API_KEY
+        # BUT only if they explicitly set LLM_PROVIDER=openai. We should not
+        # hijack the provider if they want to use Ollama.
+        if self.groq_api_key and self.llm_provider == "openai":
             if not self.openai_api_key or self.openai_api_key == self.groq_api_key:
                 self.openai_api_key = self.groq_api_key
                 self.openai_base_url = "https://api.groq.com/openai/v1"
             
-            # llama-3.3-70b-versatile: Groq's best model for reliable function/tool calling.
-            # qwen/qwen3-32b returns empty reasoning tokens instead of tool_calls,
-            # causing the chat to freeze on "Pensando..." forever.
+            # Avoid using Qwen on Groq due to empty reasoning tokens bug
             if not self.openai_model or self.openai_model.startswith(("gpt-", "devstral", "qwen")):
                 self.openai_model = "llama-3.3-70b-versatile"
-            self.llm_provider = "openai"
 
 
     # Web Search
