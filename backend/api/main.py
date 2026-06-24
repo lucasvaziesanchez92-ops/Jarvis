@@ -390,7 +390,14 @@ async def proxy_image(url: str):
     Returns 1x1 transparent PNG on total failure to avoid broken icons."""
     import httpx
     import base64
+    import urllib.parse
     from fastapi.responses import Response
+
+    # FastAPI automatically unquotes the url parameter (e.g. %28 -> '(').
+    # Wikimedia Commons will return 403 if we send raw parentheses. We must re-encode the path.
+    parsed = urllib.parse.urlsplit(url)
+    encoded_path = urllib.parse.quote(parsed.path)
+    safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, encoded_path, parsed.query, parsed.fragment))
 
     ALLOWED_TYPES = ("image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml")
     EMPTY_PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
@@ -403,7 +410,7 @@ async def proxy_image(url: str):
     for ua in USER_AGENTS:
         try:
             async with httpx.AsyncClient(http2=True, timeout=10, follow_redirects=True) as client:
-                resp = await client.get(url, headers={"User-Agent": ua, "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"})
+                resp = await client.get(safe_url, headers={"User-Agent": ua, "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"})
                 if resp.status_code == 200 and len(resp.content) > 100:
                     content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0]
                     if content_type not in ALLOWED_TYPES:
