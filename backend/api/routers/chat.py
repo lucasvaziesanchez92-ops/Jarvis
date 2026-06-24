@@ -263,6 +263,10 @@ async def ws_chat(websocket: WebSocket):
                     final_content = final_content.strip()
                     if final_content:
                         await send(StreamChunk(type="stream", content=final_content))
+                    else:
+                        # If LLM returned empty content (e.g. reasoning-only model),
+                        # send a fallback message instead of leaving the user hanging
+                        await send(StreamChunk(type="stream", content="Lo siento, tuve un problema procesando esa solicitud. ¿Podrías reformularla?"))
                 
                 await send(StreamChunk(type="done"))
 

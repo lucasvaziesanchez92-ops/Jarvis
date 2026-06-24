@@ -61,9 +61,11 @@ class Settings(BaseSettings):
                 self.openai_api_key = self.groq_api_key
                 self.openai_base_url = "https://api.groq.com/openai/v1"
             
-            # Using Qwen3-32b as the absolute best combination of speed and 
-            # intelligence available on Groq for agentic tool calling
-            self.openai_model = "qwen/qwen3-32b"
+            # llama-3.3-70b-versatile: Groq's best model for reliable function/tool calling.
+            # qwen/qwen3-32b returns empty reasoning tokens instead of tool_calls,
+            # causing the chat to freeze on "Pensando..." forever.
+            if not self.openai_model or self.openai_model.startswith(("gpt-", "devstral", "qwen")):
+                self.openai_model = "llama-3.3-70b-versatile"
             self.llm_provider = "openai"
 
 
