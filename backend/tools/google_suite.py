@@ -320,7 +320,7 @@ def analyze_drive_image(file_id: str) -> str:
             return "Error: GEMINI_API_KEY no configurada."
 
         b64 = base64.b64encode(data).decode("ascii")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [
