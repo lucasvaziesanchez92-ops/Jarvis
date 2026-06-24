@@ -9,10 +9,15 @@ from backend.agent.state import JarvisState
 from backend.llm import get_llm
 
 def extract_knowledge(state: JarvisState) -> dict:
-    """Analyze the conversation turn and save findings to the Wiki."""
-    messages = state.get("messages", [])
-    if not messages:
-        return {}
+    """Analyze the conversation turn and save findings to the Wiki.
+    
+    DISABLED: This was creating duplicate junk notes after every single message,
+    flooding the database with notes like '2026-06-24-Resumen', '2026-06-24-Archivos', etc.
+    Re-enabled only for explicit memory saves via save_memory tool.
+    """
+    # Early return — knowledge extraction is disabled to prevent note spam.
+    # The user can explicitly save memories via save_memory tool or create_note.
+    return {}
 
     tools_executed = state.get("tools_executed", [])
     if not tools_executed:
