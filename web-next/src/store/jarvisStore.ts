@@ -112,6 +112,9 @@ export interface JarvisStore {
   googleConnected: boolean | null
   googleEmail: string | null
 
+  /* ── Notes/Wiki ── */
+  activeWikiFile: string | null
+
   /* ── Actions ── */
   setActivityState: (s: ActivityState) => void
   setBrainMode: (mode: string) => void
@@ -157,6 +160,8 @@ export interface JarvisStore {
 
   fetchRemoteThreads: (apiBase: string) => Promise<void>
   loadRemoteThread: (apiBase: string, threadId: string) => Promise<void>
+
+  setActiveWikiFile: (file: string | null) => void
 
   reset: () => void
 }
@@ -205,6 +210,8 @@ export const useJarvisStore = create<JarvisStore>()(
   googleConnected: null,
   googleEmail: null,
 
+  activeWikiFile: null,
+
   /* actions */
   setActivityState: (activityState) => {
     const texts: Record<ActivityState, string> = {
@@ -234,6 +241,8 @@ export const useJarvisStore = create<JarvisStore>()(
   setPanelExpanded: (panelExpanded) => set({ panelExpanded }),
   setBrainMode: (brainMode) => set({ brainMode }),
   setBrainRenderer: (brainRenderer) => set({ brainRenderer }),
+
+  setActiveWikiFile: (activeWikiFile) => set({ activeWikiFile }),
 
   setMicActive: (micActive) => set({ micActive }),
   setVoiceEnabled: (voiceEnabled) => set({ voiceEnabled }),

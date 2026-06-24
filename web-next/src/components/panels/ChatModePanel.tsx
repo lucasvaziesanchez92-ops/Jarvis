@@ -334,7 +334,12 @@ export default function ChatModePanel() {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  useJarvisStore.setState({ currentScreen: 'notes', panelMode: 'notes', panelExpanded: true });
+                                  useJarvisStore.setState({ 
+                                    currentScreen: 'notes', 
+                                    panelMode: 'notes', 
+                                    panelExpanded: true,
+                                    activeWikiFile: noteName
+                                  });
                                 }}
                                 className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 bg-cyan-400/10 px-1 rounded"
                               >

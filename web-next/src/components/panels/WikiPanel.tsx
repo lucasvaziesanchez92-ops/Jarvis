@@ -11,8 +11,12 @@ const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { API_BASE } from '@/lib/api';
+import { useJarvisStore } from '@/store/jarvisStore';
 
 export default function WikiPanel() {
+  const activeWikiFile = useJarvisStore((state) => state.activeWikiFile);
+  const setActiveWikiFile = useJarvisStore((state) => state.setActiveWikiFile);
+
   const [files, setFiles] = useState<any[]>([]);
   const [graphData, setGraphData] = useState<any>({ nodes: [], links: [] });
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -40,6 +44,15 @@ export default function WikiPanel() {
     }
     initWiki();
   }, []);
+
+  useEffect(() => {
+    if (activeWikiFile) {
+      setSelectedFile(activeWikiFile);
+      // Optional: Clear it from the store so it doesn't get stuck, 
+      // but only if we want navigating away and back to reset it.
+      // setActiveWikiFile(null);
+    }
+  }, [activeWikiFile]);
 
   async function fetchStats() {
     try {
