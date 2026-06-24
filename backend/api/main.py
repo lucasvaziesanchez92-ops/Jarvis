@@ -408,6 +408,40 @@ async def brain_page():
         return FileResponse(str(_brain_html))
     return {"status": "ok", "service": "jarvis", "note": "Brain page not built"}
 
+@app.get("/api/v1/proxy-image")
+async def proxy_image(url: str):
+    """Proxy for external images to bypass hotlink protection (DDG, Bing, etc).
+    The tool buscar_imagenes_web generates /api/v1/proxy-image?url=... links.
+    This endpoint fetches the image server-side and returns it to the browser."""
+    import urllib.request
+    import urllib.error
+    from fastapi.responses import Response
+    ALLOWED_TYPES = ("image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml")
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "image/webp,image/png,image/jpeg,*/*",
+                "Referer": "https://duckduckgo.com/",
+            }
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            content_type = resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+            if content_type not in ALLOWED_TYPES:
+                content_type = "image/jpeg"
+            data = resp.read()
+        return Response(
+            content=data,
+            media_type=content_type,
+            headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"},
+        )
+    except Exception as e:
+        logger.warning(f"proxy-image failed for {url[:80]}: {e}")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=502, detail=f"Could not fetch image: {e}")
+
+
 @app.get("/")
 async def root_page():
     """API root -- frontend runs on port 3010."""

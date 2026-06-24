@@ -1,10 +1,13 @@
 """Web Agent PRO — Búsqueda y extracción real sin deadlocks."""
 import asyncio
+import os
 import urllib.request
 import urllib.parse
 import json
 import re
 from langchain_core.tools import tool
+
+_BACKEND_URL = os.getenv("BACKEND_PUBLIC_URL", "https://backend-production-cabf.up.railway.app")
 
 def _wiki_fallback(query: str) -> str:
     try:
@@ -116,7 +119,7 @@ def buscar_imagenes_web(query: str) -> str:
             img_url = item.get("image", "")
             title = item.get("title", query)[:60]
             if img_url and any(img_url.lower().endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
-                proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
+                proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
                 resultados.append(f"![{title}]({proxy_url})")
                 if len(resultados) >= 3:
                     break
@@ -136,7 +139,7 @@ def buscar_imagenes_web(query: str) -> str:
                 html = res.read().decode('utf-8', errors='ignore')
             matches = re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', html)
             for img_url in matches:
-                proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
+                proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
                 resultados.append(f"![{query}]({proxy_url})")
                 if len(resultados) >= 3:
                     break
