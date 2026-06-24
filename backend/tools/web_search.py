@@ -96,40 +96,80 @@ def web_search(query: str) -> str:
 def buscar_imagenes_web(query: str) -> str:
     """Busca imágenes (fotos, diagramas, infografías) en la web.
     Usa ESTA herramienta (incluso en paralelo con web_search) siempre que el usuario te pida explícitamente que le muestres "una imagen", "fotos" o "diagramas" sobre un tema."""
+    resultados = []
+
+    # Fuente 1: DuckDuckGo Images (mejor para temas reales: autos, personas, marcas)
     try:
-        # Usamos MIME filtering en su lugar para evitar PDFs
         query_safe = urllib.parse.quote(query)
-        url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={query_safe}&gsrnamespace=6&prop=imageinfo&iiprop=url|size|mime&format=json&gsrlimit=10"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/2.0 (Bot)'})
-        with urllib.request.urlopen(req, timeout=10) as res:
-            data = json.loads(res.read())
-        
-        pages = data.get("query", {}).get("pages", {})
-        if not pages:
-            return f"No se encontraron imágenes en formato foto/bitmap para '{query}'."
-            
-        resultados = []
-        for page in pages.values():
-            title = page.get("title", "").replace("File:", "").split(".")[0]
-            img_info = page.get("imageinfo", [{}])[0]
-            url_img = img_info.get("url", "")
-            mime = img_info.get("mime", "")
-            
-            # Solo permitimos formatos de imagen puros
-            if url_img and mime in ("image/jpeg", "image/png", "image/webp", "image/gif"):
-                resultados.append(f"**[{title}]({url_img})**\n![{title}]({url_img})")
-                if len(resultados) >= 3: # Limitamos a 3 imágenes buenas
-                    break
-                
-        if not resultados:
-            return f"Se encontraron resultados para '{query}', pero ninguno era una imagen válida (solo documentos)."
-            
-        return (
-            "CRÍTICO: Has encontrado imágenes. DEBES incluirlas en tu respuesta usando UNA SOLA frase introductoria conversacional (ej. 'Aquí tienes las imágenes que solicitaste:') seguida de este bloque exacto de Markdown (no lo repitas ni lo separes):\n\n"
-            + "\n\n".join(resultados)
+        ddg_url = f"https://duckduckgo.com/i.js?q={query_safe}&o=json&s=0&u=bing&f=,,,,,&l=us-en"
+        req = urllib.request.Request(
+            ddg_url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://duckduckgo.com/',
+                'Accept': 'application/json',
+            }
         )
-    except Exception as e:
-        return f"Error buscando imágenes: {str(e)}"
+        with urllib.request.urlopen(req, timeout=8) as res:
+            data = json.loads(res.read())
+        for item in data.get("results", []):
+            img_url = item.get("image", "")
+            title = item.get("title", query)[:60]
+            if img_url and any(img_url.lower().endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp")):
+                resultados.append(f"![{title}]({img_url})")
+                if len(resultados) >= 3:
+                    break
+    except Exception:
+        pass
+
+    # Fuente 2: Bing Images scraper (fallback)
+    if not resultados:
+        try:
+            query_safe = urllib.parse.quote(query)
+            bing_url = f"https://www.bing.com/images/search?q={query_safe}&form=HDRSC2&first=1"
+            req = urllib.request.Request(
+                bing_url,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'}
+            )
+            with urllib.request.urlopen(req, timeout=8) as res:
+                html = res.read().decode('utf-8', errors='ignore')
+            matches = re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', html)
+            for img_url in matches:
+                resultados.append(f"![{query}]({img_url})")
+                if len(resultados) >= 3:
+                    break
+        except Exception:
+            pass
+
+    # Fuente 3: Wikimedia Commons (fallback final - bueno para ciencia/historia)
+    if not resultados:
+        try:
+            query_safe = urllib.parse.quote(query)
+            wm_url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={query_safe}&gsrnamespace=6&prop=imageinfo&iiprop=url|mime&format=json&gsrlimit=10"
+            req = urllib.request.Request(wm_url, headers={'User-Agent': 'Jarvis/2.0 (Bot)'})
+            with urllib.request.urlopen(req, timeout=8) as res:
+                data = json.loads(res.read())
+            for page in data.get("query", {}).get("pages", {}).values():
+                title = page.get("title", "").replace("File:", "").split(".")[0]
+                img_info = page.get("imageinfo", [{}])[0]
+                img_url = img_info.get("url", "")
+                mime = img_info.get("mime", "")
+                if img_url and mime in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+                    resultados.append(f"![{title}]({img_url})")
+                    if len(resultados) >= 3:
+                        break
+        except Exception:
+            pass
+
+    if not resultados:
+        return f"No se encontraron imagenes para '{query}'. Intenta con terminos en ingles o mas especificos."
+
+    return (
+        "CRITICO: Encontraste imagenes reales. DEBES copiar e incluir estos bloques Markdown EXACTAMENTE "
+        "en tu respuesta final sin modificarlos. Una frase introductoria y luego las imagenes:\n\n"
+        + "\n\n".join(resultados)
+    )
+
 
 @tool
 def buscar_reversa_gratis(attachment_key: str) -> str:
