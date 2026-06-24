@@ -97,25 +97,32 @@ def buscar_imagenes_web(query: str) -> str:
     """Busca imágenes (fotos, diagramas, infografías) en la web.
     Usa ESTA herramienta (incluso en paralelo con web_search) siempre que el usuario te pida explícitamente que le muestres "una imagen", "fotos" o "diagramas" sobre un tema."""
     try:
-        url = "https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=" + urllib.parse.quote(query) + "&gsrnamespace=6&prop=imageinfo&iiprop=url|size|mime&format=json&gsrlimit=3"
+        # Forzamos filetype:bitmap para evitar PDFs o documentos
+        query_safe = urllib.parse.quote(f"{query} filetype:bitmap")
+        url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={query_safe}&gsrnamespace=6&prop=imageinfo&iiprop=url|size|mime&format=json&gsrlimit=10"
         req = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/2.0 (Bot)'})
         with urllib.request.urlopen(req, timeout=10) as res:
             data = json.loads(res.read())
         
         pages = data.get("query", {}).get("pages", {})
         if not pages:
-            return f"No se encontraron imágenes para '{query}'."
+            return f"No se encontraron imágenes en formato foto/bitmap para '{query}'."
             
         resultados = []
         for page in pages.values():
             title = page.get("title", "").replace("File:", "").split(".")[0]
             img_info = page.get("imageinfo", [{}])[0]
             url_img = img_info.get("url", "")
-            if url_img:
+            mime = img_info.get("mime", "")
+            
+            # Solo permitimos formatos de imagen puros
+            if url_img and mime in ("image/jpeg", "image/png", "image/webp", "image/gif"):
                 resultados.append(f"**[{title}]({url_img})**\n![{title}]({url_img})")
+                if len(resultados) >= 3: # Limitamos a 3 imágenes buenas
+                    break
                 
         if not resultados:
-            return f"No se pudieron extraer las URLs de las imágenes para '{query}'."
+            return f"Se encontraron resultados para '{query}', pero ninguno era una imagen válida (solo documentos)."
             
         return (
             "CRÍTICO: El usuario solicitó imágenes. DEBES copiar y pegar EXACTAMENTE los siguientes bloques de Markdown en tu respuesta final. "
