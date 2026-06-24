@@ -235,22 +235,10 @@ def buscar_imagenes_web(query: str) -> str:
             except Exception:
                 pass
 
-    # Wrap image URLs with our proxy-image endpoint to bypass hotlink protection (EXCEPT for Wikimedia/Wikipedia, which block Railway IPs but allow browser hotlinking)
-    final_resultados = []
-    for line in resultados:
-        import re
-        match = re.search(r'!\[([^\]]*)\]\((.*?)\)', line)
-        if match:
-            alt = match.group(1)
-            raw_url = match.group(2)
-            # Avoid double proxying and do NOT proxy wikimedia/wikipedia because they block datacenter IPs
-            if "/api/v1/proxy-image" not in raw_url and "wikimedia.org" not in raw_url and "wikipedia.org" not in raw_url:
-                proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(raw_url, safe='')}"
-                final_resultados.append(f"![{alt}]({proxy_url})")
-            else:
-                final_resultados.append(line)
-        else:
-            final_resultados.append(line)
+    # We do NOT proxy images anymore because Railway datacenter IPs get heavily blocked.
+    # The frontend React app will fetch the image directly using the user's browser/IP,
+    # which is almost never blocked for simple hotlinking.
+    final_resultados = resultados
 
     if not final_resultados:
         # This should almost never happen — only for very obscure queries

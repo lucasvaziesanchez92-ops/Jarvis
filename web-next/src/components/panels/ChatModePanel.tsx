@@ -4,10 +4,55 @@ import React, { KeyboardEvent, useRef, useEffect, useState, ChangeEvent } from '
 import { Send, Bot, User, Plus, MessageSquare, Pencil, Trash2, X, History, Paperclip } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import type { Components } from 'react-markdown';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { useJarvisChat } from '@/hooks/useJarvisChat';
 import { cn } from '@/lib/utils';
 import { API_BASE } from '@/lib/api';
+
+const markdownComponents: Components = {
+  a: ({node, href, children, ...props}) => {
+    if (href?.startsWith('#wikilink:')) {
+      const noteName = decodeURIComponent(href.replace('#wikilink:', ''));
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            useJarvisStore.setState({ 
+              currentScreen: 'notes', 
+              panelMode: 'notes', 
+              panelExpanded: true,
+              activeWikiFile: noteName
+            });
+          }}
+          className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 bg-cyan-400/10 px-1 rounded"
+        >
+          {children}
+        </button>
+      );
+    }
+    return <a href={href} {...props} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2" />;
+  },
+  img: ({node, src, alt, ...props}) => {
+    let finalSrc = src;
+    if (typeof src === 'string' && src.startsWith('/api/v1/proxy-image')) {
+      finalSrc = `${API_BASE}${src}`;
+    }
+    return (
+      <img 
+        src={finalSrc} 
+        alt={alt || ''} 
+        {...props} 
+        className="rounded-xl border border-white/10 object-cover max-w-full sm:max-w-sm h-48 shadow-lg bg-black/20 my-2" 
+        loading="lazy" 
+        referrerPolicy="no-referrer"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} 
+      />
+    );
+  }
+};
 
 /* ── ChatModePanel v6 — Historial compacto + input grande ───────────
    Sidebar de historial colapsable, textarea ancho y alto, mensajes
@@ -324,49 +369,7 @@ export default function ChatModePanel() {
                   {msg.role === 'assistant' ? (
                     <ReactMarkdown 
                       remarkPlugins={[remarkGfm]}
-                      components={{
-                        a: ({node, href, children, ...props}) => {
-                          if (href?.startsWith('#wikilink:')) {
-                            const noteName = decodeURIComponent(href.replace('#wikilink:', ''));
-                            return (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  useJarvisStore.setState({ 
-                                    currentScreen: 'notes', 
-                                    panelMode: 'notes', 
-                                    panelExpanded: true,
-                                    activeWikiFile: noteName
-                                  });
-                                }}
-                                className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 bg-cyan-400/10 px-1 rounded"
-                              >
-                                {children}
-                              </button>
-                            );
-                          }
-                          return <a href={href} {...props} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2" />;
-                        },
-                        img: ({node, src, alt, ...props}) => {
-                          let finalSrc = src;
-                          if (typeof src === 'string' && src.startsWith('/api/v1/proxy-image')) {
-                            finalSrc = `${API_BASE}${src}`;
-                          }
-                          return (
-                            <img 
-                              src={finalSrc} 
-                              alt={alt || ''} 
-                              {...props} 
-                              className="rounded-xl border border-white/10 object-cover max-w-full sm:max-w-sm h-48 shadow-lg bg-black/20 my-2" 
-                              loading="lazy" 
-                              referrerPolicy="no-referrer"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} 
-                            />
-                          );
-                        }
-                      }}
+                      components={markdownComponents}
                     >
                       {msg.content.replace(/<thought>[\s\S]*?<\/thought>/g, '').replace(/\[\[(.*?)\]\]/g, (match, p1) => `[${p1}](#wikilink:${encodeURIComponent(p1)})`)}
                     </ReactMarkdown>
