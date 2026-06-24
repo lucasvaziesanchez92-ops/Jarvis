@@ -125,9 +125,8 @@ def buscar_imagenes_web(query: str) -> str:
             return f"Se encontraron resultados para '{query}', pero ninguno era una imagen válida (solo documentos)."
             
         return (
-            "CRÍTICO: El usuario solicitó imágenes. DEBES copiar y pegar EXACTAMENTE los siguientes bloques de Markdown en tu respuesta final. "
-            "NO resumas estas imágenes, NO alteres los URLs y NO inventes imágenes con URLs vacíos como `![]()`. "
-            "COPIA Y PEGA ESTO LITERALMENTE:\n\n" + "\n\n".join(resultados)
+            "CRÍTICO: Has encontrado imágenes. DEBES incluirlas en tu respuesta usando UNA SOLA frase introductoria conversacional (ej. 'Aquí tienes las imágenes que solicitaste:') seguida de este bloque exacto de Markdown (no lo repitas ni lo separes):\n\n"
+            + "\n\n".join(resultados)
         )
     except Exception as e:
         return f"Error buscando imágenes: {str(e)}"
