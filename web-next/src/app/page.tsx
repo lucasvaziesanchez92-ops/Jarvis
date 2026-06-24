@@ -199,20 +199,53 @@ function UnifiedBottomNavbar() {
 /* ── Welcome / Google Auth Screen ──────────────────────────── */
 function WelcomeScreen() {
   const { googleConnected, checkGoogleAuth } = useJarvisStore()
-  // Si ya tenemos el estado persistido en localStorage, no mostramos spinner
   const [checking, setChecking] = useState(googleConnected === null)
+  const [backendDown, setBackendDown] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+
+  const doCheck = async () => {
+    setChecking(true)
+    setBackendDown(false)
+    try {
+      // Timeout of 6s — if the backend is booting from cold start it may take 3-5s
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 6000)
+      const res = await fetch(`${API_BASE}/auth/google/status`, { signal: controller.signal })
+      clearTimeout(timeout)
+      if (res.ok) {
+        const data = await res.json()
+        useJarvisStore.setState({ googleConnected: data.connected })
+      } else {
+        setBackendDown(true)
+      }
+    } catch {
+      // Network error or timeout — backend is waking up
+      setBackendDown(true)
+    } finally {
+      setChecking(false)
+    }
+  }
 
   useEffect(() => {
-    // Solo verificamos contra el backend si NO tenemos estado persistido
     if (googleConnected === null) {
-      checkGoogleAuth(API_BASE).finally(() => setChecking(false))
+      doCheck()
     } else {
-      // Verificamos en segundo plano sin bloquear la UI
+      // Background verification without blocking UI
       checkGoogleAuth(API_BASE)
     }
   }, [])
 
-  if (checking) {
+  // Auto-retry every 5 seconds while backend is down
+  useEffect(() => {
+    if (!backendDown) return
+    const timer = setTimeout(() => {
+      setRetryCount(c => c + 1)
+      doCheck()
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [backendDown, retryCount])
+
+  if (checking && !backendDown) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[#040408]">
         <Loader2 className="h-10 w-10 animate-spin text-cyan-400/60" />
@@ -233,7 +266,23 @@ function WelcomeScreen() {
         <p className="text-sm text-white/50 leading-relaxed">
           Tu asistente personal con Gmail, Drive, Calendar, notas, tareas y búsqueda semántica.
         </p>
-        <p className="text-xs text-white/25">Conectá tu cuenta de Google para empezar.</p>
+        {backendDown ? (
+          <div className="flex flex-col items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 text-amber-400/70">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span className="text-xs tracking-wider">SERVIDOR INICIANDO... ({retryCount > 0 ? `intento ${retryCount}` : 'verificando'})</span>
+            </div>
+            <p className="text-[10px] text-white/20">El backend tarda ~15 segundos en despertar desde Railway</p>
+            <button
+              onClick={doCheck}
+              className="text-xs text-cyan-400/50 hover:text-cyan-400 underline underline-offset-2 transition-colors mt-1"
+            >
+              Reintentar ahora
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-white/25">Conectá tu cuenta de Google para empezar.</p>
+        )}
       </div>
       <a
         href={`${API_BASE}/auth/google/login`}
@@ -254,6 +303,7 @@ function WelcomeScreen() {
     </div>
   )
 }
+
 
 /* ══════════════════════════════════════════════════════════════
    ROOT PAGE — CINEMATIC JARVIS (ADAPTIVE VIEWPORT)

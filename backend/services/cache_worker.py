@@ -8,15 +8,19 @@ from backend.services.drive_service import list_files
 from backend.services.gmail_service import list_emails
 
 class CacheWorker:
-    def __init__(self, interval_seconds=600):
+    def __init__(self, interval_seconds=600, initial_delay_seconds=45):
         self.interval_seconds = interval_seconds
+        self.initial_delay_seconds = initial_delay_seconds
         self.running = False
         self.last_sync_drive = None  # ISO 8601 datetime string
 
     async def start(self):
         """Inicia el ciclo asíncrono del worker en segundo plano."""
         self.running = True
-        logger.info(f"🚀 [CacheWorker] Iniciando Delta Sync de LanceDB cada {self.interval_seconds} segundos.")
+        logger.info(f"🚀 [CacheWorker] Iniciando Delta Sync de LanceDB cada {self.interval_seconds} segundos. Primer sync en {self.initial_delay_seconds}s.")
+        
+        # Wait before first sync so the server is fully ready and accepting requests
+        await asyncio.sleep(self.initial_delay_seconds)
         
         while self.running:
             try:
