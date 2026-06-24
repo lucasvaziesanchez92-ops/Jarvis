@@ -27,8 +27,15 @@ class TextToSpeechService:
 
     def synthesize(self, text: str, output_format: str = "wav", speed: float = 1.0) -> bytes:
         """Sintetiza texto usando Piper TTS si esta instalado, sino usa gTTS."""
-        logger.info(f"Sintetizando: {text[:50]}...")
-        if not text.strip():
+        import re
+        # Limpiar Markdown antes de leer en voz alta
+        clean_text = re.sub(r'!\[.*?\]\(.*?\)', '', text) # Quitar imágenes por completo
+        clean_text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', clean_text) # Dejar solo texto de links
+        clean_text = re.sub(r'```.*?```', ' un bloque de código ', clean_text, flags=re.DOTALL) # Quitar bloques de código
+        clean_text = clean_text.replace('*', '').replace('#', '').replace('⚡', '').replace('✓', '') # Quitar negritas y emojis UI
+        
+        logger.info(f"Sintetizando: {clean_text[:50]}...")
+        if not clean_text.strip():
             return b""
             
         # Intentar con Piper primero (Rápido y Local)
@@ -44,7 +51,7 @@ class TextToSpeechService:
                 
                 # Sintetizar con Piper
                 audio_parts = []
-                for chunk in self._piper_voice.synthesize(text):
+                for chunk in self._piper_voice.synthesize(clean_text):
                     audio_parts.append(chunk.audio_int16_bytes)
                 
                 combined_frames = b"".join(audio_parts)
@@ -64,8 +71,8 @@ class TextToSpeechService:
         # Fallback a gTTS
         try:
             from gtts import gTTS
-            logger.info(f"[gTTS] Fallback para: {text[:50]}...")
-            tts = gTTS(text=text, lang="es", tld="es")
+            logger.info(f"[gTTS] Fallback para: {clean_text[:50]}...")
+            tts = gTTS(text=clean_text, lang="es", tld="es")
             
             fp = io.BytesIO()
             tts.write_to_fp(fp)

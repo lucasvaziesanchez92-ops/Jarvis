@@ -182,14 +182,18 @@ function ensureConnection() {
         const msgs = useJarvisStore.getState().chatMessages;
         const last = msgs[msgs.length - 1];
         if (last && last.role === 'assistant') {
+          let updated = false;
+          const newToolCalls = last.toolCalls?.map(tc => {
+            if (!updated && !tc.output && (!data.tool_name || tc.tool === data.tool_name)) {
+              updated = true;
+              return { ...tc, output: typeof data.tool_output === 'string' ? data.tool_output : JSON.stringify(data.tool_output) };
+            }
+            return tc;
+          });
           useJarvisStore.setState({
             chatMessages: [...msgs.slice(0, -1), {
               ...last,
-              toolCalls: last.toolCalls?.map((tc, i) =>
-                i === (last.toolCalls?.length || 0) - 1
-                  ? { ...tc, output: typeof data.tool_output === 'string' ? data.tool_output : JSON.stringify(data.tool_output) }
-                  : tc
-              ),
+              toolCalls: newToolCalls,
             }]
           });
         }

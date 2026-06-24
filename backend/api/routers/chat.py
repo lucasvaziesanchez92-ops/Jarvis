@@ -65,15 +65,21 @@ class WebSocketCallback(BaseCallbackHandler):
         self._emit(type="tool_start", content=f"Usando {name}...", tool_name=name)
 
     def on_tool_end(self, output, **kw):
+        name = kw.get("name")
+        if not name and self._pending_tools:
+            name = self._pending_tools.pop(0)
         try:
             text = str(output) if not isinstance(output, str) else output
         except Exception:
             text = ""
-        self._emit(type="tool_end", content=text[:200], tool_output=text[:500])
+        self._emit(type="tool_end", content=text[:200], tool_output=text[:500], tool_name=name)
 
     def on_tool_error(self, error: Exception, **kw):
+        name = kw.get("name")
+        if not name and self._pending_tools:
+            name = self._pending_tools.pop(0)
         err_msg = str(error)
-        self._emit(type="tool_end", content=f"Error: {err_msg[:200]}", tool_output=f"Error: {err_msg[:500]}")
+        self._emit(type="tool_end", content=f"Error: {err_msg[:200]}", tool_output=f"Error: {err_msg[:500]}", tool_name=name)
 
 
 async def _keepalive(send_fn, connected_ref):
