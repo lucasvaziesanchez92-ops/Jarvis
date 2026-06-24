@@ -37,8 +37,13 @@ const markdownComponents: Components = {
   },
   img: ({node, src, alt, ...props}) => {
     let finalSrc = src;
-    if (typeof src === 'string' && src.startsWith('/api/v1/proxy-image')) {
-      finalSrc = `${API_BASE}${src}`;
+    // Si la URL viene del proxy, extraer la URL original y usarla directa
+    // con referrerPolicy="no-referrer" para evitar hotlinking block
+    if (typeof src === 'string' && src.includes('/api/v1/proxy-image')) {
+      const urlMatch = src.match(/[?&]url=([^&]+)/);
+      if (urlMatch) {
+        finalSrc = decodeURIComponent(urlMatch[1]);
+      }
     }
     return (
       <img 
@@ -48,6 +53,7 @@ const markdownComponents: Components = {
         className="rounded-xl border border-white/10 object-cover max-w-full sm:max-w-sm h-48 shadow-lg bg-black/20 my-2" 
         loading="lazy" 
         referrerPolicy="no-referrer"
+        crossOrigin="anonymous"
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} 
       />
     );
