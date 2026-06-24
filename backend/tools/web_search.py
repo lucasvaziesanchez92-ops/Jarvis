@@ -173,18 +173,8 @@ def buscar_imagenes_web(query: str) -> str:
             except Exception:
                 pass
 
-    # ── Fuente 3: Pollinations AI (Generador semántico de alta precisión) ──
-    # Si Bing y DDG están bloqueados, Wikipedia suele devolver imágenes basura
-    # para búsquedas genéricas (ej. "gato y perro" devuelve un señor).
-    # Generamos la imagen con IA para garantizar relevancia visual exacta.
+    # ── Fuente 3: Wikimedia Commons (Imágenes Libres) ──────────────
     if not resultados:
-        safe_prompt = urllib.parse.quote(query_en or query)
-        pollinations_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?nologo=true&enhance=true"
-        proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(pollinations_url)}"
-        resultados.append(f"![{query}]({proxy_url})")
-        return "IMÁGENES ENCONTRADAS. INSTRUCCIÓN CRÍTICA Y OBLIGATORIA: DEBES copiar y pegar EXACTAMENTE los siguientes enlaces Markdown en tu respuesta para que el usuario pueda ver las imágenes. NO los modifiques, NO escribas solo el título, DEBES incluir los corchetes y paréntesis tal cual (ej. ![Título](URL)).\n\n" + resultados[0]
-
-    # ── Fuente 4: Wikimedia Commons (Último recurso estricto) ──────────────
         for q_try in [query, query_en] if query_en != query else [query]:
             if resultados:
                 break
