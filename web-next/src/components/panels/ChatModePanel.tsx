@@ -37,10 +37,16 @@ const markdownComponents: Components = {
   },
   img: ({node, src, alt, ...props}) => {
     let finalSrc = src;
-    // Permitir que el proxy funcione (no extraer la URL original), 
-    // pero debemos asegurarnos de que la ruta relativa apunte al BACKEND y no al frontend.
-    if (typeof src === 'string' && src.startsWith('/api/v1/proxy-image')) {
-      finalSrc = `${API_BASE}${src}`;
+    
+    // Forzar TODAS las imágenes (internas o externas) a pasar por el proxy del backend
+    // para evitar bloqueos CORS, bloqueadores de anuncios o hotlinking de DuckDuckGo/Bing.
+    if (typeof src === 'string') {
+      if (src.startsWith('/api/v1/proxy-image')) {
+        finalSrc = `${API_BASE}${src}`;
+      } else if (src.startsWith('http')) {
+        // Envolver la URL externa en el proxy local
+        finalSrc = `${API_BASE}/api/v1/proxy-image?url=${encodeURIComponent(src)}`;
+      }
     }
     
     return (
@@ -53,14 +59,17 @@ const markdownComponents: Components = {
         referrerPolicy="no-referrer"
         onError={(e) => { 
             const target = e.target as HTMLImageElement;
+            // Evitar loop infinito si el SVG también falla
+            if (target.src.includes('data:image')) return;
             target.onerror = null;
+            // SVG de icono de error (gris/rojo)
             target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB4PSIzIiB5PSIzIiB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHJ4PSIyIiByeT0iMiI+PC9yZWN0PjxjaXJjbGUgY3g9IjguNSIgY3k9IjguNSIgcj0iMS41Ij48L2NpcmNsZT48cGF0aCBkPSJNMjEgMTVsLTUtNWwtNSA1LTUtNWwtNSA1Ij48L3BhdGg+PGxpbmUgeDE9IjMiIHkxPSIzIiB4Mj0iMjEiIHkyPSIyMSI+PC9saW5lPjwvc3ZnPg==';
-            target.title = 'El sitio de origen bloqueó la imagen';
+            target.title = 'El sitio de origen bloqueó la imagen (Protección Hotlink)';
             target.className = 'rounded-xl border border-red-500/30 object-contain max-w-full sm:max-w-sm h-32 shadow-lg bg-black/40 my-2 p-8 opacity-50';
           }} 
       />
     );
-  }
+  },}
 };
 
 /* ── ChatModePanel v6 — Historial compacto + input grande ───────────
