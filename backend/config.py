@@ -102,6 +102,9 @@ class Settings(BaseSettings):
         alias="PIPER_MODEL_PATH",
     )
 
+    # Gemini (Vision API for analyze_drive_image)
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
+
 
     rate_limit_default: str = Field(default="100/minute", alias="RATE_LIMIT_DEFAULT")
     rate_limit_chat: str = Field(default="10/minute", alias="RATE_LIMIT_CHAT")
