@@ -79,10 +79,10 @@ def call_model_with_tools(
     # If a tool was actually executed, its ToolMessage will appear in the
     # conversation. Otherwise, the LLM must explicitly say so.
     #
-    # ABSOLUTE RULES — violating any of these is a hallucination that
-    # erodes user trust. These come directly from the user saying
-    # 'JARVIS miente sobre lo que puede hacer, no sirve para nada'.
+    from datetime import datetime, timezone
+    current_time = datetime.now(timezone.utc).strftime("%A, %d %B %Y - %H:%M:%S")
     tool_contract = (
+        f"LA HORA Y FECHA ACTUAL DEL SERVIDOR ES: {current_time} UTC. (Nota: El usuario está en México, GMT-6).\n\n"
         "REGLAS INQUEBRANTABLES — VIOLAR CUALQUIERA ES ALUCINAR:\n"
         "\n"
         "REGLA 1: NUNCA digas 'no dispongo de herramienta', 'no tengo acceso', 'no puedo', 'esa funcion no esta disponible' "
