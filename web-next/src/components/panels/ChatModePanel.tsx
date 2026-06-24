@@ -354,7 +354,7 @@ export default function ChatModePanel() {
                           if (typeof src === 'string' && src.startsWith('/api/v1/proxy-image')) {
                             finalSrc = `${API_BASE}${src}`;
                           }
-                          return <img src={finalSrc} alt={alt || ''} {...props} className="max-w-full rounded-lg my-2" loading="lazy" />;
+                          return <img src={finalSrc} alt={alt || ''} {...props} className="max-w-full rounded-lg my-2" loading="lazy" referrerPolicy="no-referrer" />;
                         }
                       }}
                     >

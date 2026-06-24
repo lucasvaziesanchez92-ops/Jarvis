@@ -253,6 +253,9 @@ export default function WikiPanel() {
                       }
                       
                       return <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline" {...props}>{children}</a>;
+                    },
+                    img: ({node, src, alt, ...props}) => {
+                      return <img src={src} alt={alt || ''} {...props} className="max-w-full rounded-lg my-2" loading="lazy" referrerPolicy="no-referrer" />;
                     }
                   }}
                 >
