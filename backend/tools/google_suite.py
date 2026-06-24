@@ -196,7 +196,7 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                 
         return "\n".join(lines)
     except Exception as e:
-        return str(e)
+        return f"ERROR DE CONEXIÓN O FALLO EN GOOGLE DRIVE: {str(e)}. INSTRUCCIÓN CRÍTICA PARA EL LLM: Debes decirle al usuario exactamente este error. ¡NO inventes ni alucines archivos! Repito, no generes una lista falsa."
 
 
 @tool
@@ -215,7 +215,7 @@ def list_drive_files(max_results: int = 20) -> str:
             lines.append(f"- {ftype} [{f['name']}]({url}){size_str}")
         return "\n".join(lines)
     except Exception as e:
-        return str(e)
+        return f"ERROR DE CONEXIÓN O FALLO EN GOOGLE DRIVE: {str(e)}. INSTRUCCIÓN CRÍTICA PARA EL LLM: Debes decirle al usuario exactamente este error. ¡NO inventes ni alucines archivos! Repito, no generes una lista falsa."
 
 
 @tool

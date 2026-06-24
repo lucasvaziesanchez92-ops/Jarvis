@@ -54,7 +54,13 @@ const markdownComponents: Components = {
         loading="lazy" 
         referrerPolicy="no-referrer"
         crossOrigin="anonymous"
-        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} 
+        onError={(e) => { 
+            const target = e.target as HTMLImageElement;
+            target.onerror = null;
+            target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NjYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB4PSIzIiB5PSIzIiB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHJ4PSIyIiByeT0iMiI+PC9yZWN0PjxjaXJjbGUgY3g9IjguNSIgY3k9IjguNSIgcj0iMS41Ij48L2NpcmNsZT48cGF0aCBkPSJNMjEgMTVsLTUtNWwtNSA1LTUtNWwtNSA1Ij48L3BhdGg+PGxpbmUgeDE9IjMiIHkxPSIzIiB4Mj0iMjEiIHkyPSIyMSI+PC9saW5lPjwvc3ZnPg==';
+            target.title = 'El sitio de origen bloqueó la imagen';
+            target.className = 'rounded-xl border border-red-500/30 object-contain max-w-full sm:max-w-sm h-32 shadow-lg bg-black/40 my-2 p-8 opacity-50';
+          }} 
       />
     );
   }
