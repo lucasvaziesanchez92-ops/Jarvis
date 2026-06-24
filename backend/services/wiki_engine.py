@@ -160,7 +160,48 @@ def index_vault(vault_path: str = VAULT_PATH) -> dict:
     }
 
 
-# ── Search ───────────────────────────────────────────────────────
+def upsert_note(note_id: str, title: str, content: str, tags: list[str] | None = None) -> None:
+    """Efficiently embed and insert a single note without wiping the database."""
+    collection = _get_collection()
+    
+    # 1. Delete old chunks for this note
+    try:
+        results = collection.get(where={"title": title})
+        if results and results["ids"]:
+            collection.delete(ids=results["ids"])
+    except Exception as e:
+        logger.warning(f"Could not delete old note chunks for {title}: {e}")
+
+    if not content:
+        return
+
+    # 2. Chunk and insert
+    chunks = _split_text(content)
+    if not chunks:
+        chunks = [content]
+        
+    ids, documents, metadatas = [], [], []
+    created = datetime.now(timezone.utc).isoformat()
+    
+    for i, chunk in enumerate(chunks):
+        chunk_id = hashlib.md5(f"{note_id}_{i}".encode()).hexdigest()
+        ids.append(chunk_id)
+        documents.append(chunk)
+        metadatas.append({
+            "filepath": f"{title}.md",
+            "filename": f"{title}.md",
+            "title": title,
+            "tags": ", ".join(tags) if tags else "",
+            "links": "",
+            "created": created,
+            "chunk_index": str(i),
+            "chunk_total": str(len(chunks)),
+        })
+        
+    collection.add(ids=ids, documents=documents, metadatas=metadatas)
+    logger.info(f"Note '{title}' upserted with {len(chunks)} chunks.")
+
+# ── Querying ───────────────────────────────────────────────────────
 def search_vault(query: str, n_results: int = 5) -> list[dict]:
     """Semantic search over the wiki vault."""
     collection = _get_collection()

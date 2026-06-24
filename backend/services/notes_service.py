@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 def _sync_to_vector(note_id: str, title: str, content: str, tags: List[str] | None = None):
-    """Sync note to vector store. Triggers a full re-index of the active notes."""
+    """Sync note to vector store using upsert to prevent OOM."""
     try:
-        from backend.services.wiki_engine import index_vault
-        index_vault()
+        from backend.services.wiki_engine import upsert_note
+        upsert_note(note_id=note_id, title=title, content=content, tags=tags)
     except Exception as e:
         logger.warning(f"Vector sync failed for note {note_id}: {e}")
 
