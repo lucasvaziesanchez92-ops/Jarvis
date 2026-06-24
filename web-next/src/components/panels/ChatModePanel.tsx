@@ -37,14 +37,8 @@ const markdownComponents: Components = {
   },
   img: ({node, src, alt, ...props}) => {
     let finalSrc = src;
-    // Si la URL viene del proxy, extraer la URL original y usarla directa
-    // con referrerPolicy="no-referrer" para evitar hotlinking block
-    if (typeof src === 'string' && src.includes('/api/v1/proxy-image')) {
-      const urlMatch = src.match(/[?&]url=([^&]+)/);
-      if (urlMatch) {
-        finalSrc = decodeURIComponent(urlMatch[1]);
-      }
-    }
+    // Permitir que el proxy funcione (no extraer la URL original), 
+    // así el backend hace el fetch y evitamos bloqueos del navegador.
     return (
       <img 
         src={finalSrc} 

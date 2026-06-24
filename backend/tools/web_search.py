@@ -180,8 +180,8 @@ def buscar_imagenes_web(query: str) -> str:
     if not resultados:
         safe_prompt = urllib.parse.quote(query_en or query)
         pollinations_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?nologo=true&enhance=true"
-        resultados.append(f"![{query}]({pollinations_url})")
-        # No proxy needed for Pollinations, it has permissive CORS
+        proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(pollinations_url)}"
+        resultados.append(f"![{query}]({proxy_url})")
         return "IMÁGENES ENCONTRADAS. INSTRUCCIÓN CRÍTICA Y OBLIGATORIA: DEBES copiar y pegar EXACTAMENTE los siguientes enlaces Markdown en tu respuesta para que el usuario pueda ver las imágenes. NO los modifiques, NO escribas solo el título, DEBES incluir los corchetes y paréntesis tal cual (ej. ![Título](URL)).\n\n" + resultados[0]
 
     # ── Fuente 4: Wikimedia Commons (Último recurso estricto) ──────────────
