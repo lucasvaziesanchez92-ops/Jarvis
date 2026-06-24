@@ -38,7 +38,11 @@ const markdownComponents: Components = {
   img: ({node, src, alt, ...props}) => {
     let finalSrc = src;
     // Permitir que el proxy funcione (no extraer la URL original), 
-    // así el backend hace el fetch y evitamos bloqueos del navegador.
+    // pero debemos asegurarnos de que la ruta relativa apunte al BACKEND y no al frontend.
+    if (typeof src === 'string' && src.startsWith('/api/v1/proxy-image')) {
+      finalSrc = `${API_BASE}${src}`;
+    }
+    
     return (
       <img 
         src={finalSrc} 
