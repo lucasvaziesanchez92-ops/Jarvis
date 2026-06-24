@@ -219,37 +219,6 @@ async def google_not_configured_handler(request: Request, exc: GoogleNotConfigur
     )
 
 
-# -- Health Checks ---------------------------------------------
-
-@app.get("/api/v1/proxy-image")
-async def proxy_image(url: str):
-    """Proxy images to bypass hotlinking protection (403) from search engines.
-    Streams the image bytes back to the browser with proper content-type."""
-    import httpx
-    from fastapi.responses import Response
-    try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            resp = await client.get(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "image/*,*/*;q=0.8",
-                },
-            )
-            if resp.status_code == 200 and resp.content:
-                content_type = resp.headers.get("content-type", "image/jpeg")
-                # Only allow image content types for security
-                if not content_type.startswith("image/"):
-                    content_type = "image/jpeg"
-                return Response(
-                    content=resp.content,
-                    media_type=content_type,
-                    headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"},
-                )
-            return JSONResponse(status_code=502, content={"error": f"Upstream returned {resp.status_code}"})
-    except Exception as e:
-        return JSONResponse(status_code=502, content={"error": str(e)})
-
 
 @app.get("/api/v1/health")
 async def health():

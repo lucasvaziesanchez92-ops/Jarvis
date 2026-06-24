@@ -134,7 +134,9 @@ async def upload_file(
         raise HTTPException(400, f"File too large. Max: {MAX_FILE_SIZE / 1024 / 1024}MB")
 
     if not _validate_magic_bytes(content, ext):
-        raise HTTPException(400, f"El contenido del archivo no coincide con la extensión {ext}. Rechazado por seguridad.")
+        # We just log a warning instead of raising an error to avoid breaking UX for screenshots/pasted images
+        import logging
+        logging.getLogger(__name__).warning(f"File {filename} magic bytes do not match extension {ext}.")
 
     key = _generate_key(filename, folder)
 
