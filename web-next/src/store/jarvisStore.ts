@@ -335,14 +335,21 @@ export const useJarvisStore = create<JarvisStore>()(
   setGoogleConnected: (connected, email) => set({ googleConnected: connected, googleEmail: email }),
   checkGoogleAuth: async (apiBase: string) => {
     try {
-      const res = await fetch(`${apiBase}/auth/google/status`)
+      const res = await fetch(`${apiBase}/auth/google/status`, { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         set({ googleConnected: data.connected, googleEmail: data.email || null })
       }
+      // Si el fetch no fue ok pero tampoco lanzó excepción, dejamos el estado actual
     } catch (error) {
-      console.error('Failed to check Google auth status', error)
-      set({ googleConnected: false, googleEmail: null })
+      // CRÍTICO: En caso de error de red, NO borramos el estado persistido.
+      // Si el usuario ya estaba conectado (guardado en localStorage), lo mantenemos.
+      // Solo reseteamos si nunca estuvo conectado.
+      const currentConnected = get().googleConnected
+      if (!currentConnected) {
+        set({ googleConnected: false, googleEmail: null })
+      }
+      console.error('Failed to check Google auth status (keeping persisted state):', error)
     }
   },
 

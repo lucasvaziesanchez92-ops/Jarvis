@@ -199,10 +199,17 @@ function UnifiedBottomNavbar() {
 /* ── Welcome / Google Auth Screen ──────────────────────────── */
 function WelcomeScreen() {
   const { googleConnected, checkGoogleAuth } = useJarvisStore()
-  const [checking, setChecking] = useState(true)
+  // Si ya tenemos el estado persistido en localStorage, no mostramos spinner
+  const [checking, setChecking] = useState(googleConnected === null)
 
   useEffect(() => {
-    checkGoogleAuth(API_BASE).finally(() => setChecking(false))
+    // Solo verificamos contra el backend si NO tenemos estado persistido
+    if (googleConnected === null) {
+      checkGoogleAuth(API_BASE).finally(() => setChecking(false))
+    } else {
+      // Verificamos en segundo plano sin bloquear la UI
+      checkGoogleAuth(API_BASE)
+    }
   }, [])
 
   if (checking) {
