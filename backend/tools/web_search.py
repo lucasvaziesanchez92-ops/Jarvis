@@ -189,8 +189,7 @@ def buscar_imagenes_web(query: str) -> str:
                     img_url = img_info.get("url", "")
                     mime = img_info.get("mime", "")
                     if img_url and mime in ("image/jpeg", "image/png", "image/webp"):
-                        proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
-                        resultados.append(f"![{title}]({proxy_url})")
+                        resultados.append(f"![{title}]({img_url})")
                         if len(resultados) >= 2:
                             break
             except Exception:
@@ -215,8 +214,7 @@ def buscar_imagenes_web(query: str) -> str:
                 img_url = original or thumbnail
                 if img_url:
                     title = data.get("title", query)
-                    proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(img_url, safe='')}"
-                    resultados.append(f"![{title}]({proxy_url})")
+                    resultados.append(f"![{title}]({img_url})")
                     break
             except Exception:
                 pass
@@ -235,22 +233,20 @@ def buscar_imagenes_web(query: str) -> str:
                 thumbnail = data.get("thumbnail", {}).get("source", "")
                 if thumbnail:
                     title = data.get("title", query)
-                    proxy_url = f"/api/v1/proxy-image?url={urllib.parse.quote(thumbnail, safe='')}"
-                    resultados.append(f"![{title}]({proxy_url})")
+                    resultados.append(f"![{title}]({thumbnail})")
             except Exception:
                 pass
 
-    # Wrap all image URLs with our proxy-image endpoint to bypass strict browser Tracking Prevention and CORS
+    # Wrap image URLs with our proxy-image endpoint to bypass hotlink protection (EXCEPT for Wikimedia/Wikipedia, which block Railway IPs but allow browser hotlinking)
     final_resultados = []
     for line in resultados:
-        # Match markdown images: ![Alt](URL)
         import re
         match = re.search(r'!\[([^\]]*)\]\((.*?)\)', line)
         if match:
             alt = match.group(1)
             raw_url = match.group(2)
-            # Avoid double proxying
-            if "/api/v1/proxy-image" not in raw_url:
+            # Avoid double proxying and do NOT proxy wikimedia/wikipedia because they block datacenter IPs
+            if "/api/v1/proxy-image" not in raw_url and "wikimedia.org" not in raw_url and "wikipedia.org" not in raw_url:
                 proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(raw_url, safe='')}"
                 final_resultados.append(f"![{alt}]({proxy_url})")
             else:
