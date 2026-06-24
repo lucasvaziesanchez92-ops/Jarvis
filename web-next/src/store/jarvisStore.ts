@@ -416,6 +416,8 @@ export const useJarvisStore = create<JarvisStore>()(
     // Si lo agregás al partialize, los usuarios con '2d' guardado en localStorage
     // van a seguir viendo el cerebro 2D Canvas apagado en vez del holograma 3D
     chatHistory: state.chatHistory,
+    googleConnected: state.googleConnected,
+    googleEmail: state.googleEmail,
   }),
   // Migración: si hay datos viejos con brainRenderer, lo limpiamos
   onRehydrateStorage: () => (state) => {
