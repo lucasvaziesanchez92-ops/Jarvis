@@ -240,7 +240,25 @@ def buscar_imagenes_web(query: str) -> str:
             except Exception:
                 pass
 
-    if not resultados:
+    # Wrap all image URLs with our proxy-image endpoint to bypass strict browser Tracking Prevention and CORS
+    final_resultados = []
+    for line in resultados:
+        # Match markdown images: ![Alt](URL)
+        import re
+        match = re.search(r'!\[([^\]]*)\]\((.*?)\)', line)
+        if match:
+            alt = match.group(1)
+            raw_url = match.group(2)
+            # Avoid double proxying
+            if "/api/v1/proxy-image" not in raw_url:
+                proxy_url = f"{_BACKEND_URL}/api/v1/proxy-image?url={urllib.parse.quote(raw_url, safe='')}"
+                final_resultados.append(f"![{alt}]({proxy_url})")
+            else:
+                final_resultados.append(line)
+        else:
+            final_resultados.append(line)
+
+    if not final_resultados:
         # This should almost never happen — only for very obscure queries
         return (
             f"No pude obtener una imagen visual para '{query}'. "
@@ -249,7 +267,7 @@ def buscar_imagenes_web(query: str) -> str:
 
     return (
         "IMÁGENES ENCONTRADAS. INSTRUCCIÓN CRÍTICA Y OBLIGATORIA: DEBES copiar y pegar EXACTAMENTE los siguientes enlaces Markdown en tu respuesta para que el usuario pueda ver las imágenes. NO los modifiques, NO escribas solo el título, DEBES incluir los corchetes y paréntesis tal cual (ej. ![Título](URL)).\n\n"
-        + "\n\n".join(resultados)
+        + "\n\n".join(final_resultados)
     )
 
 

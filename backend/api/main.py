@@ -386,62 +386,43 @@ async def brain_page():
 
 @app.get("/api/v1/proxy-image")
 async def proxy_image(url: str):
-    """Proxy for external images to bypass hotlink protection (DDG, Bing, etc).
-    Tries 3 different User-Agents. Returns 1x1 transparent PNG on total failure
-    so the browser shows nothing instead of a broken-image icon."""
-    import urllib.request
+    """Proxy for external images to bypass hotlink protection and tracking prevention.
+    Returns 1x1 transparent PNG on total failure to avoid broken icons."""
+    import httpx
     import base64
     from fastapi.responses import Response
 
     ALLOWED_TYPES = ("image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml")
-    # Transparent 1x1 PNG (fallback so frontend shows nothing, not a broken icon)
-    EMPTY_PNG = base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-    )
+    EMPTY_PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
 
     USER_AGENTS = [
-        # Browser-like
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        # Googlebot (many CDNs whitelist it)
         "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        # Simple wget-like
-        "Wget/1.21.3",
-    ]
-    REFERERS = [
-        "https://duckduckgo.com/",
-        "https://www.google.com/",
-        "",
     ]
 
-    for ua, ref in zip(USER_AGENTS, REFERERS):
+    for ua in USER_AGENTS:
         try:
-            headers = {"User-Agent": ua, "Accept": "image/webp,image/png,image/jpeg,*/*"}
-            if ref:
-                headers["Referer"] = ref
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                content_type = resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
-                if content_type not in ALLOWED_TYPES:
-                    content_type = "image/jpeg"
-                data = resp.read(5 * 1024 * 1024)  # max 5MB
-                if len(data) < 100:  # suspiciously small — probably an error page
-                    continue
-            logger.debug(f"proxy-image ok (UA={ua[:20]}): {url[:60]}")
-            return Response(
-                content=data,
-                media_type=content_type,
-                headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"},
-            )
+            async with httpx.AsyncClient(http2=True, timeout=10, follow_redirects=True) as client:
+                resp = await client.get(url, headers={"User-Agent": ua, "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"})
+                if resp.status_code == 200 and len(resp.content) > 100:
+                    content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0]
+                    if content_type not in ALLOWED_TYPES:
+                        content_type = "image/jpeg"
+                    logger.debug(f"proxy-image ok: {url[:60]}")
+                    return Response(
+                        content=resp.content,
+                        media_type=content_type,
+                        headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"}
+                    )
         except Exception as e:
-            logger.debug(f"proxy-image attempt failed ({ua[:20]}): {e}")
+            logger.debug(f"proxy-image attempt failed: {e}")
             continue
 
-    # All attempts failed — return transparent pixel so no broken icon shows
     logger.warning(f"proxy-image all attempts failed: {url[:80]}")
     return Response(
         content=EMPTY_PNG,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=60", "Access-Control-Allow-Origin": "*"},
+        headers={"Cache-Control": "public, max-age=60", "Access-Control-Allow-Origin": "*"}
     )
 
 
