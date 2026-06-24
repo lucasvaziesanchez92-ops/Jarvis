@@ -164,7 +164,7 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                 + "."
             )
             
-        lines = ["🌐 **[Búsqueda en Vivo]**\nINSTRUCCIÓN OBLIGATORIA: Debes mostrar estos archivos a los usuarios COMO ENLACES CLICKABLES en Markdown, usando este formato exacto: [Nombre del Archivo](URL)"]
+        lines = ["Archivos encontrados en Google Drive (usa el FILE_ID para leer o analizar un archivo):"]
         for f in results:
             ftype = "📁" if f.get("mimeType") == "application/vnd.google-apps.folder" else "📄"
             size = f.get("size", "N/A")
@@ -173,19 +173,23 @@ def search_drive(query: str = "", mime_filter: str = "") -> str:
                     size = f"{int(size)/1024:.1f}KB"
             except Exception:
                 pass
-            # Robust URL: prefer webViewLink, fall back to constructed URL with file ID
             url = f.get("webViewLink", "") or f.get("alternateLink", "")
             if not url and f.get("id"):
                 url = f"https://drive.google.com/file/d/{f['id']}/view"
-            lines.append(f"- {ftype} [{f['name']}]({url}) ({size})" if url else f"- {ftype} {f['name']} ({size})")
+            file_id = f.get("id", "")
+            # Expose FILE_ID explicitly so LLM can pass it directly to read_drive_file
+            if url:
+                lines.append(f"- {ftype} [{f['name']}]({url}) | FILE_ID:{file_id} | {size}")
+            else:
+                lines.append(f"- {ftype} {f['name']} | FILE_ID:{file_id} | {size}")
             
             # Guardar el resultado en la caché para la próxima consulta
-            if ftype == "📄" and query and url:  # Solo cachear archivos (no carpetas) si hubo query
+            if ftype == "📄" and query and url:
                 semantic_cache.guardar_en_cache(
                     categoria="drive",
-                    id_doc=f["id"],
+                    id_doc=file_id,
                     titulo=f["name"],
-                    contenido="", # El contenido completo requeriría descarga, lo dejamos vacío para title search
+                    contenido="",
                     link=url,
                     timestamp=f.get("modifiedTime", "")
                 )
@@ -235,12 +239,20 @@ def list_drive_folder(folder_id: str) -> str:
 
 @tool
 def read_drive_file(file_id: str) -> str:
-    """Read and extract text content from a Google Drive file. Supports PDF, DOCX, XLSX, TXT, CSV, code files, and exports Google Docs/Sheets/Slides. Args: file_id (Drive file ID from list/search results). Returns full text content (up to 15000 chars)."""
+    """Read and extract text content from a Google Drive file.
+    Args: file_id — the raw Drive file ID (e.g. '1aBcDeFg...'). 
+    IMPORTANT: Get this from the FILE_ID shown in search_drive or list_drive_files results.
+    Never pass a URL — only the bare ID string.
+    Supports PDF, DOCX, XLSX, TXT, CSV, and Google Docs/Sheets.
+    Returns full text content (up to 15000 chars)."""
     from backend.services.drive_service import read_file_content
     try:
         return read_file_content(file_id)
     except RuntimeError as e:
-        return str(e)
+        err = str(e)
+        if "not found" in err.lower() or "404" in err:
+            return "No encontré ese archivo en Drive. Asegúrate de usar el FILE_ID exacto del resultado de búsqueda, no el nombre ni la URL."
+        return f"Error al leer el archivo: {err}"
 
 
 @tool

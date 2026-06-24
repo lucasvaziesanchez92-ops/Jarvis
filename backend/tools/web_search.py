@@ -255,75 +255,84 @@ def buscar_imagenes_web(query: str) -> str:
 
 @tool
 def buscar_reversa_gratis(attachment_key: str) -> str:
-    """Búsqueda inversa de imágenes en internet (Google Lens).
-    Usa esta herramienta SIEMPRE que el usuario te pida buscar el origen de una imagen que subió, o analizar un screenshot/foto local buscando coincidencias en la web.
-    Argumentos:
-        attachment_key: La clave (key) del archivo adjunto subido por el usuario (suele venir en tu prompt junto al archivo).
+    """Analiza una imagen que subió el usuario usando visión artificial (Gemini Vision).
+    Identifica qué es el objeto/persona/lugar y busca información sobre él en internet.
+    Usa esta herramienta SIEMPRE que el usuario suba una foto y pida analizarla, identificarla o buscar su precio.
+    Args:
+        attachment_key: La clave del archivo adjunto tal como viene en el contexto del mensaje.
     """
-    import io
+    import base64
+    import os
     import requests
-    import re
-    import json
     from backend.core.storage import download_bytes
 
+    # ── Paso 1: Descargar la imagen del storage ──────────────────
     try:
-        datos_binarios = download_bytes(attachment_key)
+        image_bytes = download_bytes(attachment_key)
     except Exception as e:
-        return f"Error al leer la imagen subida: {str(e)}"
+        return f"No pude acceder a la imagen subida. Error: {e}"
 
-    url_lens = "https://lens.google.com/v3/upload"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    if len(image_bytes) < 100:
+        return "La imagen recibida está vacía o corrupta."
+
+    # ── Paso 2: Identificar con Gemini Vision ────────────────────
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return "GEMINI_API_KEY no configurada. No puedo analizar la imagen."
+
+    b64 = base64.b64encode(image_bytes).decode("ascii")
+    # Detect mime type from magic bytes
+    mime = "image/jpeg"
+    if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+        mime = "image/png"
+    elif image_bytes[:4] == b'RIFF' and image_bytes[8:12] == b'WEBP':
+        mime = "image/webp"
+
+    vision_payload = {
+        "contents": [{
+            "parts": [
+                {"text": (
+                    "Analiza esta imagen con detalle. Responde en español:\n"
+                    "1. ¿Qué objeto, producto, persona o lugar aparece en la imagen?\n"
+                    "2. Describe sus características principales (marca, modelo, color, estado si aplica).\n"
+                    "3. ¿Qué palabras clave usarías para buscar este artículo en Google?\n"
+                    "Sé específico y conciso."
+                )},
+                {"inline_data": {"mime_type": mime, "data": b64}}
+            ]
+        }]
     }
-    
-    archivo_virtual = io.BytesIO(datos_binarios)
-    files = {
-        "encoded_image": ("screenshot.jpg", archivo_virtual, "image/jpeg")
-    }
-    
+
     try:
-        response = requests.post(url_lens, headers=headers, files=files, timeout=10)
-        if response.status_code != 200:
-            return f"Error al conectar con Google Lens: Status {response.status_code}"
-            
-        # Parse output using provided logic
-        patron = r'AF_initDataCallback\s*\(\s*\{\s*key:\s*[\'"]ds:1[\'"].*?data:\s*(\[.+?\])\s*,\s*sideChannel:\s*\{'
-        match = re.search(patron, response.text, re.DOTALL)
-        if not match:
-            return "No se encontraron coincidencias visuales (falló el parser de Lens)."
-            
-        data_raw = json.loads(match.group(1))
-        
-        try:
-            coincidencias_visuales = data_raw[1][1][1][8][8][0][12]
-        except (IndexError, TypeError):
-            return "El formato de respuesta de Google Lens cambió. No se pudo extraer la lista visual."
-
-        resultados_limpios = []
-        for item in coincidencias_visuales:
-            try:
-                titulo = item[3]
-                url_fuente = item[2]
-                url_miniatura = item[0][0]
-                nombre_sitio = item[1][0] if item[1] else "Fuente Web"
-                
-                resultados_limpios.append({
-                    "titulo": f"[{nombre_sitio}] {titulo}",
-                    "url_directa": url_fuente,
-                    "url_imagen": url_miniatura
-                })
-            except (IndexError, TypeError):
-                continue
-                
-        if not resultados_limpios:
-            return "Lo siento, no encontré coincidencias visuales exactas para esta imagen en internet."
-            
-        md = "INSTRUCCIÓN OBLIGATORIA: Muestra exactamente los siguientes resultados de búsqueda inversa al usuario usando Markdown:\n\n### 🔍 Resultados de la Búsqueda Inversa:\n\n"
-        for res in resultados_limpios[:5]:
-            md += f"🔹 **[{res['titulo']}]({res['url_directa']})**\n"
-            md += f"![vista_previa]({res['url_imagen']})\n\n"
-            
-        return md
-        
+        resp = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+            json=vision_payload,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        vision_result = resp.json()
+        description = vision_result["candidates"][0]["content"]["parts"][0]["text"]
     except Exception as e:
-        return f"Error procesando la búsqueda visual inversa: {str(e)}"
+        return f"Error al analizar la imagen con visión artificial: {e}"
+
+    # ── Paso 3: Buscar en web con la descripción ─────────────────
+    # Extract search keywords from vision result (last line of the response)
+    lines = [l.strip() for l in description.split("\n") if l.strip()]
+    search_query = lines[-1] if lines else description[:80]
+    # Clean up common prefixes
+    for prefix in ("3.", "Keywords:", "Palabras clave:", "Búsqueda:"):
+        search_query = search_query.replace(prefix, "").strip()
+
+    web_info = ""
+    try:
+        web_info = _ddg_html_scraper(f"{search_query} precio comprar")
+        if len(web_info) > 1500:
+            web_info = web_info[:1500] + "..."
+    except Exception:
+        pass
+
+    result = (
+        f"**Análisis de la imagen:**\n{description}\n\n"
+        f"**Información encontrada en internet:**\n{web_info if web_info else 'No se encontró información adicional.'}"
+    )
+    return result
