@@ -33,7 +33,7 @@ const markdownComponents: Components = {
         </button>
       );
     }
-    return <a href={href} {...props} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2" />;
+    return <a href={href} {...props} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2">{children}</a>;
   },
   img: ({node, src, alt, ...props}) => {
     let finalSrc = src;
