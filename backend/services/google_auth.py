@@ -79,6 +79,11 @@ def _generate_pkce() -> tuple[str, str]:
     return code_verifier, code_challenge
 
 
+def _get_auth_db_path() -> Path:
+    data_dir = os.environ.get("DATA_DIR", "data")
+    return Path(data_dir) / "google_tokens.db"
+
+
 def _get_pkce_conn():
     db_path = _get_auth_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
