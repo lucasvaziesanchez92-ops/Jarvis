@@ -235,10 +235,21 @@ def buscar_imagenes_web(query: str) -> str:
             except Exception:
                 pass
 
-    # We do NOT proxy images anymore because Railway datacenter IPs get heavily blocked.
-    # The frontend React app will fetch the image directly using the user's browser/IP,
-    # which is almost never blocked for simple hotlinking.
-    final_resultados = resultados
+    # The frontend React app will fetch the image directly, but to avoid 403s
+    # from Wikimedia or Bing due to browser referer policies, we wrap the URL
+    # in DuckDuckGo's external content proxy which is very permissive.
+    final_resultados = []
+    for res in resultados:
+        # Extract title and URL
+        import re
+        m = re.match(r'!\[(.*?)\]\((.*?)\)', res)
+        if m:
+            title, url = m.groups()
+            safe_url = urllib.parse.quote(url)
+            ddg_proxy = f"https://external-content.duckduckgo.com/iu/?u={safe_url}"
+            final_resultados.append(f"![{title}]({ddg_proxy})")
+        else:
+            final_resultados.append(res)
 
     if not final_resultados:
         # This should almost never happen — only for very obscure queries
