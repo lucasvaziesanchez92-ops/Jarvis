@@ -63,9 +63,10 @@ def list_files(query: str = "", max_results: int = 50, folder_id: Optional[str] 
         "pageSize": max_results,
         "fields": "files(id,name,mimeType,size,createdTime,modifiedTime,webViewLink,thumbnailLink,parents)"
     }
-    # Google Drive API doesn't support orderBy when using fullText search
+    # Google Drive API doesn't support orderBy when using fullText search (sometimes)
+    # but we usually want recent files first
     if not query:
-        kwargs["orderBy"] = "folder,name"
+        kwargs["orderBy"] = "modifiedTime desc,name"
 
     results = service.files().list(**kwargs).execute()
     return results.get("files", [])
