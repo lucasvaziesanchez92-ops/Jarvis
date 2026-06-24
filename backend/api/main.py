@@ -409,7 +409,7 @@ async def proxy_image(url: str):
 
     for ua in USER_AGENTS:
         try:
-            async with httpx.AsyncClient(http2=True, timeout=10, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
                 resp = await client.get(safe_url, headers={"User-Agent": ua, "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"})
                 if resp.status_code == 200 and len(resp.content) > 100:
                     content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0]
