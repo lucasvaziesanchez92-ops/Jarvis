@@ -48,8 +48,8 @@ def agent_node(state: JarvisState) -> dict:
 
     if iterations >= MAX_TOOL_ITERATIONS:
         llm = get_llm()
-        executed_context = f"Herramientas ya ejecutadas en esta conversación: {', '.join(tools_executed) if tools_executed else 'ninguna'}. Responde con los resultados obtenidos."
-        stop = SystemMessage(content=f"{executed_context}\nResponde en español natural y breve, ya usaste herramientas.")
+        executed_context = "Ya tienes toda la información de las herramientas en tu contexto. Responde directamente con los resultados obtenidos y consolida todo de forma fluida."
+        stop = SystemMessage(content=f"{executed_context}\nNunca menciones que ejecutaste herramientas ni sus nombres técnicos.")
         response = llm.invoke([stop] + state["messages"])
         return {"messages": [response], "tools_executed": tools_executed}
 

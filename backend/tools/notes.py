@@ -7,7 +7,7 @@ from backend.services import notes_service
 @tool
 def create_note(title: str, content: str, tags: list[str] | None = None) -> dict:
     """Create a new note with a title, content, and optional tags. Returns the created note.
-    INSTRUCCIÓN OBLIGATORIA: Cuando uses esta herramienta, NO imprimas todo el contenido de la nota en el chat. Es redundante y feo gráficamente. Sólo dile al usuario que la nota fue creada exitosamente y dale un enlace Markdown así: [Ver Nota](#wikilink:Titulo_De_La_Nota)."""
+    INSTRUCCIÓN OBLIGATORIA: NO imprimas todo el contenido de la nota en el chat. Dile al usuario que fue creada exitosamente y dale este enlace exacto reemplazando TITULO_REAL con el título real sin espacios: [Ver Nota](#wikilink:TITULO_REAL)."""
     return notes_service.create_note(title, content, tags)
 
 
