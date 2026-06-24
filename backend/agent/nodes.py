@@ -103,7 +103,7 @@ def call_model_with_tools(
         "HERRAMIENTAS DISPONIBLES (solo las que existen — no inventes otras):\n"
         "   - Notas: create_note, list_notes, get_note, update_note, delete_note\n"
         "   - Tareas: create_todo, list_todos, complete_todo, update_todo, delete_todo\n"
-        "   - Memoria: search_memory, save_memory, list_memories, delete_memory\n"
+        "   - Memoria: search_memory, save_memory, list_memories, delete_memory, compact_memory, diagnose_agent, cleanup_agent\n"
         "   - Wiki: wiki_query (busca en tu segundo cerebro ChromaDB), wiki_capture (guarda nueva info)\n"
         "   - Web: web_search, buscar_imagenes_web\n"
         "   - Tiempo: get_current_time, get_current_date\n"

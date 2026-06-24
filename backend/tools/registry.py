@@ -24,7 +24,7 @@ from backend.tools.wiki import wiki_query, wiki_capture
 from backend.tools.utility import get_current_time, get_current_date, calculate_math, get_weather
 
 # Memory
-from backend.tools.memory import search_memory, save_memory, list_memories, delete_memory
+from backend.tools.memory import search_memory, save_memory, list_memories, delete_memory, compact_memory, diagnose_agent, cleanup_agent
 
 # Google Suite (lazy import — requires OAuth)
 try:
@@ -180,6 +180,7 @@ if _STORAGE_TOOLS_IMPORTABLE:
 EXTENDED_TOOLS = [
     search_emails, send_email, list_emails,
     search_memory, save_memory, list_memories, delete_memory,
+    compact_memory, diagnose_agent, cleanup_agent,
 ]
 
 # ── All tools combined, filtered clean ──────────────────────────
