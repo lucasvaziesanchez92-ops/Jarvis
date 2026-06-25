@@ -69,7 +69,7 @@ const markdownComponents: Components = {
           }} 
       />
     );
-  },}
+  }
 };
 
 /* ── ChatModePanel v6 — Historial compacto + input grande ───────────
